@@ -5,7 +5,7 @@ import java.util.Optional;
 import com.instaswipe.model.User;
 import org.springframework.data.mongodb.repository.MongoRepository;
 
-public interface UserRepository extends MongoRepository<User, String> {
+public interface UserRepository extends MongoRepository<User, String>, UserSearchRepository {
 
     Optional<User> findByEmail(String email);
 
