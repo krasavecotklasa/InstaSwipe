@@ -10,26 +10,18 @@ import com.instaswipe.exception.InvalidCredentialsException;
 import com.instaswipe.model.User;
 import com.instaswipe.model.UserProfile;
 import com.instaswipe.repository.UserRepository;
+import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 @Service
+@RequiredArgsConstructor
 public class AuthService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final RefreshTokenService refreshTokenService;
-
-    public AuthService(UserRepository userRepository,
-                       PasswordEncoder passwordEncoder,
-                       JwtService jwtService,
-                       RefreshTokenService refreshTokenService) {
-        this.userRepository = userRepository;
-        this.passwordEncoder = passwordEncoder;
-        this.jwtService = jwtService;
-        this.refreshTokenService = refreshTokenService;
-    }
 
     /** Creates a new account. Fails if the email is already registered. */
     public UserResponse register(RegisterRequest request) {
