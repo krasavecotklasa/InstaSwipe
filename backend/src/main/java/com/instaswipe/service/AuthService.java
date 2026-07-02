@@ -2,7 +2,6 @@ package com.instaswipe.service;
 
 import java.util.Locale;
 
-import com.instaswipe.dto.AuthResponse;
 import com.instaswipe.dto.LoginRequest;
 import com.instaswipe.dto.RegisterRequest;
 import com.instaswipe.dto.UserResponse;
@@ -48,7 +47,7 @@ public class AuthService {
     }
 
     /** Authenticates and issues an access token plus a persisted refresh token. */
-    public AuthResponse login(LoginRequest request) {
+    public AuthSession login(LoginRequest request) {
         String email = normalizeEmail(request.email());
         User user = userRepository.findByEmail(email)
                 .orElseThrow(InvalidCredentialsException::new);
@@ -57,7 +56,25 @@ public class AuthService {
         }
         String accessToken = jwtService.generateAccessToken(user);
         String refreshToken = refreshTokenService.issue(user.getId());
-        return new AuthResponse(accessToken, refreshToken, new UserResponse(user.getId(), user.getEmail()));
+        return new AuthSession(accessToken, refreshToken, new UserResponse(user.getId(), user.getEmail()));
+    }
+
+    public AuthSession refresh(String refreshToken) {
+        try {
+            String userId = refreshTokenService.userIdForValidToken(refreshToken);
+            User user = userRepository.findById(userId)
+                    .orElseThrow(InvalidCredentialsException::new);
+            RefreshTokenService.TokenRotation rotation = refreshTokenService.rotate(refreshToken);
+            String accessToken = jwtService.generateAccessToken(user);
+            return new AuthSession(accessToken, rotation.refreshToken(),
+                    new UserResponse(user.getId(), user.getEmail()));
+        } catch (IllegalArgumentException ex) {
+            throw new InvalidCredentialsException();
+        }
+    }
+
+    public void logout(String refreshToken) {
+        refreshTokenService.revoke(refreshToken);
     }
 
     private String normalizeEmail(String email) {

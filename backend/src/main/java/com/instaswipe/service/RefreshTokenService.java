@@ -43,6 +43,34 @@ public class RefreshTokenService {
         return rawToken;
     }
 
+    public TokenRotation rotate(String rawToken) {
+        RefreshToken current = requireValid(rawToken);
+        current.setRevoked(true);
+        refreshTokenRepository.save(current);
+        return new TokenRotation(current.getUserId(), issue(current.getUserId()));
+    }
+
+    public String userIdForValidToken(String rawToken) {
+        return requireValid(rawToken).getUserId();
+    }
+
+    public void revoke(String rawToken) {
+        refreshTokenRepository.findByTokenHash(hash(rawToken))
+                .ifPresent(token -> {
+                    token.setRevoked(true);
+                    refreshTokenRepository.save(token);
+                });
+    }
+
+    private RefreshToken requireValid(String rawToken) {
+        RefreshToken token = refreshTokenRepository.findByTokenHash(hash(rawToken))
+                .orElseThrow(IllegalArgumentException::new);
+        if (token.isRevoked() || token.getExpiresAt() == null || !token.getExpiresAt().isAfter(Instant.now())) {
+            throw new IllegalArgumentException();
+        }
+        return token;
+    }
+
     private String generateRawToken() {
         byte[] bytes = new byte[TOKEN_BYTES];
         secureRandom.nextBytes(bytes);
@@ -57,5 +85,8 @@ public class RefreshTokenService {
         } catch (NoSuchAlgorithmException e) {
             throw new IllegalStateException("SHA-256 not available", e);
         }
+    }
+
+    public record TokenRotation(String userId, String refreshToken) {
     }
 }
