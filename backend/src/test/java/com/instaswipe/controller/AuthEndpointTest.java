@@ -8,6 +8,7 @@ import com.instaswipe.TestcontainersConfiguration;
 import com.instaswipe.dto.AuthResponse;
 import com.instaswipe.dto.LoginRequest;
 import com.instaswipe.dto.RegisterRequest;
+import com.instaswipe.dto.TokenRequest;
 import com.instaswipe.dto.UserResponse;
 import com.instaswipe.model.RefreshToken;
 import com.instaswipe.model.Role;
@@ -15,6 +16,7 @@ import com.instaswipe.model.User;
 import com.instaswipe.repository.RefreshTokenRepository;
 import com.instaswipe.repository.UserRepository;
 import com.instaswipe.service.JwtService;
+import com.instaswipe.service.RefreshTokenService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -60,12 +62,17 @@ class AuthEndpointTest {
     }
 
     private <T> HttpResult<T> post(String uri, Object requestBody, Class<T> responseType) {
-        return client.post().uri(uri)
-                .contentType(MediaType.APPLICATION_JSON)
-                .body(requestBody)
+        RestClient.RequestBodySpec spec = client.post().uri(uri)
+                .contentType(MediaType.APPLICATION_JSON);
+        if (requestBody != null) {
+            spec.body(requestBody);
+        }
+        return spec
                 .exchange((request, response) -> new HttpResult<>(
                         response.getStatusCode(),
-                        response.getStatusCode().is2xxSuccessful() ? response.bodyTo(responseType) : null));
+                        response.getStatusCode().is2xxSuccessful() && responseType != Void.class
+                                ? response.bodyTo(responseType)
+                                : null));
     }
 
     @Test
@@ -123,7 +130,53 @@ class AuthEndpointTest {
 
         List<RefreshToken> stored = refreshTokenRepository.findByUserId(userId);
         assertThat(stored).hasSize(1);
+        assertThat(stored.get(0).getTokenHash()).isEqualTo(RefreshTokenService.hash(body.refreshToken()));
         assertThat(stored.get(0).getTokenHash()).isNotEqualTo(body.refreshToken());
+    }
+
+    @Test
+    void refreshRotatesRefreshTokenAndReturnsNewTokens() {
+        post("/api/auth/register",
+                new RegisterRequest("refresh@example.com", "password123", "Ada"), UserResponse.class);
+        HttpResult<AuthResponse> login = post("/api/auth/login",
+                new LoginRequest("refresh@example.com", "password123"), AuthResponse.class);
+        String oldRefreshToken = login.body().refreshToken();
+
+        HttpResult<AuthResponse> refreshed = post("/api/auth/refresh",
+                new TokenRequest(oldRefreshToken), AuthResponse.class);
+
+        assertThat(refreshed.status().value()).isEqualTo(200);
+        assertThat(refreshed.body().user().email()).isEqualTo("refresh@example.com");
+        String newRefreshToken = refreshed.body().refreshToken();
+        assertThat(newRefreshToken).isNotEqualTo(oldRefreshToken);
+        assertThat(refreshed.body().accessToken()).isNotBlank();
+
+        List<RefreshToken> stored = refreshTokenRepository.findByUserId(refreshed.body().user().id());
+        assertThat(stored).hasSize(2);
+        assertThat(stored).anySatisfy(token -> {
+            assertThat(token.getTokenHash()).isEqualTo(RefreshTokenService.hash(oldRefreshToken));
+            assertThat(token.isRevoked()).isTrue();
+        });
+        assertThat(stored).anySatisfy(token -> {
+            assertThat(token.getTokenHash()).isEqualTo(RefreshTokenService.hash(newRefreshToken));
+            assertThat(token.isRevoked()).isFalse();
+        });
+    }
+
+    @Test
+    void logoutRevokesRefreshToken() {
+        post("/api/auth/register",
+                new RegisterRequest("logout@example.com", "password123", "Ada"), UserResponse.class);
+        HttpResult<AuthResponse> login = post("/api/auth/login",
+                new LoginRequest("logout@example.com", "password123"), AuthResponse.class);
+        String refreshToken = login.body().refreshToken();
+
+        HttpResult<Void> logout = post("/api/auth/logout", new TokenRequest(refreshToken), Void.class);
+
+        assertThat(logout.status().value()).isEqualTo(204);
+        RefreshToken stored = refreshTokenRepository.findByTokenHash(RefreshTokenService.hash(refreshToken))
+                .orElseThrow();
+        assertThat(stored.isRevoked()).isTrue();
     }
 
     @Test
