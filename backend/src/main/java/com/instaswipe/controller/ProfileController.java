@@ -40,7 +40,9 @@ public class ProfileController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<PublicProfileResponse> getPublicProfile(@PathVariable("id") String targetUserId) {
-        return ResponseEntity.ok(profileService.getPublicProfile(targetUserId));
+    public ResponseEntity<PublicProfileResponse> getPublicProfile(
+            @AuthenticationPrincipal String requesterId,
+            @PathVariable("id") String targetUserId) {
+        return ResponseEntity.ok(profileService.getPublicProfile(requesterId, targetUserId));
     }
 }

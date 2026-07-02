@@ -82,15 +82,18 @@ public class ProfileService {
         );
     }
 
-    public PublicProfileResponse getPublicProfile(String targetUserId) {
+    public PublicProfileResponse getPublicProfile(String requesterId, String targetUserId) {
         User targetUser = getUserOrThrow(targetUserId);
         UserProfile profile = targetUser.getProfile();
 
-        if (profile == null) {
-            throw new IllegalArgumentException("Requested profile does not exist or is incomplete.");
+        boolean self = targetUser.getId().equals(requesterId);
+        // Only expose enabled, fully-onboarded (discoverable) profiles to other users. A uniform
+        // "not found" for missing / banned / incomplete targets avoids leaking who exists.
+        if (profile == null || (!self && (!targetUser.isEnabled() || !isDiscoverable(profile)))) {
+            throw new IllegalArgumentException("Profile not available");
         }
 
-        // Calculate age dynamically from birthdate
+        // Calculate age dynamically from birthdate (the raw birth date is never exposed publicly)
         int age = 0;
         if (profile.getBirthDate() != null) {
             age = Period.between(profile.getBirthDate(), LocalDate.now()).getYears();
@@ -108,8 +111,16 @@ public class ProfileService {
         );
     }
 
+    private boolean isDiscoverable(UserProfile profile) {
+        return profile != null
+                && profile.getName() != null
+                && profile.getBirthDate() != null
+                && profile.getGender() != null
+                && profile.getProfilePictureUrl() != null;
+    }
+
     private User getUserOrThrow(String userId) {
         return userRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("User not found with email: " + userId));
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
     }
 }

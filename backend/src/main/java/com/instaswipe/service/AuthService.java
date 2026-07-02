@@ -23,11 +23,16 @@ public class AuthService {
     private final JwtService jwtService;
     private final RefreshTokenService refreshTokenService;
 
+    // A valid BCrypt hash compared against on login misses so response time does not reveal
+    // whether an account exists (mitigates user enumeration via a timing side channel).
+    private static final String DUMMY_PASSWORD_HASH =
+            "$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy";
+
     /** Creates a new account. Fails if the email is already registered. */
     public UserResponse register(RegisterRequest request) {
         String email = normalizeEmail(request.email());
         if (userRepository.existsByEmail(email)) {
-            throw new EmailAlreadyUsedException(email);
+            throw new EmailAlreadyUsedException();
         }
         User user = User.builder()
                 .email(email)
@@ -41,9 +46,13 @@ public class AuthService {
     /** Authenticates and issues an access token plus a persisted refresh token. */
     public AuthSession login(LoginRequest request) {
         String email = normalizeEmail(request.email());
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(InvalidCredentialsException::new);
-        if (!user.isEnabled() || !passwordEncoder.matches(request.password(), user.getPasswordHash())) {
+        User user = userRepository.findByEmail(email).orElse(null);
+        if (user == null) {
+            // Run a comparison anyway so timing does not reveal whether the email exists.
+            passwordEncoder.matches(request.password(), DUMMY_PASSWORD_HASH);
+            throw new InvalidCredentialsException();
+        }
+        if (!passwordEncoder.matches(request.password(), user.getPasswordHash()) || !user.isEnabled()) {
             throw new InvalidCredentialsException();
         }
         String accessToken = jwtService.generateAccessToken(user);

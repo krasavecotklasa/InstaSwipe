@@ -42,7 +42,7 @@ class UserRepositoryTest extends AbstractMongoRepositoryTest {
         assertThat(found.getEmail()).isEqualTo("ada@example.com");
         assertThat(found.getRoles()).containsExactly(Role.USER);
         assertThat(found.isEnabled()).isTrue();
-        assertThat(found.isEmailVerified()).isFalse();
+        assertThat(found.isEmailVerified()).isTrue();
         assertThat(found.getProfile().getName()).isEqualTo("Ada");
         assertThat(found.getProfile().getGender()).isEqualTo(Gender.FEMALE);
         assertThat(found.getProfile().getProfilePictureUrl()).isEqualTo("ada.jpg");

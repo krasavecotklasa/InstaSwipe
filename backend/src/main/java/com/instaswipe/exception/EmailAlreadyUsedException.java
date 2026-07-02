@@ -2,7 +2,8 @@ package com.instaswipe.exception;
 
 public class EmailAlreadyUsedException extends RuntimeException {
 
-    public EmailAlreadyUsedException(String email) {
-        super("Email already in use: " + email);
+    public EmailAlreadyUsedException() {
+        // Deliberately generic: does not echo the submitted email back to the caller.
+        super("Email is already in use");
     }
 }

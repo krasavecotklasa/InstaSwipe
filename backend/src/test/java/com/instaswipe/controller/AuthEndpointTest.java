@@ -78,7 +78,7 @@ class AuthEndpointTest {
     @Test
     void registerCreatesUserWithHashedPassword() {
         HttpResult<UserResponse> result = post("/api/auth/register",
-                new RegisterRequest("New@Example.com", "password123", "Ada"), UserResponse.class);
+                new RegisterRequest("New@Example.com", "Password123!", "Ada"), UserResponse.class);
 
         assertThat(result.status().value()).isEqualTo(201);
         assertThat(result.body()).isNotNull();
@@ -86,15 +86,15 @@ class AuthEndpointTest {
         assertThat(result.body().id()).isNotBlank();
 
         User saved = userRepository.findByEmail("new@example.com").orElseThrow();
-        assertThat(saved.getPasswordHash()).isNotEqualTo("password123");
-        assertThat(passwordEncoder.matches("password123", saved.getPasswordHash())).isTrue();
+        assertThat(saved.getPasswordHash()).isNotEqualTo("Password123!");
+        assertThat(passwordEncoder.matches("Password123!", saved.getPasswordHash())).isTrue();
         assertThat(saved.getRoles()).containsExactly(Role.USER);
         assertThat(saved.getProfile().getName()).isEqualTo("Ada");
     }
 
     @Test
     void registerRejectsDuplicateEmail() {
-        RegisterRequest request = new RegisterRequest("dupe@example.com", "password123", "Dee");
+        RegisterRequest request = new RegisterRequest("dupe@example.com", "Password123!", "Dee");
         post("/api/auth/register", request, UserResponse.class);
 
         HttpResult<UserResponse> second = post("/api/auth/register", request, UserResponse.class);
@@ -113,10 +113,10 @@ class AuthEndpointTest {
     @Test
     void loginReturnsAccessAndRefreshTokens() {
         post("/api/auth/register",
-                new RegisterRequest("ada@example.com", "password123", "Ada"), UserResponse.class);
+                new RegisterRequest("ada@example.com", "Password123!", "Ada"), UserResponse.class);
 
         HttpResult<AuthResponse> result = post("/api/auth/login",
-                new LoginRequest("ada@example.com", "password123"), AuthResponse.class);
+                new LoginRequest("ada@example.com", "Password123!"), AuthResponse.class);
 
         assertThat(result.status().value()).isEqualTo(200);
         AuthResponse body = result.body();
@@ -137,9 +137,9 @@ class AuthEndpointTest {
     @Test
     void refreshRotatesRefreshTokenAndReturnsNewTokens() {
         post("/api/auth/register",
-                new RegisterRequest("refresh@example.com", "password123", "Ada"), UserResponse.class);
+                new RegisterRequest("refresh@example.com", "Password123!", "Ada"), UserResponse.class);
         HttpResult<AuthResponse> login = post("/api/auth/login",
-                new LoginRequest("refresh@example.com", "password123"), AuthResponse.class);
+                new LoginRequest("refresh@example.com", "Password123!"), AuthResponse.class);
         String oldRefreshToken = login.body().refreshToken();
 
         HttpResult<AuthResponse> refreshed = post("/api/auth/refresh",
@@ -166,9 +166,9 @@ class AuthEndpointTest {
     @Test
     void logoutRevokesRefreshToken() {
         post("/api/auth/register",
-                new RegisterRequest("logout@example.com", "password123", "Ada"), UserResponse.class);
+                new RegisterRequest("logout@example.com", "Password123!", "Ada"), UserResponse.class);
         HttpResult<AuthResponse> login = post("/api/auth/login",
-                new LoginRequest("logout@example.com", "password123"), AuthResponse.class);
+                new LoginRequest("logout@example.com", "Password123!"), AuthResponse.class);
         String refreshToken = login.body().refreshToken();
 
         HttpResult<Void> logout = post("/api/auth/logout", new TokenRequest(refreshToken), Void.class);
@@ -182,7 +182,7 @@ class AuthEndpointTest {
     @Test
     void loginRejectsWrongPassword() {
         post("/api/auth/register",
-                new RegisterRequest("bob@example.com", "password123", "Bob"), UserResponse.class);
+                new RegisterRequest("bob@example.com", "Password123!", "Bob"), UserResponse.class);
 
         HttpResult<AuthResponse> result = post("/api/auth/login",
                 new LoginRequest("bob@example.com", "wrongpass1"), AuthResponse.class);
@@ -193,7 +193,7 @@ class AuthEndpointTest {
     @Test
     void loginRejectsUnknownEmail() {
         HttpResult<AuthResponse> result = post("/api/auth/login",
-                new LoginRequest("nobody@example.com", "password123"), AuthResponse.class);
+                new LoginRequest("nobody@example.com", "Password123!"), AuthResponse.class);
 
         assertThat(result.status().value()).isEqualTo(401);
     }

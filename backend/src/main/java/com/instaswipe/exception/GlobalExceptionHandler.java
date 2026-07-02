@@ -32,4 +32,11 @@ public class GlobalExceptionHandler {
         return ApiError.of(HttpStatus.BAD_REQUEST.value(),
                 message.isBlank() ? "Validation failed" : message);
     }
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    @ResponseStatus(HttpStatus.NOT_FOUND)
+    public ApiError handleNotFound(IllegalArgumentException ex) {
+        // Generic message: never echo identifiers back, and don't leak a stack trace as a 500.
+        return ApiError.of(HttpStatus.NOT_FOUND.value(), "Resource not found");
+    }
 }
