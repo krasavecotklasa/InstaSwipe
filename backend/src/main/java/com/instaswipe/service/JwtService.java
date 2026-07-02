@@ -11,6 +11,7 @@ import javax.crypto.SecretKey;
 import com.instaswipe.config.JwtProperties;
 import com.instaswipe.model.Role;
 import com.instaswipe.model.User;
+import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.stereotype.Service;
@@ -22,7 +23,14 @@ public class JwtService {
     private final Duration accessExpiration;
 
     public JwtService(JwtProperties properties) {
-        this.key = Keys.hmacShaKeyFor(properties.secret().getBytes(StandardCharsets.UTF_8));
+        String secret = properties.secret();
+        if (secret == null || secret.isBlank()) {
+            throw new IllegalStateException(
+                    "app.jwt.secret must be configured (set the APP_JWT_SECRET environment variable "
+                            + "to a random 32+ byte value)");
+        }
+        // hmacShaKeyFor rejects keys shorter than 256 bits, enforcing minimum length.
+        this.key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
         this.accessExpiration = properties.accessExpiration();
     }
 
@@ -42,11 +50,14 @@ public class JwtService {
 
     /** Parses and verifies the token, returning the subject (user id). */
     public String extractUserId(String token) {
+        return parseClaims(token).getSubject();
+    }
+
+    public Claims parseClaims(String token) {
         return Jwts.parser()
                 .verifyWith(key)
                 .build()
                 .parseSignedClaims(token)
-                .getPayload()
-                .getSubject();
+                .getPayload();
     }
 }

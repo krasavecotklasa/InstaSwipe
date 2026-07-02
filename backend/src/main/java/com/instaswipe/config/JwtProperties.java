@@ -6,13 +6,15 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
 
 /**
- * JWT configuration bound from the {@code app.jwt.*} properties. Defaults are
- * provided so the app and tests run without the (gitignored) application.yaml;
- * production MUST override {@code app.jwt.secret} via environment/config.
+ * JWT configuration bound from the {@code app.jwt.*} properties. The signing
+ * secret is REQUIRED and has no default: the app fails to start without it, so
+ * no signing key ever ships in code. Set {@code app.jwt.secret} (env var
+ * {@code APP_JWT_SECRET}) to a random 32+ byte value in every environment.
+ * Only the (non-secret) token lifetimes have defaults.
  */
 @ConfigurationProperties(prefix = "app.jwt")
 public record JwtProperties(
-        @DefaultValue("dev-only-insecure-secret-change-me-please-32bytes-minimum-key!!") String secret,
+        String secret,
         @DefaultValue("15m") Duration accessExpiration,
         @DefaultValue("30d") Duration refreshExpiration) {
 }
