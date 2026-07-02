@@ -1,12 +1,17 @@
 package com.instaswipe.service;
 
 import com.instaswipe.dto.OnboardingStatusResponse;
+import com.instaswipe.dto.OwnProfileResponse;
 import com.instaswipe.dto.ProfileUpdateRequest;
+import com.instaswipe.dto.PublicProfileResponse;
 import com.instaswipe.model.User;
 import com.instaswipe.model.UserProfile;
 import com.instaswipe.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+
+import java.time.LocalDate;
+import java.time.Period;
 
 @Service
 @RequiredArgsConstructor
@@ -55,6 +60,52 @@ public class ProfileService {
 
         user.setProfile(profile);
         userRepository.save(user);
+    }
+
+    public OwnProfileResponse getOwnProfile(String userId) {
+        User user = getUserOrThrow(userId);
+        UserProfile profile = user.getProfile();
+
+        if (profile == null) {
+            throw new IllegalArgumentException("Profile has not been set up yet.");
+        }
+
+        return new OwnProfileResponse(
+                user.getEmail(),
+                profile.getName(),
+                profile.getBio(),
+                profile.getBirthDate(),
+                profile.getCountry(),
+                profile.getGender(),
+                profile.getInterests(),
+                profile.getProfilePictureUrl()
+        );
+    }
+
+    public PublicProfileResponse getPublicProfile(String targetUserId) {
+        User targetUser = getUserOrThrow(targetUserId);
+        UserProfile profile = targetUser.getProfile();
+
+        if (profile == null) {
+            throw new IllegalArgumentException("Requested profile does not exist or is incomplete.");
+        }
+
+        // Calculate age dynamically from birthdate
+        int age = 0;
+        if (profile.getBirthDate() != null) {
+            age = Period.between(profile.getBirthDate(), LocalDate.now()).getYears();
+        }
+
+        return new PublicProfileResponse(
+                targetUser.getId(),
+                profile.getName(),
+                profile.getBio(),
+                age,
+                profile.getCountry(),
+                profile.getGender(),
+                profile.getInterests(),
+                profile.getProfilePictureUrl()
+        );
     }
 
     private User getUserOrThrow(String userId) {

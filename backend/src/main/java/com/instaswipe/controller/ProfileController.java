@@ -9,6 +9,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import com.instaswipe.dto.OwnProfileResponse;
+import com.instaswipe.dto.PublicProfileResponse;
 
 @RestController
 @RequestMapping("/api/profile")
@@ -30,5 +32,15 @@ public class ProfileController {
 
         profileService.updateProfile(userId, request);
         return ResponseEntity.ok("Profile updated successfully.");
+    }
+
+    @GetMapping("/me")
+    public ResponseEntity<OwnProfileResponse> getOwnProfile(@AuthenticationPrincipal String userId) {
+        return ResponseEntity.ok(profileService.getOwnProfile(userId));
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<PublicProfileResponse> getPublicProfile(@PathVariable("id") String targetUserId) {
+        return ResponseEntity.ok(profileService.getPublicProfile(targetUserId));
     }
 }
