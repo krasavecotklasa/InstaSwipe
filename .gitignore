@@ -30,3 +30,7 @@ application.yml
 application.yaml
 .env
 .env.local
+
+# Databases
+minio-data/
+mongo-data/
