@@ -24,6 +24,7 @@ logs/
 .claude/
 .superpowers/
 .copilot/
+docs/superpowers/
 
 # Environment Variables & Secrets
 application.yml
