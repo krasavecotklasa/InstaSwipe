@@ -1,0 +1,13 @@
+spring:
+  application:
+    name: backend
+  data:
+    mongodb:
+      auto-index-creation: true
+  mongodb:
+    uri: ${MONGODB_URI:mongodb://localhost:27017/instaswipe}
+
+app:
+  jwt:
+    # Set APP_JWT_SECRET (random 32+ bytes) in every real environment.
+    secret: ${APP_JWT_SECRET:local-dev-only-secret-change-me-at-least-32-bytes!!}
