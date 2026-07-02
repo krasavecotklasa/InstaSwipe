@@ -36,7 +36,7 @@ public class User {
     private boolean enabled = true;
 
     @Builder.Default
-    private boolean emailVerified = false;
+    private boolean emailVerified = true;
 
     private UserProfile profile;
 
