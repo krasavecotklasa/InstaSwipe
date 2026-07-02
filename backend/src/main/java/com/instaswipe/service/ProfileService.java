@@ -50,7 +50,8 @@ public class ProfileService {
         profile.setCountry(request.country());
         profile.setBirthDate(request.birthDate());
         profile.setGender(request.gender());
-        // profile.setProfilePictureUrl();
+        profile.setInterests(request.interests());
+        profile.setProfilePictureUrl(request.profilePictureUrl());
 
         user.setProfile(profile);
         userRepository.save(user);
