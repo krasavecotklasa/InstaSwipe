@@ -54,6 +54,24 @@ const clearTokens = async () => {
   await SecureStore.deleteItemAsync('refresh_token');
 };
 
+const logout = async () => {
+  const refreshToken = await getRefreshToken();
+
+  if (refreshToken) {
+    try {
+      await fetch(`${AUTH_BASE_PATH}/logout`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refresh_token: refreshToken }),
+      });
+    } catch (error) {
+      console.warn('[Auth] Logout request failed', error);
+    }
+  }
+
+  await clearTokens();
+};
+
 class API {
   private static async request(endpoint: string, options: RequestInit = {}): Promise<Response> {
     const accessToken = await getAccessToken();
@@ -127,4 +145,4 @@ class API {
   }
 }
 
-export { API, setTokens, clearTokens, getAccessToken, getRefreshToken };
+export { API, setTokens, clearTokens, getAccessToken, getRefreshToken, logout };

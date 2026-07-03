@@ -1,12 +1,13 @@
 import { DarkTheme, DefaultTheme, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useColorScheme } from 'react-native';
 
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
 import AppTabs from '@/components/app-tabs';
 import AuthGate from '@/components/auth-gate';
-import { getAccessToken } from '@/hooks/auth';
+import { getAccessToken, logout } from '@/hooks/auth';
+import { AuthContext } from '@/hooks/auth-context';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -27,17 +28,30 @@ export default function RootLayout() {
     return null;
   }
 
+  const authContextValue = useMemo(
+    () => ({
+      onAuthSuccess: () => setIsAuthenticated(true),
+      onLogout: async () => {
+        await logout();
+        setIsAuthenticated(false);
+      },
+    }),
+    [],
+  );
+
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <AnimatedSplashOverlay />
+      <AuthContext.Provider value={authContextValue}>
+        <AnimatedSplashOverlay />
 
-      {isAuthenticated ? (
-        // Authenticated: render the full tab navigator
-        <AppTabs />
-      ) : (
-        // Not authenticated: render the auth gate (no navigator — avoids NavigationContainer conflicts)
-        <AuthGate onAuthSuccess={() => setIsAuthenticated(true)} />
-      )}
+        {isAuthenticated ? (
+          // Authenticated: render the full tab navigator
+          <AppTabs />
+        ) : (
+          // Not authenticated: render the auth gate (no navigator — avoids NavigationContainer conflicts)
+          <AuthGate onAuthSuccess={() => setIsAuthenticated(true)} />
+        )}
+      </AuthContext.Provider>
     </ThemeProvider>
   );
 }
