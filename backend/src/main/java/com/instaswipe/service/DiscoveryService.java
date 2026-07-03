@@ -41,8 +41,8 @@ public class DiscoveryService {
     }
 
     private void validateAge(Integer minAge, Integer maxAge) {
-        if (minAge != null && minAge < 0) throw new IllegalArgumentException("Min age must be non-negative");
-        if (maxAge != null && maxAge < 0) throw new IllegalArgumentException("Max age must be non-negative");
+        if (minAge != null && minAge < 0) throw new InvalidRequestException("Min age must be non-negative");
+        if (maxAge != null && maxAge < 0) throw new InvalidRequestException("Max age must be non-negative");
         if (minAge != null && maxAge != null && minAge > maxAge) throw new InvalidRequestException("Min age must be less than or equal to max age");
     }
 
