@@ -9,43 +9,30 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 
+import com.instaswipe.exception.InvalidRequestException;
 import com.instaswipe.model.Post;
-import com.instaswipe.model.MediaType;
 import com.instaswipe.model.Media;
 import com.instaswipe.repository.PostRepository;
-import com.instaswipe.service.ImageProcessingService.ProcessedImage;
 
 @Service
 @RequiredArgsConstructor
 public class PostService {
     private final PostRepository postRepository;
-    private final MediaStorageService mediaStorageService;
-    private final ImageProcessingService imageProcessingService;
+    private final MediaUploadService mediaUploadService;
 
-    public Post createMediaPost(String userId, String caption, MultipartFile file) {
-        ProcessedImage image = imageProcessingService.process(file);
-        String url = mediaStorageService.upload(image.data(), image.contentType(), image.extension(), userId);
+    public Post createPost(String userId, String caption, MultipartFile file) {
+        boolean hasFile = file != null && !file.isEmpty();
+        boolean hasCaption = caption != null && !caption.isBlank();
+        if (!hasFile && !hasCaption) {
+            throw new InvalidRequestException("A post must have a caption or an image");
+        }
 
-        Media media = Media.builder()
-                .type(MediaType.IMAGE)
-                .url(url)
-                .filename(file.getOriginalFilename())
-                .size(image.data().length)
-                .build();
+        Media media = hasFile ? mediaUploadService.storeImage(file, userId) : null;
 
         Post post = Post.builder()
                 .userId(userId)
                 .caption(caption)
                 .media(media)
-                .build();
-
-        return postRepository.save(post);
-    }
-
-    public Post createTextPost(String userId, String caption) {
-        Post post = Post.builder()
-                .userId(userId)
-                .caption(caption)
                 .build();
 
         return postRepository.save(post);

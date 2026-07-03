@@ -2,6 +2,8 @@ package com.instaswipe.support;
 
 import com.instaswipe.TestcontainersConfiguration;
 import com.instaswipe.model.Gender;
+import com.instaswipe.model.Media;
+import com.instaswipe.model.MediaType;
 import com.instaswipe.model.Role;
 import com.instaswipe.model.User;
 import com.instaswipe.model.UserProfile;
@@ -17,6 +19,13 @@ import org.springframework.http.HttpStatusCode;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.web.client.RestClient;
 
+import javax.imageio.ImageIO;
+import java.awt.Color;
+import java.awt.Graphics2D;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.time.LocalDate;
 import java.util.HashSet;
 import java.util.List;
@@ -72,7 +81,12 @@ public abstract class AbstractWebIntegrationTest {
                 .country(country)
                 .birthDate(birthDate)
                 .interests(interests)
-                .profilePictureUrl("https://example.com/pic.jpg")
+                .profilePicture(Media.builder()
+                        .type(MediaType.IMAGE)
+                        .url("https://example.com/pic.jpg")
+                        .filename("pic.jpg")
+                        .size(1024)
+                        .build())
                 .build();
         User user = User.builder()
                 .email(email)
@@ -83,6 +97,22 @@ public abstract class AbstractWebIntegrationTest {
                 .profile(profile)
                 .build();
         return userRepository.save(user);
+    }
+
+    /** A small, valid JPEG so uploads pass real ImageProcessingService validation. */
+    protected static byte[] jpegBytes() {
+        BufferedImage img = new BufferedImage(64, 64, BufferedImage.TYPE_INT_RGB);
+        Graphics2D g = img.createGraphics();
+        g.setColor(new Color(30, 144, 255));
+        g.fillRect(0, 0, 64, 64);
+        g.dispose();
+        try {
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            ImageIO.write(img, "jpg", out);
+            return out.toByteArray();
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
     }
 
     protected User createAdmin(String email) {

@@ -20,5 +20,5 @@ public class UserProfile {
     private String country;
     private LocalDate birthDate;
     private List<String> interests;
-    private String profilePictureUrl;
+    private Media profilePicture;
 }

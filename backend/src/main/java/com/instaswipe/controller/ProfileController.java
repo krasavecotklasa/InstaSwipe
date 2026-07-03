@@ -1,14 +1,17 @@
 package com.instaswipe.controller;
 
 import com.instaswipe.dto.OnboardingStatusResponse;
+import com.instaswipe.dto.ProfilePictureResponse;
 import com.instaswipe.dto.ProfileUpdateRequest;
 import com.instaswipe.repository.UserRepository;
 import com.instaswipe.service.ProfileService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 import com.instaswipe.dto.OwnProfileResponse;
 import com.instaswipe.dto.PublicProfileResponse;
 
@@ -25,13 +28,22 @@ public class ProfileController {
         return ResponseEntity.ok(profileService.getStatus(userId));
     }
 
-    @PutMapping("/update")
+    @PutMapping(value = "/update", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<String> updateProfile(
             @AuthenticationPrincipal String userId,
-            @Valid @RequestBody ProfileUpdateRequest request) {
+            @Valid @ModelAttribute ProfileUpdateRequest request) {
 
         profileService.updateProfile(userId, request);
         return ResponseEntity.ok("Profile updated successfully.");
+    }
+
+    @PostMapping(value = "/picture", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ProfilePictureResponse> uploadProfilePicture(
+            @AuthenticationPrincipal String userId,
+            @RequestParam("file") MultipartFile file) {
+
+        String url = profileService.updateProfilePicture(userId, file);
+        return ResponseEntity.ok(new ProfilePictureResponse(url));
     }
 
     @GetMapping("/me")

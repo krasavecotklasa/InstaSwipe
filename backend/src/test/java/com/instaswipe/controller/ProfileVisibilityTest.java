@@ -9,11 +9,13 @@ import java.util.List;
 import com.instaswipe.TestcontainersConfiguration;
 import com.instaswipe.dto.AuthResponse;
 import com.instaswipe.dto.LoginRequest;
-import com.instaswipe.dto.ProfileUpdateRequest;
 import com.instaswipe.dto.PublicProfileResponse;
 import com.instaswipe.dto.RegisterRequest;
 import com.instaswipe.dto.UserResponse;
 import com.instaswipe.model.Gender;
+import com.instaswipe.model.Media;
+import com.instaswipe.model.User;
+import com.instaswipe.model.UserProfile;
 import com.instaswipe.repository.RefreshTokenRepository;
 import com.instaswipe.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -83,18 +85,23 @@ class ProfileVisibilityTest {
         return userRepository.findByEmail(email).orElseThrow().getId();
     }
 
-    private void completeOnboarding(String token) {
-        ProfileUpdateRequest request = new ProfileUpdateRequest(
-                "Ada Lovelace", "Math and machines", LocalDate.of(1995, 1, 1),
-                "UK", Gender.FEMALE, List.of("math", "chess", "poetry"), "https://img.example/ada.jpg");
-        HttpResult<Void> result = send(client.put().uri("/api/profile/update"), token, request, Void.class);
-        assertThat(result.status().value()).isEqualTo(200);
+    // Establish a discoverable profile directly; the /profile/update mechanics are
+    // covered by ProfileUpdateAndPictureTest. This test focuses on cross-user visibility.
+    private void completeOnboarding(String email) {
+        User user = userRepository.findByEmail(email).orElseThrow();
+        user.setProfile(UserProfile.builder()
+                .name("Ada Lovelace").bio("Math and machines").birthDate(LocalDate.of(1995, 1, 1))
+                .country("UK").gender(Gender.FEMALE).interests(List.of("math", "chess", "poetry"))
+                .profilePicture(Media.builder()
+                        .type(com.instaswipe.model.MediaType.IMAGE).url("https://img.example/ada.jpg").build())
+                .build());
+        userRepository.save(user);
     }
 
     @Test
     void returnsDiscoverableProfileToAnotherAuthenticatedUser() {
-        String adaToken = registerAndLogin("ada@example.com");
-        completeOnboarding(adaToken);
+        registerAndLogin("ada@example.com");
+        completeOnboarding("ada@example.com");
         String adaId = userId("ada@example.com");
         String viewerToken = registerAndLogin("viewer@example.com");
 

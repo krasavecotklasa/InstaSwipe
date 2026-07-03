@@ -43,7 +43,8 @@ public class AdminService {
                 user.isEmailVerified(), profile == null ? null : profile.getName(),
                 profile == null ? null : profile.getBio(), profile == null ? null : profile.getBirthDate(),
                 profile == null ? null : profile.getCountry(), profile == null ? null : profile.getGender(),
-                profile == null ? null : profile.getInterests(), profile == null ? null : profile.getProfilePictureUrl(),
+                profile == null ? null : profile.getInterests(),
+                profile == null || profile.getProfilePicture() == null ? null : profile.getProfilePicture().getUrl(),
                 size(user.getLikedUserIds()), size(user.getPassedUserIds()),
                 user.getCreatedAt(), user.getUpdatedAt()
         );

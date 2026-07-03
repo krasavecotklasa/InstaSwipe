@@ -26,7 +26,7 @@ public class UserSearchRepositoryImpl implements UserSearchRepository{
         filters.add(Criteria.where("profile.name").ne(null));
         filters.add(Criteria.where("profile.gender").ne(null));
         filters.add(Criteria.where("profile.birthDate").ne(null));
-        filters.add(Criteria.where("profile.profilePictureUrl").ne(null));
+        filters.add(Criteria.where("profile.profilePicture").ne(null));
 
         if (criteria.excludeUserIds() != null && !criteria.excludeUserIds().isEmpty()) {
             filters.add(Criteria.where("_id").nin(criteria.excludeUserIds()));

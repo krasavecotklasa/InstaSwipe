@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.instaswipe.model.Gender;
+import com.instaswipe.model.Media;
+import com.instaswipe.model.MediaType;
 import com.instaswipe.model.Role;
 import com.instaswipe.model.User;
 import com.instaswipe.model.UserProfile;
@@ -29,7 +31,7 @@ class UserRepositoryTest extends AbstractMongoRepositoryTest {
                 .name("Ada")
                 .bio("hello world")
                 .gender(Gender.FEMALE)
-                .profilePictureUrl("ada.jpg")
+                .profilePicture(Media.builder().type(MediaType.IMAGE).url("ada.jpg").build())
                 .build();
         User saved = userRepository.save(User.builder()
                 .email("ada@example.com")
@@ -45,7 +47,7 @@ class UserRepositoryTest extends AbstractMongoRepositoryTest {
         assertThat(found.isEmailVerified()).isTrue();
         assertThat(found.getProfile().getName()).isEqualTo("Ada");
         assertThat(found.getProfile().getGender()).isEqualTo(Gender.FEMALE);
-        assertThat(found.getProfile().getProfilePictureUrl()).isEqualTo("ada.jpg");
+        assertThat(found.getProfile().getProfilePicture().getUrl()).isEqualTo("ada.jpg");
     }
 
     @Test

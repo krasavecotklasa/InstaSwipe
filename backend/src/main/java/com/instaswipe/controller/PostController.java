@@ -10,11 +10,8 @@ import org.springframework.data.domain.Page;
 
 import com.instaswipe.service.PostService;
 
-import jakarta.validation.Valid;
-
 import com.instaswipe.model.Post;
-import com.instaswipe.dto.CreateMediaPostRequest;
-import com.instaswipe.dto.CreateTextPostRequest;
+import com.instaswipe.dto.CreatePostRequest;
 import com.instaswipe.dto.PostResponse;
 
 @RestController
@@ -23,21 +20,12 @@ import com.instaswipe.dto.PostResponse;
 public class PostController {
     private final PostService postService;
 
-    @PostMapping(value = "/media", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @ResponseStatus(HttpStatus.CREATED)
-    public PostResponse uploadMedia(
-        @Valid @ModelAttribute CreateMediaPostRequest request,
+    public PostResponse createPost(
+        @ModelAttribute CreatePostRequest request,
         @AuthenticationPrincipal String userId) {
-        Post post = postService.createMediaPost(userId, request.caption(), request.file());
-        return toResponse(post, userId);
-    }
-
-    @PostMapping(value = "/text")
-    @ResponseStatus(HttpStatus.CREATED)
-    public PostResponse uploadText(
-        @Valid @ModelAttribute CreateTextPostRequest request,
-        @AuthenticationPrincipal String userId) {
-        Post post = postService.createTextPost(userId, request.caption());
+        Post post = postService.createPost(userId, request.caption(), request.file());
         return toResponse(post, userId);
     }
 

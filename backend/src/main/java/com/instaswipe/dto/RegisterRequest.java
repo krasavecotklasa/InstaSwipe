@@ -14,7 +14,7 @@ public record RegisterRequest(
         @Pattern(regexp = "^(?=.*[0-9])(?=.*[a-z])(?=.*[A-Z])(?=.*[@#$%^&+=!]).*$",
                 message = "Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character")
         String password,
-        @NotBlank(message = "Name is required")
+        // Optional: the profile-creation form collected right after registration sets the name.
         @Size(max = 100, message = "Name must be less than 100 characters")
         String name
 ) {
