@@ -39,4 +39,10 @@ public class GlobalExceptionHandler {
         // Generic message: never echo identifiers back, and don't leak a stack trace as a 500.
         return ApiError.of(HttpStatus.NOT_FOUND.value(), "Resource not found");
     }
+
+    @ExceptionHandler(InvalidRequestException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ApiError handleInvalidRequest(InvalidRequestException ex) {
+        return ApiError.of(HttpStatus.BAD_REQUEST.value(), ex.getMessage());
+    }
 }
