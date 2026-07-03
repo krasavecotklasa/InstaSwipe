@@ -56,7 +56,7 @@ public class PostController {
             .id(post.getId())
             .userId(post.getUserId())
             .caption(post.getCaption())
-            .likes(post.getLikes())
+            .likeCount(post.getLikedBy() == null ? 0 : post.getLikedBy().size())
             .media(post.getMedia())
             .createdAt(post.getCreatedAt())
             .build();

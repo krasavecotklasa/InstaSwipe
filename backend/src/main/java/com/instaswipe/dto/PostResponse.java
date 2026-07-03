@@ -13,7 +13,7 @@ public class PostResponse {
     private String id;
     private String userId;
     private String caption;
-    private Integer likes;
+    private int likeCount;
     private Media media;
     private Instant createdAt;
 }

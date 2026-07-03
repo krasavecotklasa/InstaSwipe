@@ -1,7 +1,5 @@
 package com.instaswipe.service;
 
-import java.time.Instant;
-
 import lombok.RequiredArgsConstructor;
 
 import org.springframework.web.multipart.MultipartFile;
@@ -15,42 +13,40 @@ import com.instaswipe.model.Post;
 import com.instaswipe.model.MediaType;
 import com.instaswipe.model.Media;
 import com.instaswipe.repository.PostRepository;
+import com.instaswipe.service.ImageProcessingService.ProcessedImage;
 
 @Service
 @RequiredArgsConstructor
 public class PostService {
     private final PostRepository postRepository;
     private final MediaStorageService mediaStorageService;
+    private final ImageProcessingService imageProcessingService;
 
     public Post createMediaPost(String userId, String caption, MultipartFile file) {
-        String url = mediaStorageService.upload(file, userId);
+        ProcessedImage image = imageProcessingService.process(file);
+        String url = mediaStorageService.upload(image.data(), image.contentType(), image.extension(), userId);
 
-        Media media = new Media();
-        media.setUrl(url);
-        media.setFilename(file.getOriginalFilename());
-        media.setSize(file.getSize());
+        Media media = Media.builder()
+                .type(MediaType.IMAGE)
+                .url(url)
+                .filename(file.getOriginalFilename())
+                .size(image.data().length)
+                .build();
 
-        if (file.getContentType().startsWith("image")) {
-            media.setType(MediaType.IMAGE);
-        } else {
-            media.setType(MediaType.VIDEO);
-        }
-
-        Post post = new Post();
-        post.setUserId(userId);
-        post.setCaption(caption);
-        post.setMedia(media);
-        post.setCreatedAt(Instant.now());
+        Post post = Post.builder()
+                .userId(userId)
+                .caption(caption)
+                .media(media)
+                .build();
 
         return postRepository.save(post);
     }
 
     public Post createTextPost(String userId, String caption) {
-        Post post = new Post();
-        post.setUserId(userId);
-        post.setCaption(caption);
-        post.setMedia(null);
-        post.setCreatedAt(Instant.now());
+        Post post = Post.builder()
+                .userId(userId)
+                .caption(caption)
+                .build();
 
         return postRepository.save(post);
     }

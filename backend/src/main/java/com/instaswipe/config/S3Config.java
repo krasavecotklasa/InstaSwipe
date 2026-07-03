@@ -16,10 +16,10 @@ public class S3Config {
 
     @Bean
     public S3Client s3Client(
-            @Value("${s3.endpoint}") String endpoint,
+            @Value("${s3.endpoint:http://localhost:9000}") String endpoint,
             @Value("${s3.access-key}") String accessKey,
             @Value("${s3.secret-key}") String secretKey,
-            @Value("${s3.region}") String region
+            @Value("${s3.region:eu-central-2}") String region
     ) {
 
         return S3Client.builder()

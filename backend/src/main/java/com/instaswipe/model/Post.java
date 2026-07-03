@@ -1,6 +1,8 @@
 package com.instaswipe.model;
 
 import java.time.Instant;
+import java.util.HashSet;
+import java.util.Set;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -28,7 +30,7 @@ public class Post {
     private Media media;
 
     @Builder.Default
-    private Integer likes = 0;
+    private Set<String> likedBy = new HashSet<>();
 
     @CreatedDate
     private Instant createdAt;
