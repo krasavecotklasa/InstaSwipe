@@ -6,6 +6,6 @@ import org.springframework.data.mongodb.repository.MongoRepository;
 
 import com.instaswipe.model.Post;
 
-public interface PostRepository extends MongoRepository<Post, String> {
+public interface PostRepository extends MongoRepository<Post, String>, PostCustomRepository {
     Page<Post> findByUserId(String userId, Pageable pageable);
 }
