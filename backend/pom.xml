@@ -79,6 +79,11 @@
 			<optional>true</optional>
 		</dependency>
 		<dependency>
+		  <groupId>software.amazon.awssdk</groupId>
+		  <artifactId>s3</artifactId>
+		  <version>2.46.20</version>
+		</dependency>
+		<dependency>
 			<groupId>org.projectlombok</groupId>
 			<artifactId>lombok</artifactId>
 			<optional>true</optional>

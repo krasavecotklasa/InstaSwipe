@@ -11,3 +11,10 @@ app:
   jwt:
     # Set APP_JWT_SECRET (random 32+ bytes) in every real environment.
     secret: ${APP_JWT_SECRET:local-dev-only-secret-change-me-at-least-32-bytes!!}
+
+s3:
+  endpoint: http://localhost:9000
+  access-key: ${S3_USERNAME:admin}
+  secret-key: ${S3_PASSWORD:supersecretpassword}
+  bucket: media
+  region: eu-central-2
