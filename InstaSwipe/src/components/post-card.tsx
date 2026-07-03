@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, Pressable, Text } from 'react-native';
+import { View, StyleSheet, Pressable, Text, Platform } from 'react-native';
 import { Image } from 'expo-image';
 import { SymbolView } from 'expo-symbols';
 import { useTheme } from '@/hooks/use-theme';
@@ -97,9 +97,10 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: '#000000',
     borderWidth: 1,
-    padding: Spacing.three,
+    padding: Platform.OS === 'web' ? Spacing.two : Spacing.three,
     marginBottom: Spacing.three,
-    width: '100%',
+    width: Platform.OS === 'web' ? '100%' : '100%',
+    maxWidth: Platform.OS === 'web' ? 500 : undefined,
   },
   header: {
     flexDirection: 'row',
@@ -142,7 +143,7 @@ const styles = StyleSheet.create({
   },
   postImage: {
     width: '100%',
-    height: 240,
+    aspectRatio: 1,
     borderRadius: 12,
     backgroundColor: '#1c1223',
   },

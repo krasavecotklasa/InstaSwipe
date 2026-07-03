@@ -3,7 +3,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { SymbolView } from 'expo-symbols';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { WebBadge } from '@/components/web-badge';
 import { PostCard, Post } from '@/components/post-card';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -65,6 +64,8 @@ export default function HomeScreen() {
           renderItem={({ item }) => <PostCard post={item} />}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
+          scrollEnabled={Platform.OS === 'web'}
+          nestedScrollEnabled={Platform.OS === 'web'}
         />
       </SafeAreaView>
     </ThemedView>
@@ -81,6 +82,7 @@ const styles = StyleSheet.create({
     flex: 1,
     maxWidth: MaxContentWidth,
     width: '100%',
+    marginLeft: Platform.OS === 'web' ? 100 : 0,
   },
   header: {
     flexDirection: 'row',

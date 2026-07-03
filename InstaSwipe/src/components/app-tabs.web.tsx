@@ -8,11 +8,7 @@ import {
 } from 'expo-router/ui';
 import { SymbolView } from 'expo-symbols';
 import { Pressable, useColorScheme, View, StyleSheet } from 'react-native';
-
-import { ExternalLink } from './external-link';
 import { ThemedText } from './themed-text';
-import { ThemedView } from './themed-view';
-
 import { Colors, MaxContentWidth, Spacing } from '@/constants/theme';
 
 type TabButtonProps = TabTriggerSlotProps & {
@@ -29,7 +25,7 @@ export default function AppTabs() {
             <TabButton iconName={{ ios: 'house.fill', web: 'home' }} />
           </TabTrigger>
           <TabTrigger name="match" href="/match" asChild>
-            <TabButton iconName={{ ios: 'heart.fill', web: 'love' }} />
+            <TabButton iconName={{ ios: 'heart.fill', web: 'favorite' }} />
           </TabTrigger>
           <TabTrigger name="messages" href="/messages" asChild>
             <TabButton iconName={{ ios: 'paperplane', web: 'send' }} />
@@ -56,14 +52,13 @@ export function TabButton({ isFocused, iconName, ...props }: TabButtonProps) {
         style={[
           styles.tabButtonView,
           {
-            backgroundColor: isFocused ? colors.tabActiveBackground : colors.backgroundElement,
             borderColor: isFocused ? colors.tabActiveBorder : 'transparent',
           },
         ]}>
         <SymbolView
           tintColor={isFocused ? colors.text : colors.iconMuted}
           name={iconName as any}
-          size={18}
+          size={24}
         />
       </View>
     </Pressable>
@@ -72,29 +67,32 @@ export function TabButton({ isFocused, iconName, ...props }: TabButtonProps) {
 
 export function CustomTabList(props: TabListProps) {
   const scheme = useColorScheme();
-  const colors = Colors[scheme === 'unspecified' ? 'light' : scheme];
 
   return (
-    <View {...props} style={styles.tabListContainer}>
-      <ThemedView type="backgroundElement" style={styles.innerContainer}>
-        <ThemedText type="smallBold" style={styles.brandText}>
-          InstaSwipe
-        </ThemedText>
+    <View {...props} style={[styles.tabListContainer, { backgroundColor: Colors.dark.background }]}>
+      <ThemedText style={styles.brandText}>
+        InstaSwipe
+      </ThemedText>
 
-        {props.children}
-      </ThemedView>
+      {props.children}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   tabListContainer: {
-    position: 'absolute',
-    width: '100%',
-    padding: Spacing.three,
-    justifyContent: 'center',
+    position: 'fixed',
+    left: 0,
+    top: 0,
+    height: '100%',
+    width: 100,
+    padding: Spacing.two,
+    justifyContent: 'flex-start',
     alignItems: 'center',
-    flexDirection: 'row',
+    flexDirection: 'column',
+    borderRightWidth: 0.5,
+    borderRightColor: '#000000',
+    zIndex: 100,
   },
   innerContainer: {
     paddingVertical: Spacing.two,
@@ -107,10 +105,13 @@ const styles = StyleSheet.create({
     maxWidth: MaxContentWidth,
   },
   brandText: {
-    marginRight: 'auto',
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: Spacing.three,
+    color: '#7157db',
   },
   pressed: {
-    opacity: 0.7,
+    opacity: 0.75,
   },
   tabButton: {
     justifyContent: 'center',
@@ -121,8 +122,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.three,
     borderRadius: Spacing.three,
     borderWidth: 1,
-    minWidth: 40,
-    minHeight: 40,
+    minWidth: 36,
+    minHeight: 36,
     justifyContent: 'center',
     alignItems: 'center',
   },
