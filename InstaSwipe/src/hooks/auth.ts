@@ -33,9 +33,20 @@ export interface UserMeResponse {
 const getAccessToken = async () => await SecureStore.getItemAsync('access_token');
 const getRefreshToken = async () => await SecureStore.getItemAsync('refresh_token');
 
+const normalizeTokenValue = (value: unknown): string => {
+  if (typeof value !== 'string' || value.length === 0) {
+    throw new Error('Invalid token value');
+  }
+
+  return value;
+};
+
 const setTokens = async (accessToken: string, refreshToken: string) => {
-  await SecureStore.setItemAsync('access_token', accessToken);
-  await SecureStore.setItemAsync('refresh_token', refreshToken);
+  const normalizedAccessToken = normalizeTokenValue(accessToken);
+  const normalizedRefreshToken = normalizeTokenValue(refreshToken);
+
+  await SecureStore.setItemAsync('access_token', normalizedAccessToken);
+  await SecureStore.setItemAsync('refresh_token', normalizedRefreshToken);
 };
 
 const clearTokens = async () => {
