@@ -32,8 +32,22 @@ public class DiscoveryService {
         LocalDate birthDateTo = minAge == null ? null : today.minusYears(minAge);
         LocalDate birthDateFrom = maxAge == null ? null : today.minusYears(maxAge + 1L).plusDays(1);
 
+        User currentUser = userRepository.findById(requesterId)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        List<String> excludedIds = new java.util.ArrayList<>();
+        excludedIds.add(requesterId);
+
+        if (currentUser.getLikedUserIds() != null) {
+            excludedIds.addAll(currentUser.getLikedUserIds());
+        }
+
+        if (currentUser.getPassedUserIds() != null) {
+            excludedIds.addAll(currentUser.getPassedUserIds());
+        }
+
         UserSearchCriteria criteria = new UserSearchCriteria(
-                birthDateFrom, birthDateTo, gender, country, interests, requesterId
+                birthDateFrom, birthDateTo, gender, country, interests, excludedIds
         );
 
         Page<PublicProfileResponse> page = userRepository.searchDiscoverable(criteria, pageable).map(this::toPublicProfile);

@@ -94,7 +94,7 @@ class UserSearchRepositoryTest extends AbstractMongoRepositoryTest {
                 .profile(incomplete).build());
         discoverable("visible@x.com", Gender.MALE, "US", 25, List.of("a"));
 
-        var criteria = new UserSearchCriteria(null, null, null, null, null, self.getId());
+        var criteria = new UserSearchCriteria(null, null, null, null, null, List.of(self.getId()));
         Page<User> page = userRepository.searchDiscoverable(criteria, PageRequest.of(0, 10));
 
         assertThat(page.getContent()).extracting(User::getEmail).containsExactly("visible@x.com");

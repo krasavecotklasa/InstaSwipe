@@ -11,6 +11,6 @@ public record UserSearchCriteria(
         Gender gender,
         String country,
         List<String> interests,
-        String excludeUserId
+        List<String> excludeUserIds
 ) {
 }
