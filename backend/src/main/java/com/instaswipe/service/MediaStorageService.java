@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.NoSuchBucketException;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
 @Service
@@ -34,7 +35,12 @@ public class MediaStorageService {
                 .contentType(contentType)
                 .build();
 
-        s3Client.putObject(request, RequestBody.fromBytes(data));
+        try {
+            s3Client.putObject(request, RequestBody.fromBytes(data));
+        } catch (NoSuchBucketException e) {
+            s3Client.createBucket(b -> b.bucket(bucket));
+            s3Client.putObject(request, RequestBody.fromBytes(data));
+        }
 
         return s3Client.utilities()
                 .getUrl(b -> b.bucket(bucket).key(key))
