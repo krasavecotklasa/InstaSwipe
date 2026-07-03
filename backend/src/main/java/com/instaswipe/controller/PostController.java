@@ -28,7 +28,7 @@ public class PostController {
         @Valid @ModelAttribute CreateMediaPostRequest request,
         @AuthenticationPrincipal String userId) {
         Post post = postService.createMediaPost(userId, request.caption(), request.file());
-        return toResponse(post);
+        return toResponse(post, userId);
     }
 
     @PostMapping(value = "/text")
@@ -37,21 +37,24 @@ public class PostController {
         @Valid @ModelAttribute CreateTextPostRequest request,
         @AuthenticationPrincipal String userId) {
         Post post = postService.createTextPost(userId, request.caption());
-        return toResponse(post);
+        return toResponse(post, userId);
     }
 
 
     @GetMapping("/user/{userId}")
     public Page<PostResponse> getUserPosts(
         @PathVariable String userId,
+        @AuthenticationPrincipal String currentUserId,
         @RequestParam(defaultValue = "0") int page,
         @RequestParam(defaultValue = "20") int size) {
         Page<Post> posts = postService.getPostsByUserId(userId, page, size);
-        return posts.map(this::toResponse);
+        return posts.map(post -> toResponse(post, currentUserId));
     }
 
 
-    private PostResponse toResponse(Post post) {
+    private PostResponse toResponse(Post post, String currentUserId) {
+        boolean likedByMe = post.getLikedBy() != null && post.getLikedBy().contains(currentUserId);
+
         return PostResponse.builder()
             .id(post.getId())
             .userId(post.getUserId())
@@ -59,6 +62,7 @@ public class PostController {
             .likeCount(post.getLikedBy() == null ? 0 : post.getLikedBy().size())
             .media(post.getMedia())
             .createdAt(post.getCreatedAt())
+            .likedByMe(likedByMe)
             .build();
     }
 }
