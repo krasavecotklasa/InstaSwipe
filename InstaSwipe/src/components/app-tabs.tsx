@@ -16,7 +16,7 @@ export default function AppTabs() {
             <TabButton iconName={{ ios: 'heart.fill', android: 'favorite', web: 'heart' }} />
           </TabTrigger>
           <TabTrigger name="messages" href="/messages" asChild>
-            <TabButton iconName={{ ios: 'paperplane', android: 'chat', web: 'message' }} />
+            <TabButton iconName={{ ios: 'paperplane', android: 'send', web: 'message' }} />
           </TabTrigger>
           <TabTrigger name="search" href="/search" asChild>
             <TabButton iconName={{ ios: 'magnifyingglass', android: 'search', web: 'search' }} />
@@ -40,7 +40,7 @@ function TabButton({ isFocused, iconName, ...props }: TabButtonProps) {
 
   const tintColor = isFocused
     ? (isDark ? '#d1c3e6c9' : '#40194a')
-    : (isDark ? 'rgba(209, 195, 230, 0.4)' : 'rgba(64, 25, 74, 0.4)');
+    : (isDark ? '#d1c3e666' : '#40194a66');
 
   return (
     <Pressable {...props} style={({ pressed }) => [styles.tabButton, pressed && styles.pressed]}>

@@ -29,10 +29,10 @@ export default function AppTabs() {
             <TabButton iconName={{ ios: 'house.fill', web: 'home' }} />
           </TabTrigger>
           <TabTrigger name="match" href="/match" asChild>
-            <TabButton iconName={{ ios: 'heart.fill', web: 'heart' }} />
+            <TabButton iconName={{ ios: 'heart.fill', web: 'love' }} />
           </TabTrigger>
           <TabTrigger name="messages" href="/messages" asChild>
-            <TabButton iconName={{ ios: 'paperplane', web: 'message' }} />
+            <TabButton iconName={{ ios: 'paperplane', web: 'send' }} />
           </TabTrigger>
           <TabTrigger name="search" href="/search" asChild>
             <TabButton iconName={{ ios: 'magnifyingglass', web: 'search' }} />
@@ -82,17 +82,6 @@ export function CustomTabList(props: TabListProps) {
         </ThemedText>
 
         {props.children}
-
-        <ExternalLink href="https://docs.expo.dev" asChild>
-          <Pressable style={styles.externalPressable}>
-            <ThemedText type="link">Docs</ThemedText>
-            <SymbolView
-              tintColor={colors.text}
-              name={{ ios: 'arrow.up.right.square', web: 'link' }}
-              size={12}
-            />
-          </Pressable>
-        </ExternalLink>
       </ThemedView>
     </View>
   );

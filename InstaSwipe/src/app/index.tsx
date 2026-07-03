@@ -35,7 +35,6 @@ const MOCK_POSTS: Post[] = [
     description: 'Sunday morning means fresh croissants straight out of the oven! 🥐 The house smells absolutely incredible right now. Wish you could smell this through the screen!',
     imageUrl: 'https://images.unsplash.com/photo-1555507036-ab1f4038808a?w=600',
     likes: 245,
-    shares: 11,
   }
 ];
 
@@ -45,18 +44,20 @@ export default function HomeScreen() {
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-        <View style={styles.header}>
-          <ThemedText style={styles.logoText}>
-            InstaSwipe
-          </ThemedText>
-          <View style={styles.headerActions}>
-            <SymbolView
-              name={{ ios: 'bell', android: 'notifications', web: 'notifications' } as any}
-              tintColor={theme.text}
-              size={24}
-            />
+        {(Platform.OS === 'ios' || Platform.OS === 'android') && (
+          <View style={styles.header}>
+            <ThemedText style={styles.logoText}>
+              InstaSwipe
+            </ThemedText>
+            <View style={styles.headerActions}>
+              <SymbolView
+                name={{ ios: 'bell', android: 'notifications', web: 'notifications' } as any}
+                tintColor={theme.text}
+                size={24}
+              />
+            </View>
           </View>
-        </View>
+        )}
 
         <FlatList
           data={MOCK_POSTS}
@@ -64,7 +65,6 @@ export default function HomeScreen() {
           renderItem={({ item }) => <PostCard post={item} />}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
-          ListFooterComponent={Platform.OS === 'web' ? <WebBadge /> : null}
         />
       </SafeAreaView>
     </ThemedView>
@@ -89,13 +89,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.four,
     paddingVertical: Spacing.three,
     borderBottomWidth: 0.5,
-    borderBottomColor: 'rgba(168, 146, 191, 0.15)',
+    borderBottomColor: '#6f0bda26',
   },
   logoText: {
     fontSize: 24,
     fontWeight: '800',
     letterSpacing: -0.5,
-    color: '#6249ca', // follows color scheme branding style
+    color: '#7157db',
   },
   headerActions: {
     flexDirection: 'row',
@@ -106,7 +106,6 @@ const styles = StyleSheet.create({
     padding: Spacing.one,
   },
   listContent: {
-    paddingHorizontal: Spacing.four,
     paddingTop: Spacing.three,
     paddingBottom: BottomTabInset + Spacing.four,
   },
