@@ -51,6 +51,22 @@ public class PostService {
         return postRepository.save(post);
     }
 
+    public Post likePost(String postId, String userId) {
+        Post post = postRepository.likePost(postId, userId);
+        if (post == null) {
+            throw new IllegalArgumentException("Post not found");
+        }
+        return post;
+    }
+
+    public Post unlikePost(String postId, String userId) {
+        Post post = postRepository.unlikePost(postId, userId);
+        if (post == null) {
+            throw new IllegalArgumentException("Post not found");
+        }
+        return post;
+    }
+
     public Page<Post> getPostsByUserId(String userId, int page, int size) {
         Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
         return postRepository.findByUserId(userId, pageable);

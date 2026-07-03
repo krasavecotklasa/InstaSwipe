@@ -3,6 +3,7 @@ package com.instaswipe.controller;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.data.domain.Page;
@@ -51,6 +52,23 @@ public class PostController {
         return posts.map(post -> toResponse(post, currentUserId));
     }
 
+    @PostMapping("/{postId}/like")
+    public ResponseEntity<PostResponse> likePost(
+            @PathVariable String postId,
+            @AuthenticationPrincipal String currentUserId) {
+
+        Post updatedPost = postService.likePost(postId, currentUserId);
+        return ResponseEntity.ok(toResponse(updatedPost, currentUserId));
+    }
+
+    @PostMapping("/{postId}/unlike")
+    public ResponseEntity<PostResponse> unlikePost(
+            @PathVariable String postId,
+            @AuthenticationPrincipal String currentUserId) {
+
+        Post updatedPost = postService.unlikePost(postId, currentUserId);
+        return ResponseEntity.ok(toResponse(updatedPost, currentUserId));
+    }
 
     private PostResponse toResponse(Post post, String currentUserId) {
         boolean likedByMe = post.getLikedBy() != null && post.getLikedBy().contains(currentUserId);
