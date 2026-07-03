@@ -138,6 +138,6 @@ class ProfileVisibilityTest {
     void rejectsUnauthenticatedProfileAccess() {
         HttpResult<Void> result = getAuthed("/api/profile/anything", null, Void.class);
 
-        assertThat(result.status().is2xxSuccessful()).isFalse();
+        assertThat(result.status().value()).isEqualTo(401);
     }
 }

@@ -6,6 +6,7 @@ import java.util.List;
 
 import com.instaswipe.service.JwtService;
 import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.JwtException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -43,14 +44,19 @@ public class JwtBearerAuthenticationFilter extends OncePerRequestFilter {
             Claims claims = jwtService.parseClaims(token);
             String userId = claims.getSubject();
             if (userId == null || userId.isBlank()) {
+                request.setAttribute(JwtAuthenticationFailure.ATTRIBUTE, JwtAuthenticationFailure.INVALID);
                 return;
             }
             UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
                     userId, null, authorities(claims));
             authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
             SecurityContextHolder.getContext().setAuthentication(authentication);
-        } catch (JwtException | IllegalArgumentException ignored) {
+        } catch (ExpiredJwtException ex) {
             SecurityContextHolder.clearContext();
+            request.setAttribute(JwtAuthenticationFailure.ATTRIBUTE, JwtAuthenticationFailure.EXPIRED);
+        } catch (JwtException | IllegalArgumentException ex) {
+            SecurityContextHolder.clearContext();
+            request.setAttribute(JwtAuthenticationFailure.ATTRIBUTE, JwtAuthenticationFailure.INVALID);
         }
     }
 
