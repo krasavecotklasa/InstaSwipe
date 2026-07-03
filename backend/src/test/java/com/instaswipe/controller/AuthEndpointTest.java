@@ -93,6 +93,16 @@ class AuthEndpointTest {
     }
 
     @Test
+    void registerSucceedsWithoutName() {
+        HttpResult<UserResponse> result = post("/api/auth/register",
+                new RegisterRequest("noname@example.com", "Password123!", null), UserResponse.class);
+
+        assertThat(result.status().value()).isEqualTo(201);
+        User saved = userRepository.findByEmail("noname@example.com").orElseThrow();
+        assertThat(saved.getProfile().getName()).isNull();
+    }
+
+    @Test
     void registerRejectsDuplicateEmail() {
         RegisterRequest request = new RegisterRequest("dupe@example.com", "Password123!", "Dee");
         post("/api/auth/register", request, UserResponse.class);

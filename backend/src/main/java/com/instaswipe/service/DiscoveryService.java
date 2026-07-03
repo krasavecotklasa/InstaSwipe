@@ -64,9 +64,10 @@ public class DiscoveryService {
         UserProfile profile = user.getProfile();
         int age = profile.getBirthDate() == null ? 0
                 : Period.between(profile.getBirthDate(), LocalDate.now()).getYears();
+        String pictureUrl = profile.getProfilePicture() == null ? null : profile.getProfilePicture().getUrl();
         return new PublicProfileResponse(
                 user.getId(), profile.getName(), profile.getBio(), age, profile.getCountry(),
-                profile.getGender(), profile.getInterests(), profile.getProfilePictureUrl()
+                profile.getGender(), profile.getInterests(), pictureUrl
         );
     }
 }

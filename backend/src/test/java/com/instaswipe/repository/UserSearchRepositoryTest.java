@@ -2,6 +2,8 @@ package com.instaswipe.repository;
 
 import com.instaswipe.dto.UserSearchCriteria;
 import com.instaswipe.model.Gender;
+import com.instaswipe.model.Media;
+import com.instaswipe.model.MediaType;
 import com.instaswipe.model.Role;
 import com.instaswipe.model.User;
 import com.instaswipe.model.UserProfile;
@@ -33,7 +35,8 @@ class UserSearchRepositoryTest extends AbstractMongoRepositoryTest {
         UserProfile profile = UserProfile.builder()
                 .name(email.split("@")[0]).bio("bio").gender(gender).country(country)
                 .birthDate(LocalDate.now().minusYears(age))
-                .interests(interests).profilePictureUrl("https://x/y.jpg").build();
+                .interests(interests)
+                .profilePicture(Media.builder().type(MediaType.IMAGE).url("https://x/y.jpg").build()).build();
         return userRepository.save(User.builder()
                 .email(email).passwordHash("x")
                 .roles(new HashSet<>(Set.of(Role.USER))).enabled(true).emailVerified(true)
@@ -88,7 +91,7 @@ class UserSearchRepositoryTest extends AbstractMongoRepositoryTest {
         UserProfile incomplete = UserProfile.builder()
                 .name("inc").bio("b").gender(Gender.MALE).country("US")
                 .birthDate(LocalDate.now().minusYears(25)).interests(List.of("a"))
-                .profilePictureUrl(null).build();
+                .profilePicture(null).build();
         userRepository.save(User.builder().email("incomplete@x.com").passwordHash("x")
                 .roles(new HashSet<>(Set.of(Role.USER))).enabled(true).emailVerified(true)
                 .profile(incomplete).build());

@@ -6,10 +6,16 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Past;
 import jakarta.validation.constraints.Size;
+import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDate;
 import java.util.List;
 
+/**
+ * Bound from multipart/form-data so the profile picture can be uploaded inline.
+ * The picture is optional on update: when omitted, the existing picture is kept.
+ */
 public record ProfileUpdateRequest(
         @NotBlank(message = "Display name cannot be blank")
         String displayName,
@@ -18,6 +24,7 @@ public record ProfileUpdateRequest(
         @NotNull(message = "Birth date is required")
         @Past(message = "Birth date must be in the past")
         @MinAge
+        @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
         LocalDate birthDate,
         @NotBlank(message = "Country cannot be blank")
         String country,
@@ -26,8 +33,6 @@ public record ProfileUpdateRequest(
         @NotNull(message = "Interests selection is required")
         @Size(min = 3, message = "You must select at least 3 interests")
         List<String> interests,
-        @NotBlank(message = "Profile picture URL cannot be blank")
-        @Size(max = 2000, message = "Profile picture URL must be less than 2000 characters")
-        String profilePictureUrl
+        MultipartFile profilePicture
 ) {
 }
