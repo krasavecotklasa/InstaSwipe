@@ -1,5 +1,7 @@
 package com.instaswipe.controller;
 
+import com.instaswipe.dto.MatchResponse;
+import com.instaswipe.dto.PageResponse;
 import com.instaswipe.dto.SwipeResult;
 import com.instaswipe.dto.SwipeStatus;
 import com.instaswipe.exception.ApiError;
@@ -9,6 +11,7 @@ import com.instaswipe.repository.MatchRepository;
 import com.instaswipe.support.AbstractWebIntegrationTest;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.ResponseEntity;
 
 import java.util.HashSet;
@@ -99,6 +102,39 @@ class MatchControllerTest extends AbstractWebIntegrationTest {
     void anonymousIsRejected() {
         ResponseEntity<Void> response = client().post()
                 .uri("/api/matches/someone/love")
+                .retrieve().toBodilessEntity();
+        assertThat(response.getStatusCode().value()).isIn(401, 403);
+    }
+
+    @Test
+    void listMatchesShowsThePairForBothUsers() {
+        User alice = createUser("alice@x.com");
+        User bob = createUser("bob@x.com");
+        client(tokenFor(alice)).post().uri("/api/matches/" + bob.getId() + "/love")
+                .retrieve().toBodilessEntity();
+        client(tokenFor(bob)).post().uri("/api/matches/" + alice.getId() + "/love")
+                .retrieve().toBodilessEntity();
+
+        ResponseEntity<PageResponse<MatchResponse>> aliceView = client(tokenFor(alice)).get()
+                .uri("/api/matches")
+                .retrieve().toEntity(new ParameterizedTypeReference<>() {});
+        assertThat(aliceView.getStatusCode().value()).isEqualTo(200);
+        assertThat(aliceView.getBody().content()).extracting(MatchResponse::otherUserId)
+                .containsExactly(bob.getId());
+        assertThat(aliceView.getBody().content()).extracting(MatchResponse::matchId)
+                .containsExactly(expectedMatchId(alice.getId(), bob.getId()));
+
+        ResponseEntity<PageResponse<MatchResponse>> bobView = client(tokenFor(bob)).get()
+                .uri("/api/matches")
+                .retrieve().toEntity(new ParameterizedTypeReference<>() {});
+        assertThat(bobView.getBody().content()).extracting(MatchResponse::otherUserId)
+                .containsExactly(alice.getId());
+    }
+
+    @Test
+    void listMatchesRequiresAuth() {
+        ResponseEntity<Void> response = client().get()
+                .uri("/api/matches")
                 .retrieve().toBodilessEntity();
         assertThat(response.getStatusCode().value()).isIn(401, 403);
     }

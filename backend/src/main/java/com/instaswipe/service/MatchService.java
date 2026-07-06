@@ -1,13 +1,20 @@
 package com.instaswipe.service;
 
+import com.instaswipe.dto.MatchResponse;
+import com.instaswipe.dto.PageResponse;
 import com.instaswipe.dto.SwipeResult;
 import com.instaswipe.event.MatchCreatedEvent;
 import com.instaswipe.exception.InvalidRequestException;
+import com.instaswipe.model.Match;
 import com.instaswipe.model.User;
 import com.instaswipe.repository.MatchRepository;
 import com.instaswipe.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -43,6 +50,24 @@ public class MatchService {
             eventPublisher.publishEvent(new MatchCreatedEvent(matchId, userOneId, userTwoId));
         }
         return SwipeResult.matched(matchId);
+    }
+
+    public PageResponse<MatchResponse> listMatches(String currentUserId, Pageable pageable) {
+        Pageable effective = pageable.getSort().isSorted()
+                ? pageable
+                : PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(),
+                        Sort.by(Sort.Direction.DESC, "createdAt"));
+        Page<MatchResponse> page = matchRepository
+                .findByUserOneIdOrUserTwoId(currentUserId, currentUserId, effective)
+                .map(match -> toResponse(match, currentUserId));
+        return PageResponse.from(page);
+    }
+
+    private MatchResponse toResponse(Match match, String currentUserId) {
+        String otherUserId = match.getUserOneId().equals(currentUserId)
+                ? match.getUserTwoId()
+                : match.getUserOneId();
+        return new MatchResponse(match.getId(), otherUserId, match.getCreatedAt());
     }
 
     private void validateNotSelf(String currentUserId, String targetUserId, String verb) {
