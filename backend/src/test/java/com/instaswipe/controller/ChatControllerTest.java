@@ -1,6 +1,8 @@
 package com.instaswipe.controller;
 
+import com.instaswipe.config.RabbitMQConfig;
 import com.instaswipe.dto.ChatMessageRequest;
+import com.instaswipe.event.OfflineMessageEvent;
 import com.instaswipe.model.Message;
 import com.instaswipe.repository.MessageRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -10,6 +12,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.messaging.simp.SimpMessageHeaderAccessor;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.messaging.simp.user.SimpUser;
@@ -34,6 +37,9 @@ class ChatControllerTest {
 
     @Mock
     private SimpUserRegistry simpUserRegistry;
+
+    @Mock
+    private RabbitTemplate rabbitTemplate;
 
     @InjectMocks
     private ChatController chatController;
@@ -115,16 +121,36 @@ class ChatControllerTest {
         when(headerAccessor.getUser()).thenReturn(principal);
         when(principal.getName()).thenReturn("user123");
 
-        when(messageRepository.save(any(Message.class))).thenReturn(new Message());
+        Message savedMessage = Message.builder()
+                .id("msg1")
+                .chatRoomId("user123_user456")
+                .senderId("user123")
+                .recipientId("user456")
+                .content("Hello there!")
+                .build();
+        when(messageRepository.save(any(Message.class))).thenReturn(savedMessage);
 
         when(simpUserRegistry.getUser("user456")).thenReturn(null); // Recipient offline
 
         chatController.processMessage(request, headerAccessor);
 
-        // Verification for push notification queue logic will go here
         verify(simpUserRegistry).getUser("user456");
-        
+
         // Still sends the web socket message in case there's a race condition with sessions
         verify(messagingTemplate, times(2)).convertAndSendToUser(anyString(), anyString(), any(Message.class));
+
+        // Publishes an offline push event carrying the persisted message details
+        ArgumentCaptor<OfflineMessageEvent> eventCaptor = ArgumentCaptor.forClass(OfflineMessageEvent.class);
+        verify(rabbitTemplate).convertAndSend(
+                eq(RabbitMQConfig.PUSH_EXCHANGE),
+                eq(RabbitMQConfig.PUSH_ROUTING),
+                eventCaptor.capture());
+
+        OfflineMessageEvent event = eventCaptor.getValue();
+        assertEquals("msg1", event.messageId());
+        assertEquals("user123_user456", event.chatRoomId());
+        assertEquals("user123", event.senderId());
+        assertEquals("user456", event.recipientId());
+        assertEquals("Hello there!", event.content());
     }
 }
