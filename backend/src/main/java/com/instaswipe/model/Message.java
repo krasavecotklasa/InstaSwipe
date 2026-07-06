@@ -1,5 +1,6 @@
 package com.instaswipe.model;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -35,5 +36,6 @@ public class Message {
     private Instant timestamp;
     
     @Builder.Default
+    @JsonProperty("isRead")
     private boolean isRead = false;
 }
