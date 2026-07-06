@@ -37,8 +37,8 @@ services:
       - "15672:15672"   # Management UI
       - "61613:61613"   # STOMP
     environment:
-      RABBITMQ_DEFAULT_USER: guest
-      RABBITMQ_DEFAULT_PASS: guest
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_ROOT_USERNAME:guest}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_ROOT_PASSWORD:guest}
     command: >
       sh -c "rabbitmq-plugins enable --offline rabbitmq_stomp;
-      docker-entrypoint.sh rabbitmq-server"
+      docker-entrypoint.sh rabbitmq-server"
