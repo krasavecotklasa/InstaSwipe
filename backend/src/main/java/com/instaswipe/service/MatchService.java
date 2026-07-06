@@ -98,6 +98,9 @@ public class MatchService {
         if (currentUserId == null) {
             throw new InvalidRequestException("Current user ID is required");
         }
+        if (targetUserId == null) {
+            throw new InvalidRequestException("Target user ID is required");
+        }
         if (currentUserId.equals(targetUserId)) {
             throw new InvalidRequestException("Cannot " + verb + " yourself");
         }
