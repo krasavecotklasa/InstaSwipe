@@ -22,6 +22,7 @@ import java.util.List;
 public class DiscoveryService {
 
     private final UserRepository userRepository;
+    private final MediaStorageService mediaStorageService;
 
     public PageResponse<PublicProfileResponse> discover(
             String requesterId, Integer minAge, Integer maxAge, Gender gender,
@@ -64,7 +65,11 @@ public class DiscoveryService {
         UserProfile profile = user.getProfile();
         int age = profile.getBirthDate() == null ? 0
                 : Period.between(profile.getBirthDate(), LocalDate.now()).getYears();
-        String pictureUrl = profile.getProfilePicture() == null ? null : profile.getProfilePicture().getUrl();
+        String pictureUrl = null;
+        if (profile.getProfilePicture() != null) {
+            // Ensure profile picture URL is presigned
+            pictureUrl = mediaStorageService.ensurePresignedUrl(profile.getProfilePicture().getUrl());
+        }
         return new PublicProfileResponse(
                 user.getId(), profile.getName(), profile.getBio(), age, profile.getCountry(),
                 profile.getGender(), profile.getInterests(), pictureUrl

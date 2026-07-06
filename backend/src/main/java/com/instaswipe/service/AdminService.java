@@ -17,6 +17,7 @@ import java.util.Set;
 public class AdminService {
 
     private final UserRepository userRepository;
+    private final MediaStorageService mediaStorageService;
 
     public PageResponse<AdminUserSummaryResponse> listUsers(Pageable pageable) {
         return PageResponse.from(userRepository.findAll(pageable).map(this::toSummary));
@@ -38,13 +39,19 @@ public class AdminService {
 
     private AdminUserDetailResponse toDetail(User user) {
         UserProfile profile = user.getProfile();
+        String profilePictureUrl = null;
+        if (profile != null && profile.getProfilePicture() != null) {
+            // Ensure profile picture URL is presigned
+            profilePictureUrl = mediaStorageService.ensurePresignedUrl(profile.getProfilePicture().getUrl());
+        }
+        
         return new AdminUserDetailResponse(
                 user.getId(), user.getEmail(), user.getRoles(), user.isEnabled(),
                 user.isEmailVerified(), profile == null ? null : profile.getName(),
                 profile == null ? null : profile.getBio(), profile == null ? null : profile.getBirthDate(),
                 profile == null ? null : profile.getCountry(), profile == null ? null : profile.getGender(),
                 profile == null ? null : profile.getInterests(),
-                profile == null || profile.getProfilePicture() == null ? null : profile.getProfilePicture().getUrl(),
+                profilePictureUrl,
                 size(user.getLikedUserIds()), size(user.getPassedUserIds()),
                 user.getCreatedAt(), user.getUpdatedAt()
         );
