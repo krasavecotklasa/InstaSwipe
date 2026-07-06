@@ -7,7 +7,7 @@ services:
     restart: unless-stopped
     environment:
       APP_JWT_SECRET: ${APP_JWT_SECRET}
-      MONGODB_URI: mongodb://admin:${MONGO_INITDB_ROOT_PASSWORD}@mongodb:27017/instaswipe?authSource=admin
+      MONGODB_URI: mongodb://${MONGO_INITDB_ROOT_USERNAME}:${MONGO_INITDB_ROOT_PASSWORD}@mongodb:27017/instaswipe?authSource=admin
       S3_USERNAME: ${MINIO_ROOT_USER}
       S3_PASSWORD: ${MINIO_ROOT_PASSWORD}
       S3_ENDPOINT: http://minio:9000
@@ -28,7 +28,7 @@ services:
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
 
     volumes:
-      - ./minio-data:/minio-data/
+      - ./minio-data:/data
 
     ports:
       - "9000:9000"   # S3 API
@@ -42,6 +42,6 @@ services:
       MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME}
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
     volumes:
-      - ./mongo-data:/mongo-data
+      - ./mongo-data:/data/db
     ports:
       - "27017:27017"   # API
