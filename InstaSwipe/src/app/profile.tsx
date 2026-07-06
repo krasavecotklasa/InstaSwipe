@@ -1,10 +1,11 @@
 import { Platform, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Header } from '@/components/header';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useAuthContext } from '@/hooks/auth-context';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+import Header from '@/components/header';
+
 
 export default function ProfileScreen() {
   const { onLogout } = useAuthContext();

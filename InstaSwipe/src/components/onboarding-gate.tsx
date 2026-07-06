@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import {
+  Platform,
   StyleSheet,
   TextInput,
   TouchableOpacity,
@@ -8,7 +9,6 @@ import {
   ActivityIndicator,
   ScrollView,
   Image,
-  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
@@ -22,7 +22,16 @@ interface OnboardingGateProps {
   onOnboardSuccess: () => void;
 }
 
+function errorHandle(error: string) {
+  if (Platform.OS === 'web') {
+    alert('Error: ' + error);
+  } else {
+    Alert.alert('Error', error);
+  }
+}
+
 const GENDERS = ['MALE', 'FEMALE', 'NON_BINARY', 'OTHER'];
+const GendersDisplay = ['Male', 'Female', 'Non-Binary', 'Other'];
 
 export default function OnboardingGate({ onOnboardSuccess }: OnboardingGateProps) {
   const [displayName, setDisplayName] = useState('');
@@ -40,7 +49,7 @@ export default function OnboardingGate({ onOnboardSuccess }: OnboardingGateProps
       mediaTypes: ['images'],
       allowsEditing: true,
       aspect: [1, 1],
-      quality: 0.8,
+      quality: 0.7,
     });
 
     if (!result.canceled && result.assets && result.assets.length > 0) {
@@ -49,8 +58,8 @@ export default function OnboardingGate({ onOnboardSuccess }: OnboardingGateProps
   };
 
   const handleSubmit = async () => {
-    if (!displayName || !birthDate || !country) {
-      Alert.alert('Error', 'Please fill in required fields (Name, Birth Date, Country).');
+    if (!displayName || !birthDate || !country || !bio || !interests) {
+      errorHandle('Please fill in required fields (User name, bio, birth date, country, interests).');
       return;
     }
 
@@ -65,22 +74,10 @@ export default function OnboardingGate({ onOnboardSuccess }: OnboardingGateProps
       formData.append('interests', interests);
 
       if (profilePicture) {
-        // Basic filename extraction
         const filename = profilePicture.split('/').pop() || 'profile.jpg';
-        const match = /\.(\w+)$/.exec(filename);
-        const type = match ? `image/${match[1]}` : `image/jpeg`;
-
-        if (Platform.OS === 'web') {
-          const res = await fetch(profilePicture);
-          const blob = await res.blob();
-          formData.append('profilePicture', blob, filename);
-        } else {
-          formData.append('profilePicture', {
-            uri: profilePicture,
-            name: filename,
-            type,
-          } as any);
-        }
+        const res = await fetch(profilePicture);
+        const blob = await res.blob();
+        formData.append('profilePicture', blob, filename);
       }
 
       const response = await API.updateProfile(formData);
@@ -88,11 +85,11 @@ export default function OnboardingGate({ onOnboardSuccess }: OnboardingGateProps
         onOnboardSuccess();
       } else {
         const errorData = await response.json().catch(() => ({}));
-        Alert.alert('Update Failed', errorData.message || 'Could not update profile');
+        errorHandle(errorData.message || 'Could not update profile');
       }
     } catch (error) {
       console.error(error);
-      Alert.alert('Error', 'An unexpected error occurred. Please try again.');
+      errorHandle('An unexpected error occurred. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -102,10 +99,9 @@ export default function OnboardingGate({ onOnboardSuccess }: OnboardingGateProps
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
         <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
-          <ThemedText type="title" style={styles.title}>Complete Your Profile</ThemedText>
+          <ThemedText type="title" style={styles.title}>Let's finish setting up your profile</ThemedText>
 
           <View style={styles.form}>
-            {/* Avatar Picker */}
             <TouchableOpacity style={styles.avatarContainer} onPress={handlePickImage}>
               {profilePicture ? (
                 <Image source={{ uri: profilePicture }} style={styles.avatarImage} />
@@ -118,7 +114,7 @@ export default function OnboardingGate({ onOnboardSuccess }: OnboardingGateProps
 
             <TextInput
               style={[styles.input, { color: theme.text, borderColor: theme.tabActiveBorder }]}
-              placeholder="Display Name"
+              placeholder="User Name"
               placeholderTextColor={theme.iconMuted}
               value={displayName}
               onChangeText={setDisplayName}
@@ -152,18 +148,18 @@ export default function OnboardingGate({ onOnboardSuccess }: OnboardingGateProps
 
             <ThemedText style={styles.label}>Gender</ThemedText>
             <View style={styles.genderRow}>
-              {GENDERS.map((g) => (
+              {GendersDisplay.map((g, i) => (
                 <TouchableOpacity
-                  key={g}
+                  key={i}
                   style={[
                     styles.genderButton,
                     { borderColor: theme.tabActiveBorder },
-                    gender === g && { backgroundColor: theme.backgroundElement, borderColor: theme.backgroundElement },
+                    gender === GENDERS[i] && { backgroundColor: theme.backgroundElement, borderColor: theme.backgroundElement },
                   ]}
-                  onPress={() => setGender(g)}
+                  onPress={() => setGender(GENDERS[i])}
                 >
-                  <ThemedText style={[styles.genderText, gender === g && styles.genderTextSelected]}>
-                    {g.replace('_', ' ')}
+                  <ThemedText style={[styles.genderText, gender === GENDERS[i] && styles.genderTextSelected]}>
+                    {g}
                   </ThemedText>
                 </TouchableOpacity>
               ))}
@@ -171,7 +167,7 @@ export default function OnboardingGate({ onOnboardSuccess }: OnboardingGateProps
 
             <TextInput
               style={[styles.input, { color: theme.text, borderColor: theme.tabActiveBorder }]}
-              placeholder="Interests (e.g. Gaming, Gym)"
+              placeholder="3 interests (e.g. Reading, Exercising, Cooking)"
               placeholderTextColor={theme.iconMuted}
               value={interests}
               onChangeText={setInterests}
@@ -185,7 +181,7 @@ export default function OnboardingGate({ onOnboardSuccess }: OnboardingGateProps
               {loading ? (
                 <ActivityIndicator color="#fff" />
               ) : (
-                <ThemedText style={styles.buttonText}>Complete Onboarding</ThemedText>
+                <ThemedText style={styles.buttonText}>Create profile</ThemedText>
               )}
             </TouchableOpacity>
           </View>
@@ -236,7 +232,6 @@ const styles = StyleSheet.create({
   },
   avatarText: {
     color: '#fff',
-    fontWeight: 'bold',
   },
   input: {
     height: 50,
@@ -246,7 +241,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   textArea: {
-    height: 80,
+    height: 100,
     textAlignVertical: 'top',
     paddingTop: Spacing.three,
   },
@@ -265,7 +260,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.two,
     borderWidth: 1,
-    borderRadius: 20,
+    borderRadius: 8,
   },
   genderText: {
     fontSize: 14,

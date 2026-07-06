@@ -1,11 +1,9 @@
-import { FlatList, Platform, StyleSheet, View } from 'react-native';
+import { FlatList, Platform, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { SymbolView } from 'expo-symbols';
-import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { PostCard, Post } from '@/components/post-card';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
+import Header from '@/components/header';
 
 const MOCK_POSTS: Post[] = [
   {
@@ -50,25 +48,10 @@ const MOCK_POSTS: Post[] = [
 ];
 
 export default function HomeScreen() {
-  const theme = useTheme();
-
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-        {(Platform.OS === 'ios' || Platform.OS === 'android') && (
-          <View style={styles.header}>
-            <ThemedText style={styles.logoText}>
-              InstaSwipe
-            </ThemedText>
-            <View style={styles.headerActions}>
-              <SymbolView
-                name={{ ios: 'bell', android: 'notifications', web: 'notifications' } as any}
-                tintColor={theme.text}
-                size={24}
-              />
-            </View>
-          </View>
-        )}
+        <Header />
 
         <FlatList
           data={MOCK_POSTS}
@@ -96,29 +79,7 @@ const styles = StyleSheet.create({
     width: '100%',
     marginLeft: Platform.OS === 'web' ? 100 : 0,
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: Spacing.four,
-    paddingVertical: Spacing.three,
-    borderBottomWidth: 0.5,
-    borderBottomColor: '#6f0bda26',
-  },
-  logoText: {
-    fontSize: 24,
-    fontWeight: '800',
-    letterSpacing: -0.5,
-    color: '#7157db',
-  },
-  headerActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.three,
-  },
-  headerIcon: {
-    padding: Spacing.one,
-  },
+
   listContent: {
     paddingTop: Spacing.three,
     paddingBottom: BottomTabInset + Spacing.four,

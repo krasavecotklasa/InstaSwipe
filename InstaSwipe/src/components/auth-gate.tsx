@@ -7,6 +7,7 @@ import {
   Alert,
   ActivityIndicator,
   Switch,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemedText } from '@/components/themed-text';
@@ -19,6 +20,14 @@ type Screen = 'login' | 'register';
 
 interface AuthGateProps {
   onAuthSuccess: () => void;
+}
+
+function errorHandle(error: string) {
+  if (Platform.OS === 'web') {
+    alert('Error: ' + error);
+  } else {
+    Alert.alert('Error', error);
+  }
 }
 
 export default function AuthGate({ onAuthSuccess }: AuthGateProps) {
@@ -56,7 +65,7 @@ function LoginView({ onAuthSuccess, onGoToRegister }: LoginViewProps) {
 
   const handleLogin = async () => {
     if (!email || !password) {
-      Alert.alert('Error', 'Please fill in all fields');
+      errorHandle('Please fill in all fields');
       return;
     }
 
@@ -69,7 +78,7 @@ function LoginView({ onAuthSuccess, onGoToRegister }: LoginViewProps) {
         const refreshToken = data.refreshToken ?? data.refresh_token;
 
         if (!accessToken || !refreshToken) {
-          Alert.alert('Login Failed', 'Missing authentication tokens in response');
+          errorHandle('Login Failed: Missing authentication tokens in response');
           return;
         }
 
@@ -77,11 +86,10 @@ function LoginView({ onAuthSuccess, onGoToRegister }: LoginViewProps) {
         onAuthSuccess();
       } else {
         const errorData = await response.json().catch(() => ({}));
-        Alert.alert('Login Failed', errorData.message || 'Invalid credentials');
+        errorHandle(errorData.message || 'Invalid credentials');
       }
     } catch (error) {
-      console.error(error);
-      Alert.alert('Error', 'An unexpected error occurred. Please try again.');
+      errorHandle('An unexpected error occurred. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -147,7 +155,6 @@ interface RegisterViewProps {
 
 function RegisterView({ onAuthSuccess, onGoToLogin }: RegisterViewProps) {
   const [email, setEmail] = useState('');
-  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isAgeConfirmed, setIsAgeConfirmed] = useState(false);
@@ -155,24 +162,24 @@ function RegisterView({ onAuthSuccess, onGoToLogin }: RegisterViewProps) {
   const theme = useTheme();
 
   const handleRegister = async () => {
-    if (!email || !username || !password || !confirmPassword) {
-      Alert.alert('Error', 'Please fill in all fields');
+    if (!email || !password || !confirmPassword) {
+      errorHandle('Please fill in all fields');
       return;
     }
 
     if (!isAgeConfirmed) {
-      Alert.alert('Age Requirement', 'You must be at least 18 years old to register.');
+      errorHandle('You must be at least 18 years old to register.');
       return;
     }
 
     if (password !== confirmPassword) {
-      Alert.alert('Error', 'Passwords do not match');
+      errorHandle('Passwords do not match');
       return;
     }
 
     setLoading(true);
     try {
-      const response = await API.register({ email, name: username, password });
+      const response = await API.register({ email, name: email, password });
       if (response.ok) {
         const data = await response.json();
         const accessToken = data.accessToken ?? data.access_token;
@@ -182,17 +189,22 @@ function RegisterView({ onAuthSuccess, onGoToLogin }: RegisterViewProps) {
           await setTokens(accessToken, refreshToken);
           onAuthSuccess();
         } else {
-          Alert.alert('Success', 'Account created! Please log in.', [
-            { text: 'OK', onPress: onGoToLogin },
-          ]);
+          if (Platform.OS === 'web') {
+            alert("Account created. Please log in!");
+            onGoToLogin();
+          } else {
+            Alert.alert('Success', 'Account created! Please log in.', [
+              { text: 'OK', onPress: onGoToLogin },
+            ]);
+          }
         }
       } else {
         const errorData = await response.json().catch(() => ({}));
-        Alert.alert('Registration Failed', errorData.message || 'Could not create account');
+        errorHandle(errorData.message || 'Could not create account');
       }
     } catch (error) {
       console.error(error);
-      Alert.alert('Error', 'An unexpected error occurred. Please try again.');
+      errorHandle('Registration Failed: ' + error);
     } finally {
       setLoading(false);
     }
@@ -213,14 +225,6 @@ function RegisterView({ onAuthSuccess, onGoToLogin }: RegisterViewProps) {
               onChangeText={setEmail}
               autoCapitalize="none"
               keyboardType="email-address"
-            />
-            <TextInput
-              style={[styles.input, { color: theme.text, borderColor: theme.tabActiveBorder }]}
-              placeholder="Username"
-              placeholderTextColor={theme.iconMuted}
-              value={username}
-              onChangeText={setUsername}
-              autoCapitalize="none"
             />
             <TextInput
               style={[styles.input, { color: theme.text, borderColor: theme.tabActiveBorder }]}
@@ -247,7 +251,7 @@ function RegisterView({ onAuthSuccess, onGoToLogin }: RegisterViewProps) {
                 thumbColor={isAgeConfirmed ? '#fff' : '#ccc'}
               />
               <ThemedText style={styles.ageLabel}>
-                I confirm I am at least 18 years old
+                By registering, I confirm I am at least 18 years old.
               </ThemedText>
             </View>
 
@@ -296,7 +300,8 @@ const styles = StyleSheet.create({
   },
   title: {
     textAlign: 'center',
-    marginBottom: Spacing.one,
+    marginBottom: Spacing.four,
+    color: '#7157db',
   },
   subtitle: {
     textAlign: 'center',
