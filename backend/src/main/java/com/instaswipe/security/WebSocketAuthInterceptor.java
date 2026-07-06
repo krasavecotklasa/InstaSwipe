@@ -3,6 +3,7 @@ package com.instaswipe.security;
 import com.instaswipe.model.Match;
 import com.instaswipe.repository.MatchRepository;
 import com.instaswipe.service.JwtService;
+import io.jsonwebtoken.Claims;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.Message;
@@ -15,12 +16,17 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.stereotype.Component;
 
+import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class WebSocketAuthInterceptor implements ChannelInterceptor {
+
+    /** Session-attribute key under which the access token's expiry ({@link Instant}) is stored at CONNECT. */
+    public static final String SESSION_TOKEN_EXPIRY = "tokenExpiry";
 
     private final JwtService jwtService;
     private final MatchRepository matchRepository;
@@ -28,41 +34,75 @@ public class WebSocketAuthInterceptor implements ChannelInterceptor {
     @Override
     public Message<?> preSend(Message<?> message, MessageChannel channel) {
         StompHeaderAccessor accessor = MessageHeaderAccessor.getAccessor(message, StompHeaderAccessor.class);
+        if (accessor == null) {
+            return message;
+        }
 
-        if (accessor != null) {
-            if (StompCommand.CONNECT.equals(accessor.getCommand())) {
-                List<String> authorization = accessor.getNativeHeader("Authorization");
-                if (authorization == null || authorization.isEmpty() || !authorization.get(0).startsWith("Bearer ")) {
-                    throw new AccessDeniedException("Missing or invalid Authorization header");
-                }
+        StompCommand command = accessor.getCommand();
+        if (StompCommand.CONNECT.equals(command) || StompCommand.STOMP.equals(command)) {
+            // Authenticate once, at connect time, and remember when the token expires.
+            authenticateConnect(accessor);
+        } else if (command != null && !StompCommand.DISCONNECT.equals(command)) {
+            // Every subsequent client frame (SEND, SUBSCRIBE, ...) re-checks that the access token
+            // has not expired, giving the WebSocket session the same lifetime as a REST request.
+            enforceTokenNotExpired(accessor);
 
-                String token = authorization.get(0).substring(7);
-                String userId;
-                try {
-                    userId = jwtService.extractUserId(token);
-                } catch (io.jsonwebtoken.JwtException e) {
-                    throw new AccessDeniedException("Invalid JWT Token");
-                }
-                
-                if (userId == null) {
-                    throw new AccessDeniedException("Invalid JWT Token");
-                }
-
-                accessor.setUser(new UsernamePasswordAuthenticationToken(userId, null, List.of()));
-            } else if (StompCommand.SUBSCRIBE.equals(accessor.getCommand())) {
-                if (accessor.getUser() == null) {
-                    throw new AccessDeniedException("Unauthenticated");
-                }
-                String userId = accessor.getUser().getName();
-                String destination = accessor.getDestination();
-                
-                if (destination != null && destination.contains("/queue/")) {
-                    String chatRoomId = extractChatRoomId(destination);
-                    verifyUserInMatch(userId, chatRoomId);
-                }
+            if (StompCommand.SUBSCRIBE.equals(command)) {
+                authorizeSubscription(accessor);
             }
         }
         return message;
+    }
+
+    private void authenticateConnect(StompHeaderAccessor accessor) {
+        List<String> authorization = accessor.getNativeHeader("Authorization");
+        if (authorization == null || authorization.isEmpty() || !authorization.get(0).startsWith("Bearer ")) {
+            throw new AccessDeniedException("Missing or invalid Authorization header");
+        }
+
+        String token = authorization.get(0).substring(7);
+        Claims claims;
+        try {
+            claims = jwtService.parseClaims(token);
+        } catch (io.jsonwebtoken.JwtException e) {
+            // Also covers ExpiredJwtException: a token already expired at connect time is rejected here.
+            throw new AccessDeniedException("Invalid JWT Token");
+        }
+
+        String userId = claims.getSubject();
+        if (userId == null) {
+            throw new AccessDeniedException("Invalid JWT Token");
+        }
+
+        accessor.setUser(new UsernamePasswordAuthenticationToken(userId, null, List.of()));
+
+        Map<String, Object> sessionAttributes = accessor.getSessionAttributes();
+        if (sessionAttributes != null && claims.getExpiration() != null) {
+            sessionAttributes.put(SESSION_TOKEN_EXPIRY, claims.getExpiration().toInstant());
+        }
+    }
+
+    private void enforceTokenNotExpired(StompHeaderAccessor accessor) {
+        if (accessor.getUser() == null) {
+            throw new AccessDeniedException("Unauthenticated");
+        }
+
+        Map<String, Object> sessionAttributes = accessor.getSessionAttributes();
+        Object expiry = sessionAttributes == null ? null : sessionAttributes.get(SESSION_TOKEN_EXPIRY);
+        if (expiry instanceof Instant expiresAt && !Instant.now().isBefore(expiresAt)) {
+            log.info("WebSocket frame rejected for user {}: access token expired at {}",
+                    accessor.getUser().getName(), expiresAt);
+            throw new AccessDeniedException("Access token expired");
+        }
+    }
+
+    private void authorizeSubscription(StompHeaderAccessor accessor) {
+        String userId = accessor.getUser().getName();
+        String destination = accessor.getDestination();
+        if (destination != null && destination.contains("/queue/")) {
+            String chatRoomId = extractChatRoomId(destination);
+            verifyUserInMatch(userId, chatRoomId);
+        }
     }
 
     private String extractChatRoomId(String destination) {
