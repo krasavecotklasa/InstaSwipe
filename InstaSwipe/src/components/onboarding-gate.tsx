@@ -40,7 +40,9 @@ export default function OnboardingGate({ onOnboardSuccess }: OnboardingGateProps
   const [country, setCountry] = useState('');
   const [gender, setGender] = useState('MALE');
   const [interests, setInterests] = useState('');
-  const [profilePicture, setProfilePicture] = useState<string | null>(null);
+  // FIX: keep the full picker asset (uri + mimeType), not just the uri string.
+  // We need the real mime type to build a correct native FormData part below.
+  const [profileImage, setProfileImage] = useState<ImagePicker.ImagePickerAsset | null>(null);
   const [loading, setLoading] = useState(false);
   const theme = useTheme();
 
@@ -53,7 +55,7 @@ export default function OnboardingGate({ onOnboardSuccess }: OnboardingGateProps
     });
 
     if (!result.canceled && result.assets && result.assets.length > 0) {
-      setProfilePicture(result.assets[0].uri);
+      setProfileImage(result.assets[0]);
     }
   };
 
@@ -65,27 +67,80 @@ export default function OnboardingGate({ onOnboardSuccess }: OnboardingGateProps
 
     setLoading(true);
     try {
-      const formData = new FormData();
-      formData.append('displayName', displayName);
-      formData.append('bio', bio);
-      formData.append('birthDate', birthDate);
-      formData.append('country', country);
-      formData.append('gender', gender);
-      formData.append('interests', interests);
+      if (Platform.OS !== 'web' && profileImage) {
+        // Use FileSystem.uploadAsync for native to avoid React Native fetch PUT FormData bug
+        const { getAccessToken, getProfileUpdateUrl } = await import('@/hooks/auth');
+        const FileSystem = await import('expo-file-system/legacy');
+        const token = await getAccessToken();
+        const url = getProfileUpdateUrl();
+        const filename = profileImage.uri.split('/').pop() || 'profile.jpg';
+        const inferredType =
+          profileImage.mimeType ||
+          (filename.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg');
 
-      if (profilePicture) {
-        const filename = profilePicture.split('/').pop() || 'profile.jpg';
-        const res = await fetch(profilePicture);
-        const blob = await res.blob();
-        formData.append('profilePicture', blob, filename);
-      }
+        const uploadResult = await FileSystem.uploadAsync(url, profileImage.uri, {
+          httpMethod: 'PUT',
+          uploadType: FileSystem.FileSystemUploadType.MULTIPART,
+          fieldName: 'profilePicture',
+          mimeType: inferredType,
+          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+          parameters: {
+            displayName,
+            bio,
+            birthDate,
+            country,
+            gender,
+            interests,
+          },
+        });
 
-      const response = await API.updateProfile(formData);
-      if (response.ok) {
-        onOnboardSuccess();
+        if (uploadResult.status >= 200 && uploadResult.status < 300) {
+          onOnboardSuccess();
+        } else {
+          let errorMsg = 'Could not update profile';
+          try {
+            const data = JSON.parse(uploadResult.body);
+            errorMsg = data.message || errorMsg;
+          } catch (e) {}
+          errorHandle(errorMsg);
+        }
       } else {
-        const errorData = await response.json().catch(() => ({}));
-        errorHandle(errorData.message || 'Could not update profile');
+        // Web fallback, or native without image
+        const formData = new FormData();
+        formData.append('displayName', displayName);
+        formData.append('bio', bio);
+        formData.append('birthDate', birthDate);
+        formData.append('country', country);
+        formData.append('gender', gender);
+        formData.append('interests', interests);
+
+        if (profileImage) {
+          const filename = profileImage.uri.split('/').pop() || 'profile.jpg';
+          const inferredType =
+            profileImage.mimeType ||
+            (filename.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg');
+
+          if (Platform.OS === 'web') {
+            const res = await fetch(profileImage.uri);
+            const blob = await res.blob();
+            formData.append('profilePicture', blob, filename);
+          } else {
+            // Should be unreachable due to branch above, but keeping for safety
+            formData.append('profilePicture', {
+              uri: profileImage.uri,
+              name: filename,
+              type: inferredType,
+            } as any);
+          }
+        }
+
+        const response = await API.updateProfile(formData);
+        if (response.ok) {
+          onOnboardSuccess();
+        } else {
+          const errorData = await response.json().catch(() => ({}));
+          errorHandle(errorData.message || 'Could not update profile');
+        }
       }
     } catch (error) {
       console.error(error);
@@ -103,8 +158,8 @@ export default function OnboardingGate({ onOnboardSuccess }: OnboardingGateProps
 
           <View style={styles.form}>
             <TouchableOpacity style={styles.avatarContainer} onPress={handlePickImage}>
-              {profilePicture ? (
-                <Image source={{ uri: profilePicture }} style={styles.avatarImage} />
+              {profileImage ? (
+                <Image source={{ uri: profileImage.uri }} style={styles.avatarImage} />
               ) : (
                 <View style={[styles.avatarPlaceholder, { backgroundColor: theme.backgroundElement }]}>
                   <ThemedText style={styles.avatarText}>Add Photo</ThemedText>
