@@ -1,5 +1,6 @@
 package com.instaswipe.controller;
 
+import com.instaswipe.dto.SwipeResult;
 import com.instaswipe.service.MatchService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -17,7 +18,7 @@ public class MatchController {
     private final MatchService matchService;
 
     @PostMapping("/{userId}/pass")
-    public ResponseEntity<String> passPerson(
+    public ResponseEntity<SwipeResult> passPerson(
             @PathVariable String userId,
             @AuthenticationPrincipal String currentUserId
     ) {
@@ -25,7 +26,7 @@ public class MatchController {
     }
 
     @PostMapping("/{userId}/love")
-    public ResponseEntity<String> lovePerson(
+    public ResponseEntity<SwipeResult> lovePerson(
             @PathVariable String userId,
             @AuthenticationPrincipal String currentUserId
     ) {

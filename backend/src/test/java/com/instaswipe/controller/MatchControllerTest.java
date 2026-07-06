@@ -1,10 +1,14 @@
 package com.instaswipe.controller;
 
+import com.instaswipe.dto.SwipeResult;
+import com.instaswipe.dto.SwipeStatus;
 import com.instaswipe.exception.ApiError;
 import com.instaswipe.model.Role;
 import com.instaswipe.model.User;
+import com.instaswipe.repository.MatchRepository;
 import com.instaswipe.support.AbstractWebIntegrationTest;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 
 import java.util.HashSet;
@@ -13,6 +17,9 @@ import java.util.Set;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class MatchControllerTest extends AbstractWebIntegrationTest {
+
+    @Autowired
+    private MatchRepository matchRepository;
 
     private User createUser(String email) {
         return userRepository.save(User.builder()
@@ -24,34 +31,57 @@ class MatchControllerTest extends AbstractWebIntegrationTest {
                 .build());
     }
 
+    private String expectedMatchId(String a, String b) {
+        return a.compareTo(b) < 0 ? a + "_" + b : b + "_" + a;
+    }
+
     @Test
-    void lovePersonReturns200AndRecordsLike() {
+    void lovePersonWithoutReciprocityReturnsLiked() {
         User actor = createUser("actor@x.com");
         User target = createUser("target@x.com");
 
-        ResponseEntity<String> response = client(tokenFor(actor)).post()
+        ResponseEntity<SwipeResult> response = client(tokenFor(actor)).post()
                 .uri("/api/matches/" + target.getId() + "/love")
-                .retrieve().toEntity(String.class);
+                .retrieve().toEntity(SwipeResult.class);
 
         assertThat(response.getStatusCode().value()).isEqualTo(200);
-        assertThat(response.getBody()).isEqualTo("liked");
+        assertThat(response.getBody().status()).isEqualTo(SwipeStatus.LIKED);
+        assertThat(response.getBody().matchId()).isNull();
         assertThat(userRepository.findById(actor.getId()).orElseThrow().getLikedUserIds())
                 .containsExactly(target.getId());
     }
 
     @Test
-    void passPersonReturns200AndRecordsPass() {
+    void passPersonReturnsPassed() {
         User actor = createUser("actor@x.com");
         User target = createUser("target@x.com");
 
-        ResponseEntity<String> response = client(tokenFor(actor)).post()
+        ResponseEntity<SwipeResult> response = client(tokenFor(actor)).post()
                 .uri("/api/matches/" + target.getId() + "/pass")
-                .retrieve().toEntity(String.class);
+                .retrieve().toEntity(SwipeResult.class);
 
         assertThat(response.getStatusCode().value()).isEqualTo(200);
-        assertThat(response.getBody()).isEqualTo("passed");
+        assertThat(response.getBody().status()).isEqualTo(SwipeStatus.PASSED);
         assertThat(userRepository.findById(actor.getId()).orElseThrow().getPassedUserIds())
                 .containsExactly(target.getId());
+    }
+
+    @Test
+    void mutualLoveCreatesMatch() {
+        User alice = createUser("alice@x.com");
+        User bob = createUser("bob@x.com");
+
+        client(tokenFor(alice)).post().uri("/api/matches/" + bob.getId() + "/love")
+                .retrieve().toBodilessEntity();
+
+        ResponseEntity<SwipeResult> response = client(tokenFor(bob)).post()
+                .uri("/api/matches/" + alice.getId() + "/love")
+                .retrieve().toEntity(SwipeResult.class);
+
+        String expectedId = expectedMatchId(alice.getId(), bob.getId());
+        assertThat(response.getBody().status()).isEqualTo(SwipeStatus.MATCHED);
+        assertThat(response.getBody().matchId()).isEqualTo(expectedId);
+        assertThat(matchRepository.findById(expectedId)).isPresent();
     }
 
     @Test

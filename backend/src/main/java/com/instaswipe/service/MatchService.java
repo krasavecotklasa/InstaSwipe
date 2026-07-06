@@ -1,9 +1,13 @@
 package com.instaswipe.service;
 
+import com.instaswipe.dto.SwipeResult;
+import com.instaswipe.event.MatchCreatedEvent;
 import com.instaswipe.exception.InvalidRequestException;
 import com.instaswipe.model.User;
+import com.instaswipe.repository.MatchRepository;
 import com.instaswipe.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -11,17 +15,34 @@ import org.springframework.stereotype.Service;
 public class MatchService {
 
     private final UserRepository userRepository;
+    private final MatchRepository matchRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
-    public String passPerson(String currentUserId, String targetUserId) {
+    public SwipeResult passPerson(String currentUserId, String targetUserId) {
         validateNotSelf(currentUserId, targetUserId, "pass");
         requireExists(userRepository.recordPass(currentUserId, targetUserId));
-        return "passed";
+        return SwipeResult.passed();
     }
 
-    public String lovePerson(String currentUserId, String targetUserId) {
+    public SwipeResult lovePerson(String currentUserId, String targetUserId) {
         validateNotSelf(currentUserId, targetUserId, "like");
         requireExists(userRepository.recordLike(currentUserId, targetUserId));
-        return "liked";
+
+        // Reciprocity: does the target already like the current user?
+        if (!userRepository.existsByIdAndLikedUserIdsContains(targetUserId, currentUserId)) {
+            return SwipeResult.liked();
+        }
+
+        boolean currentIsFirst = currentUserId.compareTo(targetUserId) < 0;
+        String userOneId = currentIsFirst ? currentUserId : targetUserId;
+        String userTwoId = currentIsFirst ? targetUserId : currentUserId;
+        String matchId = userOneId + "_" + userTwoId;
+
+        // Deterministic id + upsert => exactly one insert even under concurrent mutual likes.
+        if (matchRepository.createIfAbsent(matchId, userOneId, userTwoId)) {
+            eventPublisher.publishEvent(new MatchCreatedEvent(matchId, userOneId, userTwoId));
+        }
+        return SwipeResult.matched(matchId);
     }
 
     private void validateNotSelf(String currentUserId, String targetUserId, String verb) {

@@ -10,4 +10,7 @@ public interface UserRepository extends MongoRepository<User, String>, UserSearc
     Optional<User> findByEmail(String email);
 
     boolean existsByEmail(String email);
+
+    /** True if the user with {@code id} has {@code userId} in their liked set (collection membership). */
+    boolean existsByIdAndLikedUserIdsContains(String id, String userId);
 }
