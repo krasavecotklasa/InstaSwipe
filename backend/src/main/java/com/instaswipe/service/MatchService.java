@@ -1,46 +1,35 @@
 package com.instaswipe.service;
 
 import com.instaswipe.model.User;
-import com.instaswipe.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.stereotype.Service;
-
-import java.util.HashSet;
 
 @Service
 @RequiredArgsConstructor
 public class MatchService {
-    private final UserRepository userRepository;
+    private final MongoTemplate mongoTemplate;
 
     public String passPerson(String currentUserId, String targetUserId) {
         validateInteraction(currentUserId, targetUserId, "pass");
 
-        User currentUser = userRepository.findById(currentUserId)
-                .orElseThrow(() -> new IllegalArgumentException("Current user not found"));
+        Query query = Query.query(Criteria.where("_id").is(currentUserId));
+        Update update = new Update().addToSet("passedUserIds", targetUserId);
 
-        if (currentUser.getPassedUserIds() == null) {
-            currentUser.setPassedUserIds(new HashSet<>());
-        }
-
-        currentUser.getPassedUserIds().add(targetUserId);
-        userRepository.save(currentUser);
-
+        mongoTemplate.updateFirst(query, update, User.class);
         return "passed";
     }
 
     public String lovePerson(String currentUserId, String targetUserId) {
         validateInteraction(currentUserId, targetUserId, "love");
 
-        User currentUser = userRepository.findById(currentUserId)
-                .orElseThrow(() -> new IllegalArgumentException("Current user not found"));
+        Query query = Query.query(Criteria.where("_id").is(currentUserId));
+        Update update = new Update().addToSet("likedUserIds", targetUserId);
 
-        if (currentUser.getLikedUserIds() == null) {
-            currentUser.setLikedUserIds(new HashSet<>());
-        }
-
-        currentUser.getLikedUserIds().add(targetUserId);
-        userRepository.save(currentUser);
-
+        mongoTemplate.updateFirst(query, update, User.class);
         return "liked";
     }
 
