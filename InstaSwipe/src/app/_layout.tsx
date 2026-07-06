@@ -6,7 +6,8 @@ import { useColorScheme } from 'react-native';
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
 import AppTabs from '@/components/app-tabs';
 import AuthGate from '@/components/auth-gate';
-import { getAccessToken, logout } from '@/hooks/auth';
+import OnboardingGate from '@/components/onboarding-gate';
+import { getAccessToken, logout, API } from '@/hooks/auth';
 import { AuthContext } from '@/hooks/auth-context';
 
 SplashScreen.preventAutoHideAsync();
@@ -14,6 +15,7 @@ SplashScreen.preventAutoHideAsync();
 export default function RootLayout() {
   const colorScheme = useColorScheme();
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+  const [needsOnboarding, setNeedsOnboarding] = useState<boolean | null>(null);
 
   useEffect(() => {
     async function checkAuth() {
@@ -23,8 +25,36 @@ export default function RootLayout() {
     checkAuth();
   }, []);
 
-  // Show nothing while checking auth to avoid flickering
+  // Once authenticated, check whether onboarding is required
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setNeedsOnboarding(null);
+      return;
+    }
+    async function checkOnboarding() {
+      try {
+        const response = await API.getProfileStatus();
+        if (response.ok) {
+          const data = await response.json();
+          setNeedsOnboarding(!!data.needsOnboarding);
+        } else {
+          // If the status check fails, skip onboarding to avoid blocking the user
+          setNeedsOnboarding(false);
+        }
+      } catch {
+        setNeedsOnboarding(false);
+      }
+    }
+    checkOnboarding();
+  }, [isAuthenticated]);
+
+  // Show nothing while checking auth or onboarding status to avoid flickering
   if (isAuthenticated === null) {
+    return null;
+  }
+
+  // Still loading onboarding status
+  if (isAuthenticated && needsOnboarding === null) {
     return null;
   }
 
@@ -34,6 +64,7 @@ export default function RootLayout() {
       onLogout: async () => {
         await logout();
         setIsAuthenticated(false);
+        setNeedsOnboarding(null);
       },
     }),
     [],
@@ -44,12 +75,15 @@ export default function RootLayout() {
       <AuthContext.Provider value={authContextValue}>
         <AnimatedSplashOverlay />
 
-        {isAuthenticated ? (
-          // Authenticated: render the full tab navigator
-          <AppTabs />
-        ) : (
-          // Not authenticated: render the auth gate (no navigator — avoids NavigationContainer conflicts)
+        {!isAuthenticated ? (
+          // Not authenticated: show login / register
           <AuthGate onAuthSuccess={() => setIsAuthenticated(true)} />
+        ) : needsOnboarding ? (
+          // Authenticated but profile incomplete: show onboarding
+          <OnboardingGate onOnboardSuccess={() => setNeedsOnboarding(false)} />
+        ) : (
+          // Fully set up: render the main tab navigator
+          <AppTabs />
         )}
       </AuthContext.Provider>
     </ThemeProvider>
