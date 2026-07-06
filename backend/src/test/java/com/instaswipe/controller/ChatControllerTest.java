@@ -5,6 +5,7 @@ import com.instaswipe.dto.ChatMessageRequest;
 import com.instaswipe.event.OfflineMessageEvent;
 import com.instaswipe.model.Message;
 import com.instaswipe.repository.MessageRepository;
+import com.instaswipe.service.MatchService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -40,6 +41,9 @@ class ChatControllerTest {
 
     @Mock
     private RabbitTemplate rabbitTemplate;
+
+    @Mock
+    private MatchService matchService;
 
     @InjectMocks
     private ChatController chatController;
@@ -81,9 +85,21 @@ class ChatControllerTest {
     }
 
     @Test
+    void testProcessMessage_NotAParticipant_DropsMessage() {
+        when(headerAccessor.getUser()).thenReturn(principal);
+        when(principal.getName()).thenReturn("user123");
+        when(matchService.isConversationBetween("user123_user456", "user123", "user456")).thenReturn(false);
+
+        chatController.processMessage(request, headerAccessor);
+
+        verifyNoInteractions(messageRepository, messagingTemplate, simpUserRegistry, rabbitTemplate);
+    }
+
+    @Test
     void testProcessMessage_RecipientOnline_Success() {
         when(headerAccessor.getUser()).thenReturn(principal);
         when(principal.getName()).thenReturn("user123");
+        when(matchService.isConversationBetween("user123_user456", "user123", "user456")).thenReturn(true);
 
         Message savedMessage = Message.builder()
                 .chatRoomId("user123_user456")
@@ -120,6 +136,7 @@ class ChatControllerTest {
     void testProcessMessage_RecipientOffline_QueuesPush() {
         when(headerAccessor.getUser()).thenReturn(principal);
         when(principal.getName()).thenReturn("user123");
+        when(matchService.isConversationBetween("user123_user456", "user123", "user456")).thenReturn(true);
 
         Message savedMessage = Message.builder()
                 .id("msg1")

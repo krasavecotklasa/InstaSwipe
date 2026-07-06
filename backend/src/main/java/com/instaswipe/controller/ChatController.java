@@ -5,6 +5,7 @@ import com.instaswipe.dto.ChatMessageRequest;
 import com.instaswipe.event.OfflineMessageEvent;
 import com.instaswipe.model.Message;
 import com.instaswipe.repository.MessageRepository;
+import com.instaswipe.service.MatchService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
@@ -17,7 +18,6 @@ import org.springframework.messaging.simp.user.SimpUserRegistry;
 import org.springframework.stereotype.Controller;
 
 import java.security.Principal;
-import java.time.Instant;
 
 @Slf4j
 @Controller
@@ -28,6 +28,7 @@ public class ChatController {
     private final MessageRepository messageRepository;
     private final SimpUserRegistry simpUserRegistry;
     private final RabbitTemplate rabbitTemplate;
+    private final MatchService matchService;
 
     @MessageMapping("/chat")
     public void processMessage(@Payload ChatMessageRequest chatMessage, SimpMessageHeaderAccessor headerAccessor) {
@@ -45,33 +46,40 @@ public class ChatController {
             return;
         }
 
-        // 2. Persist message to MongoDB
+        // 2. Authorize: sender and recipient must be the two participants of this match (room).
+        //    Guards the write path the same way the SUBSCRIBE interceptor guards the read path.
+        if (!matchService.isConversationBetween(chatMessage.getChatRoomId(), senderId, chatMessage.getRecipientId())) {
+            log.warn("Rejected message: {} is not authorized to send to room {} (recipient {})",
+                    senderId, chatMessage.getChatRoomId(), chatMessage.getRecipientId());
+            return;
+        }
+
+        // 3. Persist message to MongoDB (timestamp is populated by @CreatedDate auditing)
         Message message = Message.builder()
                 .chatRoomId(chatMessage.getChatRoomId())
                 .senderId(senderId)
                 .recipientId(chatMessage.getRecipientId())
                 .content(chatMessage.getContent())
-                .timestamp(Instant.now())
                 .isRead(false)
                 .build();
 
         Message savedMessage = messageRepository.save(message);
 
-        // 3. Deliver to recipient's private queue
+        // 4. Deliver to recipient's private queue
         messagingTemplate.convertAndSendToUser(
                 chatMessage.getRecipientId(),
                 "/queue/chat/" + chatMessage.getChatRoomId(),
                 savedMessage
         );
 
-        // 4. Echo back to sender (supports multiple devices/tabs)
+        // 5. Echo back to sender (supports multiple devices/tabs)
         messagingTemplate.convertAndSendToUser(
                 senderId,
                 "/queue/chat/" + chatMessage.getChatRoomId(),
                 savedMessage
         );
 
-        // 5. Offline push notification via RabbitMQ → FCM
+        // 6. Offline push notification via RabbitMQ → FCM
         SimpUser recipient = simpUserRegistry.getUser(chatMessage.getRecipientId());
         boolean isRecipientConnected = (recipient != null && !recipient.getSessions().isEmpty());
 

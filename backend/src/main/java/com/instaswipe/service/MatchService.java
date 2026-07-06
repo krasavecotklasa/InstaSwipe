@@ -63,6 +63,30 @@ public class MatchService {
         return PageResponse.from(page);
     }
 
+    /** True if the user is one of the two participants of the given match (room). */
+    public boolean isParticipant(String userId, String matchId) {
+        return matchRepository.findById(matchId)
+                .map(match -> isMember(match, userId))
+                .orElse(false);
+    }
+
+    /**
+     * True if {@code senderId} and {@code recipientId} are the two (distinct) participants of the
+     * match. Used to authorize a chat send before it is persisted or delivered.
+     */
+    public boolean isConversationBetween(String matchId, String senderId, String recipientId) {
+        if (senderId == null || recipientId == null || senderId.equals(recipientId)) {
+            return false;
+        }
+        return matchRepository.findById(matchId)
+                .map(match -> isMember(match, senderId) && isMember(match, recipientId))
+                .orElse(false);
+    }
+
+    private static boolean isMember(Match match, String userId) {
+        return match.getUserOneId().equals(userId) || match.getUserTwoId().equals(userId);
+    }
+
     private MatchResponse toResponse(Match match, String currentUserId) {
         String otherUserId = match.getUserOneId().equals(currentUserId)
                 ? match.getUserTwoId()

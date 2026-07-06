@@ -4,6 +4,7 @@ import com.instaswipe.dto.SwipeResult;
 import com.instaswipe.dto.SwipeStatus;
 import com.instaswipe.event.MatchCreatedEvent;
 import com.instaswipe.exception.InvalidRequestException;
+import com.instaswipe.model.Match;
 import com.instaswipe.model.User;
 import com.instaswipe.repository.MatchRepository;
 import com.instaswipe.repository.UserRepository;
@@ -15,9 +16,13 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 
+import java.util.Optional;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -144,5 +149,42 @@ class MatchServiceTest {
 
         assertThrows(IllegalArgumentException.class,
                 () -> matchService.lovePerson("ghost", "target"));
+    }
+
+    private Match match(String id, String userOneId, String userTwoId) {
+        return Match.builder().id(id).userOneId(userOneId).userTwoId(userTwoId).build();
+    }
+
+    @Test
+    void isParticipantTrueForEitherMember() {
+        when(matchRepository.findById("alice_bob")).thenReturn(Optional.of(match("alice_bob", "alice", "bob")));
+
+        assertTrue(matchService.isParticipant("alice", "alice_bob"));
+        assertTrue(matchService.isParticipant("bob", "alice_bob"));
+    }
+
+    @Test
+    void isParticipantFalseForOutsiderOrMissingMatch() {
+        when(matchRepository.findById("alice_bob")).thenReturn(Optional.of(match("alice_bob", "alice", "bob")));
+        assertFalse(matchService.isParticipant("carol", "alice_bob"));
+
+        when(matchRepository.findById("nope")).thenReturn(Optional.empty());
+        assertFalse(matchService.isParticipant("alice", "nope"));
+    }
+
+    @Test
+    void isConversationBetweenTrueOnlyForTheTwoDistinctMembers() {
+        when(matchRepository.findById("alice_bob")).thenReturn(Optional.of(match("alice_bob", "alice", "bob")));
+
+        assertTrue(matchService.isConversationBetween("alice_bob", "alice", "bob"));
+        assertTrue(matchService.isConversationBetween("alice_bob", "bob", "alice"));
+        assertFalse(matchService.isConversationBetween("alice_bob", "alice", "carol"));
+    }
+
+    @Test
+    void isConversationBetweenFalseForSameSenderAndRecipient() {
+        // Short-circuits before hitting the repository.
+        assertFalse(matchService.isConversationBetween("alice_bob", "alice", "alice"));
+        verifyNoInteractions(matchRepository);
     }
 }
