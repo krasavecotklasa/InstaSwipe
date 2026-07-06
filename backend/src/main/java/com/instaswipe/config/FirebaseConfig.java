@@ -22,15 +22,15 @@ public class FirebaseConfig {
     public void initialize() {
         try {
             if (serviceAccountPath != null && !serviceAccountPath.isBlank()) {
-                FileInputStream serviceAccount = new FileInputStream(serviceAccountPath);
+                try (FileInputStream serviceAccount = new FileInputStream(serviceAccountPath)) {
+                    FirebaseOptions options = FirebaseOptions.builder()
+                            .setCredentials(GoogleCredentials.fromStream(serviceAccount))
+                            .build();
 
-                FirebaseOptions options = FirebaseOptions.builder()
-                        .setCredentials(GoogleCredentials.fromStream(serviceAccount))
-                        .build();
-
-                if (FirebaseApp.getApps().isEmpty()) {
-                    FirebaseApp.initializeApp(options);
-                    log.info("Firebase application has been initialized");
+                    if (FirebaseApp.getApps().isEmpty()) {
+                        FirebaseApp.initializeApp(options);
+                        log.info("Firebase application has been initialized");
+                    }
                 }
             } else {
                 log.warn("FIREBASE_CREDENTIALS environment variable not set. FCM Push Notifications will be disabled.");
