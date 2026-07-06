@@ -1,5 +1,6 @@
 package com.instaswipe.service;
 
+import com.instaswipe.exception.InvalidRequestException;
 import com.instaswipe.model.User;
 import com.instaswipe.repository.UserRepository;
 import org.junit.jupiter.api.Test;
@@ -8,13 +9,8 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.util.HashSet;
-import java.util.Optional;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -29,42 +25,68 @@ class MatchServiceTest {
     private MatchService matchService;
 
     @Test
-    void passPersonAddsTargetToPassedUserIds() {
-        User currentUser = User.builder()
-                .id("current-user")
-                .passedUserIds(new HashSet<>())
-                .build();
-
-        when(userRepository.findById("current-user")).thenReturn(Optional.of(currentUser));
-        when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+    void passPersonRecordsPassAndReturnsPassed() {
+        when(userRepository.recordPass("current-user", "target-user"))
+                .thenReturn(User.builder().id("current-user").build());
 
         String result = matchService.passPerson("current-user", "target-user");
 
         assertEquals("passed", result);
-        assertTrue(currentUser.getPassedUserIds().contains("target-user"));
-        verify(userRepository).save(currentUser);
+        verify(userRepository).recordPass("current-user", "target-user");
     }
 
     @Test
-    void lovePersonAddsTargetToLikedUserIds() {
-        User currentUser = User.builder()
-                .id("current-user")
-                .likedUserIds(new HashSet<>())
-                .build();
-
-        when(userRepository.findById("current-user")).thenReturn(Optional.of(currentUser));
-        when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+    void lovePersonRecordsLikeAndReturnsLiked() {
+        when(userRepository.recordLike("current-user", "target-user"))
+                .thenReturn(User.builder().id("current-user").build());
 
         String result = matchService.lovePerson("current-user", "target-user");
 
         assertEquals("liked", result);
-        assertTrue(currentUser.getLikedUserIds().contains("target-user"));
-        verify(userRepository).save(currentUser);
+        verify(userRepository).recordLike("current-user", "target-user");
     }
 
     @Test
     void passPersonRejectsSelfInteraction() {
-        assertThrows(IllegalArgumentException.class, () -> matchService.passPerson("same-user", "same-user"));
+        assertThrows(InvalidRequestException.class,
+                () -> matchService.passPerson("same-user", "same-user"));
         verifyNoInteractions(userRepository);
+    }
+
+    @Test
+    void lovePersonRejectsSelfInteraction() {
+        assertThrows(InvalidRequestException.class,
+                () -> matchService.lovePerson("same-user", "same-user"));
+        verifyNoInteractions(userRepository);
+    }
+
+    @Test
+    void passPersonRejectsNullCurrentUser() {
+        assertThrows(InvalidRequestException.class,
+                () -> matchService.passPerson(null, "target-user"));
+        verifyNoInteractions(userRepository);
+    }
+
+    @Test
+    void lovePersonRejectsNullCurrentUser() {
+        assertThrows(InvalidRequestException.class,
+                () -> matchService.lovePerson(null, "target-user"));
+        verifyNoInteractions(userRepository);
+    }
+
+    @Test
+    void passPersonThrowsWhenCurrentUserMissing() {
+        when(userRepository.recordPass("ghost", "target-user")).thenReturn(null);
+
+        assertThrows(IllegalArgumentException.class,
+                () -> matchService.passPerson("ghost", "target-user"));
+    }
+
+    @Test
+    void lovePersonThrowsWhenCurrentUserMissing() {
+        when(userRepository.recordLike("ghost", "target-user")).thenReturn(null);
+
+        assertThrows(IllegalArgumentException.class,
+                () -> matchService.lovePerson("ghost", "target-user"));
     }
 }
