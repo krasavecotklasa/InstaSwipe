@@ -28,11 +28,11 @@ public class PushNotificationService {
             key = RabbitMQConfig.PUSH_ROUTING
     ))
     public void handleOfflineMessageEvent(OfflineMessageEvent event) {
-        log.info("Received offline push notification event for recipient {}", event.getRecipientId());
+        log.info("Received offline push notification event for recipient {}", event.recipientId());
 
-        User recipient = userRepository.findById(event.getRecipientId()).orElse(null);
+        User recipient = userRepository.findById(event.recipientId()).orElse(null);
         if (recipient == null || recipient.getFcmToken() == null) {
-            log.warn("Cannot send push notification: User or FCM token missing for user {}", event.getRecipientId());
+            log.warn("Cannot send push notification: User or FCM token missing for user {}", event.recipientId());
             return;
         }
 
@@ -43,15 +43,15 @@ public class PushNotificationService {
                             .setTitle("New Message")
                             .setBody("You have a new message waiting in InstaSwipe!")
                             .build())
-                    .putData("chatRoomId", event.getChatRoomId())
-                    .putData("senderId", event.getSenderId())
+                    .putData("chatRoomId", event.chatRoomId())
+                    .putData("senderId", event.senderId())
                     .build();
 
             // FirebaseApp must be initialized for this to work
             String response = FirebaseMessaging.getInstance().send(message);
             log.info("Successfully sent FCM message: {}", response);
         } catch (Exception e) {
-            log.error("Error sending push notification to user {}", event.getRecipientId(), e);
+            log.error("Error sending push notification to user {}", event.recipientId(), e);
         }
     }
 }

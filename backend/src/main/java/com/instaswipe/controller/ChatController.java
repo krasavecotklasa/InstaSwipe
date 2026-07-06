@@ -60,14 +60,14 @@ public class ChatController {
         // 3. Deliver to recipient's private queue
         messagingTemplate.convertAndSendToUser(
                 chatMessage.getRecipientId(),
-                "/queue/" + chatMessage.getChatRoomId(),
+                "/queue/chat/" + chatMessage.getChatRoomId(),
                 savedMessage
         );
 
         // 4. Echo back to sender (supports multiple devices/tabs)
         messagingTemplate.convertAndSendToUser(
                 senderId,
-                "/queue/" + chatMessage.getChatRoomId(),
+                "/queue/chat/" + chatMessage.getChatRoomId(),
                 savedMessage
         );
 
@@ -78,13 +78,12 @@ public class ChatController {
         if (!isRecipientConnected) {
             log.debug("Recipient {} is offline. Publishing push notification event...", chatMessage.getRecipientId());
 
-            OfflineMessageEvent pushEvent = OfflineMessageEvent.builder()
-                    .messageId(savedMessage.getId())
-                    .chatRoomId(savedMessage.getChatRoomId())
-                    .senderId(senderId)
-                    .recipientId(savedMessage.getRecipientId())
-                    .content(savedMessage.getContent())
-                    .build();
+            OfflineMessageEvent pushEvent = new OfflineMessageEvent(
+                    savedMessage.getId(),
+                    savedMessage.getChatRoomId(),
+                    senderId,
+                    savedMessage.getRecipientId(),
+                    savedMessage.getContent());
 
             rabbitTemplate.convertAndSend(
                     RabbitMQConfig.PUSH_EXCHANGE,
