@@ -113,12 +113,12 @@ public class WebSocketAuthInterceptor implements ChannelInterceptor {
     private void verifyUserInMatch(String userId, String matchId) {
         Match match = matchRepository.findById(matchId)
                 .orElseThrow(() -> {
-                    log.error("WebSocket Subscribe Error: Match '{}' not found in database", matchId);
-                    return new AccessDeniedException("Match not found");
+                    log.warn("WebSocket subscribe rejected for user {}: match {} not found", userId, matchId);
+                    return new AccessDeniedException("User is not a participant of this match");
                 });
 
         if (!match.getUserOneId().equals(userId) && !match.getUserTwoId().equals(userId)) {
-            log.error("WebSocket Subscribe Error: User {} is not a participant of match {}", userId, matchId);
+            log.warn("WebSocket subscribe rejected for user {}: not a participant of match {}", userId, matchId);
             throw new AccessDeniedException("User is not a participant of this match");
         }
     }
