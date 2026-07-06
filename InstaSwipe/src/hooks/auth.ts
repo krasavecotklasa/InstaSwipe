@@ -3,8 +3,8 @@ import { Platform } from 'react-native';
 
 // On Android emulators, 'localhost' refers to the emulator itself.
 // Use 10.0.2.2 to reach the host machine's loopback interface.
-const API_HOST = '10.222.38.66';
-const API_PORT = process.env.EXPO_PUBLIC_API_PORT || '8080';
+const API_HOST = process.env.EXPO_PUBLIC_API_HOST;
+const API_PORT = process.env.EXPO_PUBLIC_API_PORT;
 const API_PREFIX_RAW = process.env.EXPO_PUBLIC_API_PREFIX || '/api';
 const API_PREFIX = API_PREFIX_RAW.startsWith('/') ? API_PREFIX_RAW : `/${API_PREFIX_RAW}`;
 const AUTH_BASE_PATH = `${API_PREFIX}/auth`;
