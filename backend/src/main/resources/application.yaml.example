@@ -5,7 +5,7 @@ spring:
     mongodb:
       auto-index-creation: true
   mongodb:
-    uri: ${MONGODB_URI:mongodb://localhost:27017/instaswipe}
+    uri: ${MONGODB_URI:mongodb://mongodb:27017/instaswipe}
 
 app:
   jwt:
@@ -13,7 +13,7 @@ app:
     secret: ${APP_JWT_SECRET:local-dev-only-secret-change-me-at-least-32-bytes!!}
 
 s3:
-  endpoint: http://localhost:9000
+  endpoint: http://minio:9000
   access-key: ${S3_USERNAME:admin}
   secret-key: ${S3_PASSWORD:supersecretpassword}
   bucket: media

@@ -21,11 +21,11 @@ public class MediaUploadService {
 
     public Media storeImage(MultipartFile file, String userId) {
         ProcessedImage image = imageProcessingService.process(file);
-        String url = mediaStorageService.upload(image.data(), image.contentType(), image.extension(), userId);
+        String publicUrl = mediaStorageService.upload(image.data(), image.contentType(), image.extension(), userId);
 
         return Media.builder()
                 .type(MediaType.IMAGE)
-                .url(url)
+                .url(publicUrl)
                 .filename(file.getOriginalFilename())
                 .size(image.data().length)
                 .build();

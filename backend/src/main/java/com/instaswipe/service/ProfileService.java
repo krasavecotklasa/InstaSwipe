@@ -21,6 +21,7 @@ public class ProfileService {
 
     private final UserRepository userRepository;
     private final MediaUploadService mediaUploadService;
+    private final MediaStorageService mediaStorageService;
 
     public OnboardingStatusResponse getStatus(String userId) {
         User user = getUserOrThrow(userId);
@@ -143,7 +144,11 @@ public class ProfileService {
     }
 
     private String pictureUrl(UserProfile profile) {
-        return profile.getProfilePicture() == null ? null : profile.getProfilePicture().getUrl();
+        if (profile.getProfilePicture() == null) {
+            return null;
+        }
+        // Ensure the URL is converted to presigned URL
+        return mediaStorageService.ensurePresignedUrl(profile.getProfilePicture().getUrl());
     }
 
     private User getUserOrThrow(String userId) {
