@@ -3,7 +3,7 @@ import { Platform } from 'react-native';
 
 // On Android emulators, 'localhost' refers to the emulator itself.
 // Use 10.0.2.2 to reach the host machine's loopback interface.
-const DEFAULT_API_HOST = '10.48.89.66';
+const DEFAULT_API_HOST = 'localhost';
 const API_HOST = process.env.EXPO_PUBLIC_API_HOST || DEFAULT_API_HOST;
 const API_PORT = process.env.EXPO_PUBLIC_API_PORT || '8080';
 const API_PREFIX_RAW = process.env.EXPO_PUBLIC_API_PREFIX || '/api';
@@ -30,8 +30,25 @@ export interface UserMeResponse {
   email: string;
 }
 
-const getAccessToken = async () => await SecureStore.getItemAsync('access_token');
-const getRefreshToken = async () => await SecureStore.getItemAsync('refresh_token');
+export interface ProfileStatusResponse {
+  email: string;
+  needsOnboarding: boolean;
+  emailVerified: boolean;
+}
+
+const getAccessToken = async () => {
+  if (Platform.OS === 'web') {
+    return localStorage.getItem('access_token');
+  }
+  return await SecureStore.getItemAsync('access_token');
+};
+
+const getRefreshToken = async () => {
+  if (Platform.OS === 'web') {
+    return localStorage.getItem('refresh_token');
+  }
+  return await SecureStore.getItemAsync('refresh_token');
+};
 
 const normalizeTokenValue = (value: unknown): string => {
   if (typeof value !== 'string' || value.length === 0) {
@@ -45,13 +62,23 @@ const setTokens = async (accessToken: string, refreshToken: string) => {
   const normalizedAccessToken = normalizeTokenValue(accessToken);
   const normalizedRefreshToken = normalizeTokenValue(refreshToken);
 
-  await SecureStore.setItemAsync('access_token', normalizedAccessToken);
-  await SecureStore.setItemAsync('refresh_token', normalizedRefreshToken);
+  if (Platform.OS === 'web') {
+    localStorage.setItem('access_token', normalizedAccessToken);
+    localStorage.setItem('refresh_token', normalizedRefreshToken);
+  } else {
+    await SecureStore.setItemAsync('access_token', normalizedAccessToken);
+    await SecureStore.setItemAsync('refresh_token', normalizedRefreshToken);
+  }
 };
 
 const clearTokens = async () => {
-  await SecureStore.deleteItemAsync('access_token');
-  await SecureStore.deleteItemAsync('refresh_token');
+  if (Platform.OS === 'web') {
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('refresh_token');
+  } else {
+    await SecureStore.deleteItemAsync('access_token');
+    await SecureStore.deleteItemAsync('refresh_token');
+  }
 };
 
 const logout = async () => {
@@ -75,10 +102,13 @@ const logout = async () => {
 class API {
   private static async request(endpoint: string, options: RequestInit = {}): Promise<Response> {
     const accessToken = await getAccessToken();
-    const headers = {
-      'Content-Type': 'application/json',
+    const headers: any = {
       ...((options.headers as any) || {}),
     };
+
+    if (!headers['Content-Type'] && !(options.body instanceof FormData)) {
+      headers['Content-Type'] = 'application/json';
+    }
 
     if (accessToken) {
       headers['Authorization'] = `Bearer ${accessToken}`;
@@ -141,6 +171,19 @@ class API {
         email: payload.email.toLowerCase(),
         password: payload.password,
       }),
+    });
+  }
+
+  static async getProfileStatus(): Promise<Response> {
+    return this.request(`${PROFILE_BASE_PATH}/status`, {
+      method: 'GET',
+    });
+  }
+
+  static async updateProfile(payload: FormData): Promise<Response> {
+    return this.request(`${PROFILE_BASE_PATH}/update`, {
+      method: 'PUT',
+      body: payload,
     });
   }
 }
