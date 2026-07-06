@@ -38,6 +38,11 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
                 .setClientPasscode(clientPasscode)
                 .setSystemLogin(clientLogin)
                 .setSystemPasscode(clientPasscode)
+                // Broadcast user sessions + unresolved user destinations over the shared broker so
+                // that, across multiple app instances, convertAndSendToUser reaches a user connected
+                // to any node and SimpUserRegistry sees presence cluster-wide (not just locally).
+                .setUserRegistryBroadcast("/topic/simp-user-registry")
+                .setUserDestinationBroadcast("/topic/unresolved-user-destination")
                 .setVirtualHost("/");
         
         config.setApplicationDestinationPrefixes("/app");
