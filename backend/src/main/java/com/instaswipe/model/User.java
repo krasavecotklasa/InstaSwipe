@@ -44,6 +44,9 @@ public class User {
     private Set<String> likedUserIds;
     private Set<String> passedUserIds;
 
+    // Mobile Push Notification token
+    private String fcmToken;
+
     // posts / shorts live in their own collections later
 
     @CreatedDate

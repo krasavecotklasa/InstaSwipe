@@ -22,17 +22,14 @@ services:
     container_name: minio
     restart: unless-stopped
     command: server /data --console-address ":9001"
-
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
-
     volumes:
       - ./minio-data:/data
-
     ports:
-      - "9000:9000"   # S3 API
-      - "9001:9001"   # Web console
+      - "9000:9000" # S3 API
+      - "9001:9001" # Web console
 
   mongodb:
     image: mongo:8.3.4-noble
@@ -44,4 +41,20 @@ services:
     volumes:
       - ./mongo-data:/data/db
     ports:
-      - "27017:27017"   # API
+      - "27017:27017" # API
+
+  rabbitmq:
+    image: rabbitmq:4.0-management
+    container_name: rabbitmq
+    restart: unless-stopped
+    ports:
+      - "5672:5672" # AMQP
+      - "15672:15672" # Management UI
+      - "61613:61613" # STOMP
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_ROOT_USERNAME:-guest}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_ROOT_PASSWORD:-guest}
+      # Enables the stomp plugin cleanly during boot without overriding the command
+      RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS: "-rabbitmq_management load_definitions \"\" -rabbit enabled_plugins_file \"/etc/rabbitmq/enabled_plugins\""
+    volumes:
+      - ./rabbitmq-data:/var/lib/rabbitmq
