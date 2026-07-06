@@ -15,6 +15,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
 import java.time.Period;
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -35,7 +36,7 @@ public class DiscoveryService {
         User currentUser = userRepository.findById(requesterId)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
-        List<String> excludedIds = new java.util.ArrayList<>();
+        List<String> excludedIds = new ArrayList<>();
         excludedIds.add(requesterId);
 
         if (currentUser.getLikedUserIds() != null) {
