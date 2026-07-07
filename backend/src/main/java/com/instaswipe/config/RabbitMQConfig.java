@@ -94,14 +94,25 @@ public class RabbitMQConfig {
 
     // --- Listener Container Factory (used by @RabbitListener in PushNotificationService) ---
 
+    // Default factory (used by the offline push listener): keeps Spring's default requeue
+    // behavior. The push queue has no DLQ, so dropping-on-reject here would silently lose
+    // messages on transient errors.
     @Bean
     public SimpleRabbitListenerContainerFactory rabbitListenerContainerFactory(ConnectionFactory connectionFactory) {
         SimpleRabbitListenerContainerFactory factory = new SimpleRabbitListenerContainerFactory();
         factory.setConnectionFactory(connectionFactory);
         factory.setMessageConverter(jsonMessageConverter());
-        // On a listener exception, reject without requeue so a poison message dead-letters
-        // (image queue -> DLQ) instead of hot-looping. The push listener catches its own
-        // errors, so it never rejects and is unaffected.
+        return factory;
+    }
+
+    // Dedicated factory for the image processing listener: on a listener exception, reject
+    // without requeue so a poison message dead-letters to the image DLQ instead of hot-looping.
+    // Scoped here so it does not affect the offline push listener.
+    @Bean
+    public SimpleRabbitListenerContainerFactory imageListenerContainerFactory(ConnectionFactory connectionFactory) {
+        SimpleRabbitListenerContainerFactory factory = new SimpleRabbitListenerContainerFactory();
+        factory.setConnectionFactory(connectionFactory);
+        factory.setMessageConverter(jsonMessageConverter());
         factory.setDefaultRequeueRejected(false);
         return factory;
     }
