@@ -41,25 +41,25 @@ public class ChatController {
         }
 
         String senderId = principal.getName();
-        if (!senderId.equals(chatMessage.getSenderId())) {
-            log.warn("Sender ID mismatch. Token principal: {}, Payload senderId: {}", senderId, chatMessage.getSenderId());
+        if (!senderId.equals(chatMessage.senderId())) {
+            log.warn("Sender ID mismatch. Token principal: {}, Payload senderId: {}", senderId, chatMessage.senderId());
             return;
         }
 
         // 2. Authorize: sender and recipient must be the two participants of this match (room).
         //    Guards the write path the same way the SUBSCRIBE interceptor guards the read path.
-        if (!matchService.isConversationBetween(chatMessage.getChatRoomId(), senderId, chatMessage.getRecipientId())) {
+        if (!matchService.isConversationBetween(chatMessage.chatRoomId(), senderId, chatMessage.recipientId())) {
             log.warn("Rejected message: {} is not authorized to send to room {} (recipient {})",
-                    senderId, chatMessage.getChatRoomId(), chatMessage.getRecipientId());
+                    senderId, chatMessage.chatRoomId(), chatMessage.recipientId());
             return;
         }
 
         // 3. Persist message to MongoDB (timestamp is populated by @CreatedDate auditing)
         Message message = Message.builder()
-                .chatRoomId(chatMessage.getChatRoomId())
+                .chatRoomId(chatMessage.chatRoomId())
                 .senderId(senderId)
-                .recipientId(chatMessage.getRecipientId())
-                .content(chatMessage.getContent())
+                .recipientId(chatMessage.recipientId())
+                .content(chatMessage.content())
                 .isRead(false)
                 .build();
 
@@ -67,24 +67,24 @@ public class ChatController {
 
         // 4. Deliver to recipient's private queue
         messagingTemplate.convertAndSendToUser(
-                chatMessage.getRecipientId(),
-                "/queue/chat/" + chatMessage.getChatRoomId(),
+                chatMessage.recipientId(),
+                "/queue/chat/" + chatMessage.chatRoomId(),
                 savedMessage
         );
 
         // 5. Echo back to sender (supports multiple devices/tabs)
         messagingTemplate.convertAndSendToUser(
                 senderId,
-                "/queue/chat/" + chatMessage.getChatRoomId(),
+                "/queue/chat/" + chatMessage.chatRoomId(),
                 savedMessage
         );
 
         // 6. Offline push notification via RabbitMQ → FCM
-        SimpUser recipient = simpUserRegistry.getUser(chatMessage.getRecipientId());
+        SimpUser recipient = simpUserRegistry.getUser(chatMessage.recipientId());
         boolean isRecipientConnected = (recipient != null && !recipient.getSessions().isEmpty());
 
         if (!isRecipientConnected) {
-            log.debug("Recipient {} is offline. Publishing push notification event...", chatMessage.getRecipientId());
+            log.debug("Recipient {} is offline. Publishing push notification event...", chatMessage.recipientId());
 
             OfflineMessageEvent pushEvent = new OfflineMessageEvent(
                     savedMessage.getId(),
