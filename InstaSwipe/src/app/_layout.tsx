@@ -7,7 +7,7 @@ import { AnimatedSplashOverlay } from '@/components/animated-icon';
 import AppTabs from '@/components/app-tabs';
 import AuthGate from '@/components/auth-gate';
 import OnboardingGate from '@/components/onboarding-gate';
-import { getAccessToken, logout, API } from '@/hooks/auth';
+import { getAccessToken, logout, API, OwnProfileResponse } from '@/hooks/auth';
 import { AuthContext } from '@/hooks/auth-context';
 
 SplashScreen.preventAutoHideAsync();
@@ -16,6 +16,7 @@ export default function RootLayout() {
   const colorScheme = useColorScheme();
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const [needsOnboarding, setNeedsOnboarding] = useState<boolean | null>(null);
+  const [profileEditorProfile, setProfileEditorProfile] = useState<OwnProfileResponse | null>(null);
 
   useEffect(() => {
     async function checkAuth() {
@@ -58,11 +59,13 @@ export default function RootLayout() {
         await logout();
         setIsAuthenticated(false);
         setNeedsOnboarding(null);
+        setProfileEditorProfile(null);
       },
+      onEditProfile: (profile: OwnProfileResponse) => setProfileEditorProfile(profile),
     }),
     [],
   );
-//
+
   // Show nothing while checking auth or onboarding status to avoid flickering
   if (isAuthenticated === null) {
     return null;
@@ -81,6 +84,12 @@ export default function RootLayout() {
         {!isAuthenticated ? (
           // Not authenticated: show login / register
           <AuthGate onAuthSuccess={() => setIsAuthenticated(true)} />
+        ) : profileEditorProfile ? (
+          <OnboardingGate
+            mode="update"
+            initialProfile={profileEditorProfile}
+            onOnboardSuccess={() => setProfileEditorProfile(null)}
+          />
         ) : needsOnboarding ? (
           // Authenticated but profile incomplete: show onboarding
           <OnboardingGate onOnboardSuccess={() => setNeedsOnboarding(false)} />

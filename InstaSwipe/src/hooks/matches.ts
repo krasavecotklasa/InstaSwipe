@@ -10,7 +10,15 @@ const API_BASE_URL = (API_PORT === '80' || API_PORT === '443')
   ? `http://${API_HOST}`
   : `http://${API_HOST}:${API_PORT}`;
 
-export type Gender = 'MALE' | 'FEMALE';
+export type Gender = 'MALE' | 'FEMALE' | 'NON_BINARY' | 'OTHER';
+
+export const DISCOVERY_GENDERS: Gender[] = ['FEMALE', 'MALE', 'NON_BINARY', 'OTHER'];
+export const DISCOVERY_GENDER_LABELS: Record<Gender, string> = {
+  FEMALE: 'Female',
+  MALE: 'Male',
+  NON_BINARY: 'Non-Binary',
+  OTHER: 'Other',
+};
 
 export interface DiscoveryProfile {
   id: string;
@@ -35,13 +43,23 @@ export interface PageResponse<T> {
 export interface DiscoveryFilters {
   minAge?: number;
   maxAge?: number;
-  gender?: Gender;
+  gender?: string;
   country?: string;
   interests?: string[];
   page?: number;
   size?: number;
   sort?: string[];
 }
+
+export interface DiscoveryPreferences {
+  minAge: number | '';
+  maxAge: number | '';
+  gender: Gender | '';
+  country: string;
+  interests: string[];
+}
+
+const DISCOVERY_PREFERENCES_KEY = 'discovery_preferences';
 
 const isWebPlatform = () => Platform.OS === 'web';
 
@@ -66,12 +84,17 @@ const appendStringParam = (params: URLSearchParams, key: string, value?: string)
   }
 };
 
+const normalizeDiscoveryGender = (value?: string) => {
+  const normalized = value?.trim().toUpperCase();
+  return normalized && DISCOVERY_GENDERS.includes(normalized as Gender) ? normalized : undefined;
+};
+
 const buildDiscoveryQuery = (filters: DiscoveryFilters = {}) => {
   const params = new URLSearchParams();
 
   appendNumberParam(params, 'minAge', filters.minAge);
   appendNumberParam(params, 'maxAge', filters.maxAge);
-  appendStringParam(params, 'gender', filters.gender);
+  appendStringParam(params, 'gender', normalizeDiscoveryGender(filters.gender));
   appendStringParam(params, 'country', filters.country);
   appendNumberParam(params, 'page', filters.page ?? 0);
   appendNumberParam(params, 'size', filters.size ?? 20);
@@ -88,6 +111,49 @@ const buildDiscoveryQuery = (filters: DiscoveryFilters = {}) => {
 
   const query = params.toString();
   return query ? `?${query}` : '';
+};
+
+const normalizeDiscoveryPreferences = (preferences: Partial<DiscoveryPreferences> | null | undefined): DiscoveryPreferences => {
+  return {
+    minAge: typeof preferences?.minAge === 'number' && Number.isFinite(preferences.minAge) ? preferences.minAge : '',
+    maxAge: typeof preferences?.maxAge === 'number' && Number.isFinite(preferences.maxAge) ? preferences.maxAge : '',
+    gender: preferences?.gender && DISCOVERY_GENDERS.includes(preferences.gender as Gender)
+      ? (preferences.gender as Gender)
+      : '',
+    country: preferences?.country?.trim() || '',
+    interests: Array.isArray(preferences?.interests)
+      ? preferences.interests.map((interest) => interest.trim()).filter(Boolean)
+      : [],
+  };
+};
+
+export const getDiscoveryPreferences = async (): Promise<DiscoveryPreferences> => {
+  const rawValue = isWebPlatform()
+    ? window.localStorage.getItem(DISCOVERY_PREFERENCES_KEY)
+    : await SecureStore.getItemAsync(DISCOVERY_PREFERENCES_KEY);
+
+  if (!rawValue) {
+    return normalizeDiscoveryPreferences(null);
+  }
+
+  try {
+    return normalizeDiscoveryPreferences(JSON.parse(rawValue));
+  } catch {
+    return normalizeDiscoveryPreferences(null);
+  }
+};
+
+export const setDiscoveryPreferences = async (preferences: Partial<DiscoveryPreferences>) => {
+  const normalized = normalizeDiscoveryPreferences(preferences);
+  const serialized = JSON.stringify(normalized);
+
+  if (isWebPlatform()) {
+    window.localStorage.setItem(DISCOVERY_PREFERENCES_KEY, serialized);
+  } else {
+    await SecureStore.setItemAsync(DISCOVERY_PREFERENCES_KEY, serialized);
+  }
+
+  return normalized;
 };
 
 export class MatchAPI {

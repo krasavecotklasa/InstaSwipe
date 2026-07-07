@@ -40,6 +40,17 @@ export interface ProfileStatusResponse {
   emailVerified: boolean;
 }
 
+export interface OwnProfileResponse {
+  email: string;
+  displayName: string;
+  bio: string;
+  birthDate: string;
+  country: string;
+  gender: string;
+  interests: string[];
+  profilePictureUrl: string | null;
+}
+
 const isWebPlatform = () => Platform.OS === 'web';
 
 const getAccessToken = async () => {
@@ -214,6 +225,12 @@ class API {
 
   static async getProfileStatus(): Promise<Response> {
     return this.request(`${PROFILE_BASE_PATH}/status`, {
+      method: 'GET',
+    });
+  }
+
+  static async getOwnProfile(): Promise<Response> {
+    return this.request(`${PROFILE_BASE_PATH}/me`, {
       method: 'GET',
     });
   }

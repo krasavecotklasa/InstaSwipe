@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Platform,
   StyleSheet,
@@ -14,12 +14,14 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { API } from '@/hooks/auth';
+import { API, OwnProfileResponse } from '@/hooks/auth';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 interface OnboardingGateProps {
   onOnboardSuccess: () => void;
+  mode?: 'create' | 'update';
+  initialProfile?: Pick<OwnProfileResponse, 'displayName' | 'bio' | 'birthDate' | 'country' | 'gender' | 'interests' | 'profilePictureUrl'>;
 }
 
 function errorHandle(error: string) {
@@ -33,18 +35,29 @@ function errorHandle(error: string) {
 const GENDERS = ['MALE', 'FEMALE', 'NON_BINARY', 'OTHER'];
 const GendersDisplay = ['Male', 'Female', 'Non-Binary', 'Other'];
 
-export default function OnboardingGate({ onOnboardSuccess }: OnboardingGateProps) {
-  const [displayName, setDisplayName] = useState('');
-  const [bio, setBio] = useState('');
-  const [birthDate, setBirthDate] = useState('');
-  const [country, setCountry] = useState('');
-  const [gender, setGender] = useState('MALE');
-  const [interests, setInterests] = useState('');
+export default function OnboardingGate({ onOnboardSuccess, mode = 'create', initialProfile }: OnboardingGateProps) {
+  const [displayName, setDisplayName] = useState(initialProfile?.displayName ?? '');
+  const [bio, setBio] = useState(initialProfile?.bio ?? '');
+  const [birthDate, setBirthDate] = useState(initialProfile?.birthDate ?? '');
+  const [country, setCountry] = useState(initialProfile?.country ?? '');
+  const [gender, setGender] = useState(initialProfile?.gender ?? GENDERS[0]);
+  const [interests, setInterests] = useState((initialProfile?.interests ?? []).join(', '));
   // FIX: keep the full picker asset (uri + mimeType), not just the uri string.
   // We need the real mime type to build a correct native FormData part below.
   const [profileImage, setProfileImage] = useState<ImagePicker.ImagePickerAsset | null>(null);
   const [loading, setLoading] = useState(false);
   const theme = useTheme();
+  const currentProfilePictureUrl = initialProfile?.profilePictureUrl;
+
+  useEffect(() => {
+    setDisplayName(initialProfile?.displayName ?? '');
+    setBio(initialProfile?.bio ?? '');
+    setBirthDate(initialProfile?.birthDate ?? '');
+    setCountry(initialProfile?.country ?? '');
+    setGender(initialProfile?.gender ?? GENDERS[0]);
+    setInterests((initialProfile?.interests ?? []).join(', '));
+    setProfileImage(null);
+  }, [initialProfile]);
 
   const handlePickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -154,15 +167,21 @@ export default function OnboardingGate({ onOnboardSuccess }: OnboardingGateProps
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
         <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
-          <ThemedText type="title" style={styles.title}>Let's finish setting up your profile</ThemedText>
+          <ThemedText type="title" style={styles.title}>
+            {mode === 'update' ? 'Update your profile' : "Let's finish setting up your profile"}
+          </ThemedText>
 
           <View style={styles.form}>
             <TouchableOpacity style={styles.avatarContainer} onPress={handlePickImage}>
               {profileImage ? (
                 <Image source={{ uri: profileImage.uri }} style={styles.avatarImage} />
+              ) : currentProfilePictureUrl ? (
+                <Image source={{ uri: currentProfilePictureUrl }} style={styles.avatarImage} />
               ) : (
                 <View style={[styles.avatarPlaceholder, { backgroundColor: theme.backgroundElement }]}>
-                  <ThemedText style={styles.avatarText}>Add Photo</ThemedText>
+                  <ThemedText style={styles.avatarText}>
+                    {mode === 'update' ? 'Keep Photo' : 'Add Photo'}
+                  </ThemedText>
                 </View>
               )}
             </TouchableOpacity>
@@ -236,7 +255,9 @@ export default function OnboardingGate({ onOnboardSuccess }: OnboardingGateProps
               {loading ? (
                 <ActivityIndicator color="#fff" />
               ) : (
-                <ThemedText style={styles.buttonText}>Create profile</ThemedText>
+                <ThemedText style={styles.buttonText}>
+                  {mode === 'update' ? 'Update profile' : 'Create profile'}
+                </ThemedText>
               )}
             </TouchableOpacity>
           </View>
