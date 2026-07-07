@@ -25,15 +25,21 @@ public class MediaStorageService {
     private final S3Presigner s3Presigner;
     private final String bucket;
     private final String publicEndpoint;
+    private final Duration presignDuration;
+    private final boolean publicBucket;
 
     public MediaStorageService(S3Client s3Client,
                           S3Presigner s3Presigner,
                           @Value("${s3.bucket:media}") String bucket,
-                          @Value("${s3.public-endpoint:${s3.endpoint}}") String publicEndpoint) {
+                          @Value("${s3.public-endpoint:${s3.endpoint}}") String publicEndpoint,
+                          @Value("${s3.presign-ttl-minutes:60}") long presignTtlMinutes,
+                          @Value("${s3.public-bucket:false}") boolean publicBucket) {
         this.s3Client = s3Client;
         this.s3Presigner = s3Presigner;
         this.bucket = bucket;
         this.publicEndpoint = normalizeEndpoint(publicEndpoint);
+        this.presignDuration = Duration.ofMinutes(presignTtlMinutes);
+        this.publicBucket = publicBucket;
     }
 
     /**
@@ -92,7 +98,7 @@ public class MediaStorageService {
      * The presigned URL points to the original media location and can be used without authentication.
      */
     public String getPresignedUrl(String key) {
-        return getPresignedUrl(key, Duration.ofMinutes(5));
+        return getPresignedUrl(key, presignDuration);
     }
 
     /**
@@ -158,6 +164,11 @@ public class MediaStorageService {
         if (url.contains("X-Amz-Signature") || url.contains("X-Amz-Algorithm")) {
             return url; // Already presigned, return as-is
         }
+        // If this deployment uses a public bucket, return the raw public URL (strip any query params).
+        if (publicBucket && url.contains(publicEndpoint) && url.contains(bucket)) {
+            return url.split("\\?")[0];
+        }
+
         // Only convert if it looks like a public URL pointing to our bucket
         if (url.contains(publicEndpoint) && url.contains(bucket)) {
             return convertToPresignedUrl(url);
