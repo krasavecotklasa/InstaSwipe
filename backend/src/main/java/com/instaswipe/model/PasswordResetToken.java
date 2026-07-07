@@ -1,0 +1,38 @@
+package com.instaswipe.model;
+
+import java.time.Instant;
+
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.index.Indexed;
+import org.springframework.data.mongodb.core.mapping.Document;
+
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+@Document(collection = "password_reset_tokens")
+public class PasswordResetToken {
+
+    @Id
+    private String id;
+
+    @Indexed
+    private String userId;
+
+    @Indexed(unique = true)
+    private String tokenHash;
+
+    @Indexed(expireAfter = "0s")
+    private Instant expiresAt;
+
+    @Builder.Default
+    private boolean used = false;
+
+    @CreatedDate
+    private Instant createdAt;
+}

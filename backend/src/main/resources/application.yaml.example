@@ -1,0 +1,33 @@
+spring:
+  application:
+    name: backend
+  data:
+    mongodb:
+      auto-index-creation: true
+  mongodb:
+    uri: ${MONGODB_URI:mongodb://mongodb:27017/instaswipe}
+  rabbitmq:
+    host: ${SPRING_RABBITMQ_HOST:localhost}
+    port: ${SPRING_RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_ROOT_USERNAME:guest}
+    password: ${RABBITMQ_ROOT_PASSWORD:guest}
+
+app:
+  jwt:
+    # Set APP_JWT_SECRET (random 32+ bytes) in every real environment.
+    secret: ${APP_JWT_SECRET:local-dev-only-secret-change-me-at-least-32-bytes!!}
+
+s3:
+  endpoint: http://minio:9000
+  access-key: ${S3_USERNAME:admin}
+  secret-key: ${S3_PASSWORD:supersecretpassword}
+  bucket: media
+  region: eu-central-2
+
+# Image uploads (images only for now: JPEG/PNG in, re-encoded to compressed JPEG).
+# max-image-size is also enforced at the multipart layer (see MediaConfig), so these
+# defaults hold even without this block. Values shown are the built-in defaults.
+media:
+  max-image-size: 10MB   # hard upload cap
+  max-dimension: 1080    # longest side after downscaling, in px (images are never upscaled)
+  jpeg-quality: 0.82     # JPEG output quality, 0.0-1.0
