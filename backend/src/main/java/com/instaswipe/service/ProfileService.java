@@ -6,6 +6,7 @@ import com.instaswipe.dto.ProfileUpdateRequest;
 import com.instaswipe.dto.PublicProfileResponse;
 import com.instaswipe.event.ImageTarget;
 import com.instaswipe.model.Media;
+import com.instaswipe.model.MediaStatus;
 import com.instaswipe.model.User;
 import com.instaswipe.model.UserProfile;
 import com.instaswipe.repository.UserRepository;
@@ -104,12 +105,22 @@ public class ProfileService {
         return accepted.pendingMedia();
     }
 
-    /** Object key of the profile's current picture, or null if there isn't one. */
+    /**
+     * Object key of the profile's current picture when it is safe to delete on replacement,
+     * or null otherwise. Only a finalized ({@link MediaStatus#READY}, or legacy {@code null})
+     * image is a valid deletion target: a PROCESSING placeholder's URL points at a temp raw
+     * object still owned by its own queued event, and deleting it would break that event.
+     */
     private String currentPictureKey(UserProfile profile) {
-        if (profile.getProfilePicture() == null) {
+        Media current = profile.getProfilePicture();
+        if (current == null) {
             return null;
         }
-        return mediaStorageService.extractKeyFromUrl(profile.getProfilePicture().getUrl());
+        MediaStatus status = current.getStatus();
+        if (status != null && status != MediaStatus.READY) {
+            return null;
+        }
+        return mediaStorageService.extractKeyFromUrl(current.getUrl());
     }
 
     public OwnProfileResponse getOwnProfile(String userId) {

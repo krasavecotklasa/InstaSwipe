@@ -193,4 +193,58 @@ class ProfileUpdateAndPictureTest extends AbstractWebIntegrationTest {
         Media picture = userRepository.findById(user.getId()).orElseThrow().getProfile().getProfilePicture();
         assertThat(picture.getUrl()).isEqualTo(originalUrl);
     }
+
+    @Test
+    void uploadDoesNotPassInFlightProcessingPictureAsPreviousKey() {
+        User user = bareUser("proc@x.com");
+        // An earlier upload is still PROCESSING; its URL points at a temp raw object.
+        user.setProfile(UserProfile.builder()
+                .profilePicture(Media.builder()
+                        .url("https://cdn.test/tmp/inflight.jpg")
+                        .status(MediaStatus.PROCESSING)
+                        .build())
+                .build());
+        userRepository.save(user);
+        // Even if a key could be extracted, the in-flight temp object must not be a deletion target.
+        when(mediaStorageService.extractKeyFromUrl("https://cdn.test/tmp/inflight.jpg"))
+                .thenReturn("proc/tmp/inflight.jpg");
+
+        MultipartBodyBuilder body = new MultipartBodyBuilder();
+        body.part("file", jpegPart()).contentType(MediaType.IMAGE_JPEG);
+        client(tokenFor(user)).post().uri("/api/profile/picture")
+                .contentType(MediaType.MULTIPART_FORM_DATA)
+                .body(body.build())
+                .retrieve().toEntity(ProfilePictureResponse.class);
+
+        ArgumentCaptor<ImageProcessingEvent> event = ArgumentCaptor.forClass(ImageProcessingEvent.class);
+        verify(rabbitTemplate).convertAndSend(
+                eq(RabbitMQConfig.IMAGE_EXCHANGE), eq(RabbitMQConfig.IMAGE_ROUTING), (Object) event.capture());
+        assertThat(event.getValue().previousKey()).isNull();
+    }
+
+    @Test
+    void uploadPassesReadyPreviousPictureKeyForDeletion() {
+        User user = bareUser("ready@x.com");
+        user.setProfile(UserProfile.builder()
+                .profilePicture(Media.builder()
+                        .url("https://cdn.test/media/u/profile/old.jpg")
+                        .status(MediaStatus.READY)
+                        .build())
+                .build());
+        userRepository.save(user);
+        when(mediaStorageService.extractKeyFromUrl("https://cdn.test/media/u/profile/old.jpg"))
+                .thenReturn("u/profile/old.jpg");
+
+        MultipartBodyBuilder body = new MultipartBodyBuilder();
+        body.part("file", jpegPart()).contentType(MediaType.IMAGE_JPEG);
+        client(tokenFor(user)).post().uri("/api/profile/picture")
+                .contentType(MediaType.MULTIPART_FORM_DATA)
+                .body(body.build())
+                .retrieve().toEntity(ProfilePictureResponse.class);
+
+        ArgumentCaptor<ImageProcessingEvent> event = ArgumentCaptor.forClass(ImageProcessingEvent.class);
+        verify(rabbitTemplate).convertAndSend(
+                eq(RabbitMQConfig.IMAGE_EXCHANGE), eq(RabbitMQConfig.IMAGE_ROUTING), (Object) event.capture());
+        assertThat(event.getValue().previousKey()).isEqualTo("u/profile/old.jpg");
+    }
 }
