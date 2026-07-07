@@ -35,3 +35,4 @@ application.yaml
 # Databases
 minio-data/
 mongo-data/
+rabbitmq-data/
