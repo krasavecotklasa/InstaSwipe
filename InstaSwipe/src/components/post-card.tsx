@@ -4,6 +4,8 @@ import { Image } from 'expo-image';
 import { SymbolView } from 'expo-symbols';
 import { useTheme } from '@/hooks/use-theme';
 import { Spacing } from '@/constants/theme';
+import { likePost, unlikePost } from '@/hooks/posts';
+
 
 // Mirrors the backend Media: images are uploaded async, so `status` tracks where
 // the object is in the processing pipeline. While PROCESSING, `url` points at a raw
@@ -19,12 +21,14 @@ export interface Media {
 }
 
 export interface Post {
-  caption: string;
-  createdAt: string;
   id: string;
-  likes: number;
-  media: Media | null; // text-only posts have no media
   userId: string;
+  username: string;
+  caption?: string;
+  likes: number;
+  likedByMe: boolean;
+  createdAt: string;
+  media: Media | null; // text-only posts have no media
 }
 
 interface PostCardProps {
@@ -33,15 +37,17 @@ interface PostCardProps {
 
 export function PostCard({ post }: PostCardProps) {
   const theme = useTheme();
-  const [liked, setLiked] = useState(false);
+  const [liked, setLiked] = useState(post.likedByMe);
   const [likeCount, setLikeCount] = useState(post.likes);
 
   const handleLike = () => {
     if (liked) {
       setLiked(false);
+      unlikePost(post.id);
       setLikeCount(prev => prev - 1);
     } else {
       setLiked(true);
+      likePost(post.id);
       setLikeCount(prev => prev + 1);
     }
   };
@@ -50,13 +56,13 @@ export function PostCard({ post }: PostCardProps) {
     <View style={[styles.card, { borderColor: theme.tabActiveBorder }]}>
       <View style={styles.header}>
         <Image
-          source={{ uri: post.userId }}
+          source={{ uri: post.username }}
           style={styles.avatar}
           contentFit="cover"
           transition={200}
         />
         <View style={styles.headerTextContainer}>
-          <Text style={styles.username}>{post.userId}</Text>
+          <Text style={styles.username}>{post.username}</Text>
           <Text style={[styles.date, { color: theme.textSecondary }]}>
             {post.createdAt}
           </Text>
