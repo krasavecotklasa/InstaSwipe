@@ -9,6 +9,7 @@ import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 
 import javax.imageio.ImageIO;
 
@@ -19,8 +20,9 @@ import com.instaswipe.exception.InvalidRequestException;
 import com.instaswipe.service.ImageProcessingService.ProcessedImage;
 
 /**
- * Pure unit test (no Spring context, no Testcontainers) covering image validation,
- * downscaling, and JPEG re-encoding.
+ * Pure unit test (no Spring context, no Testcontainers) covering cheap up-front
+ * validation ({@link ImageProcessingService#validateBasics}) and the worker-side
+ * downscale + JPEG re-encode ({@link ImageProcessingService#process(byte[])}).
  */
 class ImageProcessingServiceTest {
 
@@ -31,8 +33,7 @@ class ImageProcessingServiceTest {
     void downscalesImagesLargerThanMaxDimension() throws IOException {
         byte[] input = image(2000, 1500, "png", false);
 
-        ProcessedImage result = service.process(
-                new MockMultipartFile("file", "big.png", "image/png", input));
+        ProcessedImage result = service.process(input);
 
         assertThat(result.contentType()).isEqualTo("image/jpeg");
         assertThat(result.extension()).isEqualTo(".jpg");
@@ -47,8 +48,7 @@ class ImageProcessingServiceTest {
     void doesNotUpscaleSmallImages() throws IOException {
         byte[] input = image(400, 300, "jpg", false);
 
-        ProcessedImage result = service.process(
-                new MockMultipartFile("file", "small.jpg", "image/jpeg", input));
+        ProcessedImage result = service.process(input);
 
         BufferedImage decoded = decode(result.data());
         assertThat(decoded.getWidth()).isEqualTo(400);
@@ -59,40 +59,38 @@ class ImageProcessingServiceTest {
     void acceptsPngWithAlphaAndProducesValidJpeg() throws IOException {
         byte[] input = image(500, 500, "png", true);
 
-        ProcessedImage result = service.process(
-                new MockMultipartFile("file", "alpha.png", "image/png", input));
+        ProcessedImage result = service.process(input);
 
         assertThat(decode(result.data())).isNotNull();
     }
 
     @Test
-    void rejectsNonImageContentType() {
+    void validateRejectsNonImageContentType() {
         MockMultipartFile file = new MockMultipartFile(
-                "file", "note.txt", "text/plain", "hello".getBytes());
+                "file", "note.txt", "text/plain", "hello".getBytes(StandardCharsets.UTF_8));
 
-        assertThatThrownBy(() -> service.process(file))
+        assertThatThrownBy(() -> service.validateBasics(file))
                 .isInstanceOf(InvalidRequestException.class);
     }
 
     @Test
-    void rejectsBytesThatAreNotADecodableImage() {
-        // content-type claims PNG, but the bytes are not an image
-        MockMultipartFile file = new MockMultipartFile(
-                "file", "fake.png", "image/png", "not really a png".getBytes());
-
-        assertThatThrownBy(() -> service.process(file))
-                .isInstanceOf(InvalidRequestException.class);
-    }
-
-    @Test
-    void rejectsFilesOverTheSizeLimit() throws IOException {
+    void validateRejectsFilesOverTheSizeLimit() throws IOException {
         ImageProcessingService tinyLimit =
                 new ImageProcessingService(1080, 0.82, "1KB");
         byte[] input = image(800, 800, "png", false);
 
         MockMultipartFile file = new MockMultipartFile("file", "big.png", "image/png", input);
 
-        assertThatThrownBy(() -> tinyLimit.process(file))
+        assertThatThrownBy(() -> tinyLimit.validateBasics(file))
+                .isInstanceOf(InvalidRequestException.class);
+    }
+
+    @Test
+    void processRejectsBytesThatAreNotADecodableImage() {
+        // Passes the cheap content-type check upstream, but the real decode fails here.
+        byte[] notAnImage = "not really a png".getBytes(StandardCharsets.UTF_8);
+
+        assertThatThrownBy(() -> service.process(notAnImage))
                 .isInstanceOf(InvalidRequestException.class);
     }
 

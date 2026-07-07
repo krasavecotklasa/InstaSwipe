@@ -9,9 +9,9 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 
+import com.instaswipe.event.ImageTarget;
 import com.instaswipe.exception.InvalidRequestException;
 import com.instaswipe.model.Post;
-import com.instaswipe.model.Media;
 import com.instaswipe.repository.PostRepository;
 
 @Service
@@ -27,15 +27,22 @@ public class PostService {
             throw new InvalidRequestException("A post must have a caption or an image");
         }
 
-        Media media = hasFile ? mediaUploadService.storeImage(file, userId) : null;
+        // Store the raw bytes and attach a PROCESSING placeholder. The post is saved
+        // (so it has an id) before the image is enqueued, so the worker can find it.
+        MediaUploadService.AcceptedImage accepted = hasFile ? mediaUploadService.accept(file, userId) : null;
 
         Post post = Post.builder()
                 .userId(userId)
                 .caption(caption)
-                .media(media)
+                .media(accepted != null ? accepted.pendingMedia() : null)
                 .build();
 
-        return postRepository.save(post);
+        Post saved = postRepository.save(post);
+
+        if (accepted != null) {
+            mediaUploadService.enqueue(accepted.rawKey(), userId, ImageTarget.POST, saved.getId(), null);
+        }
+        return saved;
     }
 
     public Post likePost(String postId, String userId) {
