@@ -6,6 +6,11 @@ spring:
       auto-index-creation: true
   mongodb:
     uri: ${MONGODB_URI:mongodb://mongodb:27017/instaswipe}
+  rabbitmq:
+    host: ${SPRING_RABBITMQ_HOST:localhost}
+    port: ${SPRING_RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_ROOT_USERNAME:guest}
+    password: ${RABBITMQ_ROOT_PASSWORD:guest}
 
 app:
   jwt:
