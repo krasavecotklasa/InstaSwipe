@@ -1,8 +1,12 @@
 package com.instaswipe.controller;
 
+import com.instaswipe.config.RabbitMQConfig;
 import com.instaswipe.dto.ProfilePictureResponse;
+import com.instaswipe.event.ImageProcessingEvent;
+import com.instaswipe.event.ImageTarget;
 import com.instaswipe.model.Gender;
 import com.instaswipe.model.Media;
+import com.instaswipe.model.MediaStatus;
 import com.instaswipe.model.Role;
 import com.instaswipe.model.User;
 import com.instaswipe.model.UserProfile;
@@ -10,6 +14,8 @@ import com.instaswipe.service.MediaStorageService;
 import com.instaswipe.support.AbstractWebIntegrationTest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.MediaType;
@@ -25,23 +31,31 @@ import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
  * Covers both profile-picture upload paths — the dedicated POST /api/profile/picture
- * and the inline file on the multipart PUT /api/profile/update — plus the keep-existing
- * and validation branches. S3 is mocked; ImageProcessingService runs for real.
+ * and the inline file on the multipart PUT /api/profile/update — under the async
+ * pipeline: the request stores the raw bytes, persists a PROCESSING placeholder, and
+ * queues finalization. S3 and RabbitMQ are mocked; validation runs for real.
  */
 class ProfileUpdateAndPictureTest extends AbstractWebIntegrationTest {
 
-    private static final String STUB_URL = "https://cdn.test/profile.jpg";
+    private static final String RAW_KEY = "user/tmp/raw.jpg";
+    private static final String PREVIEW_URL = "https://cdn.test/tmp/raw.jpg";
 
     @MockitoBean
     private MediaStorageService mediaStorageService;
 
+    @MockitoBean
+    private RabbitTemplate rabbitTemplate;
+
     @BeforeEach
     void stubStorage() {
-        when(mediaStorageService.upload(any(), any(), any(), any())).thenReturn(STUB_URL);
+        when(mediaStorageService.upload(any(), any(), any(), any(), any())).thenReturn(RAW_KEY);
+        when(mediaStorageService.publicUrl(any())).thenReturn(PREVIEW_URL);
     }
 
     private User bareUser(String email) {
@@ -79,7 +93,7 @@ class ProfileUpdateAndPictureTest extends AbstractWebIntegrationTest {
     }
 
     @Test
-    void uploadProfilePictureStoresMediaAndReturnsUrl() {
+    void uploadProfilePictureAcceptsStoresPendingAndQueues() {
         User user = bareUser("pic@x.com");
         MultipartBodyBuilder body = new MultipartBodyBuilder();
         body.part("file", jpegPart()).contentType(MediaType.IMAGE_JPEG);
@@ -90,20 +104,32 @@ class ProfileUpdateAndPictureTest extends AbstractWebIntegrationTest {
                 .body(body.build())
                 .retrieve().toEntity(ProfilePictureResponse.class);
 
-        assertThat(response.getStatusCode().value()).isEqualTo(200);
-        assertThat(response.getBody().url()).isEqualTo(STUB_URL);
+        // Accepted for background processing, returns the raw preview + PROCESSING status
+        assertThat(response.getStatusCode().value()).isEqualTo(202);
+        assertThat(response.getBody().url()).isEqualTo(PREVIEW_URL);
+        assertThat(response.getBody().status()).isEqualTo(MediaStatus.PROCESSING);
 
+        // Placeholder persisted on the profile
         Media stored = userRepository.findById(user.getId()).orElseThrow().getProfile().getProfilePicture();
         assertThat(stored).isNotNull();
-        assertThat(stored.getUrl()).isEqualTo(STUB_URL);
+        assertThat(stored.getUrl()).isEqualTo(PREVIEW_URL);
+        assertThat(stored.getStatus()).isEqualTo(MediaStatus.PROCESSING);
+
+        // Finalization event published for the PROFILE target
+        ArgumentCaptor<ImageProcessingEvent> event = ArgumentCaptor.forClass(ImageProcessingEvent.class);
+        verify(rabbitTemplate).convertAndSend(
+                eq(RabbitMQConfig.IMAGE_EXCHANGE), eq(RabbitMQConfig.IMAGE_ROUTING), (Object) event.capture());
+        assertThat(event.getValue().target()).isEqualTo(ImageTarget.PROFILE);
+        assertThat(event.getValue().rawKey()).isEqualTo(RAW_KEY);
+        assertThat(event.getValue().userId()).isEqualTo(user.getId());
     }
 
     @Test
-    void uploadProfilePictureRejectsNonImage() {
+    void uploadProfilePictureRejectsUnsupportedType() {
         User user = bareUser("bad@x.com");
         MultipartBodyBuilder body = new MultipartBodyBuilder();
         body.part("file", namedResource("not an image".getBytes(StandardCharsets.UTF_8)))
-                .contentType(MediaType.IMAGE_JPEG);
+                .contentType(MediaType.TEXT_PLAIN);
 
         ResponseEntity<Void> response = client(tokenFor(user)).post()
                 .uri("/api/profile/picture")
@@ -129,7 +155,7 @@ class ProfileUpdateAndPictureTest extends AbstractWebIntegrationTest {
     }
 
     @Test
-    void updateProfileWithInlinePictureSetsNameAndMedia() {
+    void updateProfileWithInlinePictureSetsNameAndPendingMedia() {
         User user = bareUser("onboard@x.com");
         MultipartBodyBuilder body = profileFields();
         body.part("profilePicture", jpegPart()).contentType(MediaType.IMAGE_JPEG);
@@ -144,7 +170,11 @@ class ProfileUpdateAndPictureTest extends AbstractWebIntegrationTest {
         UserProfile profile = userRepository.findById(user.getId()).orElseThrow().getProfile();
         assertThat(profile.getName()).isEqualTo("Ada");
         assertThat(profile.getProfilePicture()).isNotNull();
-        assertThat(profile.getProfilePicture().getUrl()).isEqualTo(STUB_URL);
+        assertThat(profile.getProfilePicture().getUrl()).isEqualTo(PREVIEW_URL);
+        assertThat(profile.getProfilePicture().getStatus()).isEqualTo(MediaStatus.PROCESSING);
+
+        verify(rabbitTemplate).convertAndSend(
+                eq(RabbitMQConfig.IMAGE_EXCHANGE), eq(RabbitMQConfig.IMAGE_ROUTING), any(ImageProcessingEvent.class));
     }
 
     @Test
@@ -162,5 +192,59 @@ class ProfileUpdateAndPictureTest extends AbstractWebIntegrationTest {
         assertThat(response.getStatusCode().value()).isEqualTo(200);
         Media picture = userRepository.findById(user.getId()).orElseThrow().getProfile().getProfilePicture();
         assertThat(picture.getUrl()).isEqualTo(originalUrl);
+    }
+
+    @Test
+    void uploadDoesNotPassInFlightProcessingPictureAsPreviousKey() {
+        User user = bareUser("proc@x.com");
+        // An earlier upload is still PROCESSING; its URL points at a temp raw object.
+        user.setProfile(UserProfile.builder()
+                .profilePicture(Media.builder()
+                        .url("https://cdn.test/tmp/inflight.jpg")
+                        .status(MediaStatus.PROCESSING)
+                        .build())
+                .build());
+        userRepository.save(user);
+        // Even if a key could be extracted, the in-flight temp object must not be a deletion target.
+        when(mediaStorageService.extractKeyFromUrl("https://cdn.test/tmp/inflight.jpg"))
+                .thenReturn("proc/tmp/inflight.jpg");
+
+        MultipartBodyBuilder body = new MultipartBodyBuilder();
+        body.part("file", jpegPart()).contentType(MediaType.IMAGE_JPEG);
+        client(tokenFor(user)).post().uri("/api/profile/picture")
+                .contentType(MediaType.MULTIPART_FORM_DATA)
+                .body(body.build())
+                .retrieve().toEntity(ProfilePictureResponse.class);
+
+        ArgumentCaptor<ImageProcessingEvent> event = ArgumentCaptor.forClass(ImageProcessingEvent.class);
+        verify(rabbitTemplate).convertAndSend(
+                eq(RabbitMQConfig.IMAGE_EXCHANGE), eq(RabbitMQConfig.IMAGE_ROUTING), (Object) event.capture());
+        assertThat(event.getValue().previousKey()).isNull();
+    }
+
+    @Test
+    void uploadPassesReadyPreviousPictureKeyForDeletion() {
+        User user = bareUser("ready@x.com");
+        user.setProfile(UserProfile.builder()
+                .profilePicture(Media.builder()
+                        .url("https://cdn.test/media/u/profile/old.jpg")
+                        .status(MediaStatus.READY)
+                        .build())
+                .build());
+        userRepository.save(user);
+        when(mediaStorageService.extractKeyFromUrl("https://cdn.test/media/u/profile/old.jpg"))
+                .thenReturn("u/profile/old.jpg");
+
+        MultipartBodyBuilder body = new MultipartBodyBuilder();
+        body.part("file", jpegPart()).contentType(MediaType.IMAGE_JPEG);
+        client(tokenFor(user)).post().uri("/api/profile/picture")
+                .contentType(MediaType.MULTIPART_FORM_DATA)
+                .body(body.build())
+                .retrieve().toEntity(ProfilePictureResponse.class);
+
+        ArgumentCaptor<ImageProcessingEvent> event = ArgumentCaptor.forClass(ImageProcessingEvent.class);
+        verify(rabbitTemplate).convertAndSend(
+                eq(RabbitMQConfig.IMAGE_EXCHANGE), eq(RabbitMQConfig.IMAGE_ROUTING), (Object) event.capture());
+        assertThat(event.getValue().previousKey()).isEqualTo("u/profile/old.jpg");
     }
 }

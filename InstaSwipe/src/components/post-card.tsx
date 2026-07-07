@@ -1,31 +1,29 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, Pressable, Text, Platform } from 'react-native';
+import { View, StyleSheet, Pressable, Text, Platform, ActivityIndicator } from 'react-native';
 import { Image } from 'expo-image';
 import { SymbolView } from 'expo-symbols';
 import { useTheme } from '@/hooks/use-theme';
 import { Spacing } from '@/constants/theme';
-/* "caption": "Skibidi",
-    "createdAt": "2026-07-03T07:33:08.993169400Z",
-    "id": "6a4765b48091b216cd247d01",
-    "likes": 123,
-    "media": {
-        "type": "IMAGE",
-        "url": "https://i1.sndcdn.com/artworks-YDQOy2Pru5CA2rhs-x1uzgA-t1080x1080.jpg",
-        "filename": "tung.jpg",
-        "size": 43580
-    },
-    "userId": "6a476198037f9e89b6f5da33" */
+
+// Mirrors the backend Media: images are uploaded async, so `status` tracks where
+// the object is in the processing pipeline. While PROCESSING, `url` points at a raw
+// preview; once READY it's the final compressed image; FAILED has no usable image.
+export type MediaStatus = 'PROCESSING' | 'READY' | 'FAILED';
+
+export interface Media {
+  type: 'IMAGE' | 'VIDEO';
+  url: string;
+  filename: string;
+  size: number;
+  status?: MediaStatus;
+}
+
 export interface Post {
   caption: string;
   createdAt: string;
   id: string;
   likes: number;
-  media: {
-    type: 'IMAGE' | 'VIDEO';
-    url: string;
-    filename: string;
-    size: number;
-  };
+  media: Media | null; // text-only posts have no media
   userId: string;
 }
 
@@ -67,13 +65,32 @@ export function PostCard({ post }: PostCardProps) {
 
       <View style={styles.body}>
         <Text style={styles.description}>{post.caption}</Text>
-        {post.media.url && (
-          <Image
-            source={{ uri: post.media.url }}
-            style={styles.postImage}
-            contentFit="cover"
-            transition={300}
-          />
+        {post.media && (
+          post.media.status === 'FAILED' ? (
+            <View style={[styles.postImage, styles.mediaFailed]}>
+              <SymbolView
+                name={{ ios: 'exclamationmark.triangle', android: 'error', web: 'error' } as any}
+                tintColor="#a892bf"
+                size={22}
+              />
+              <Text style={styles.mediaFailedText}>Image unavailable</Text>
+            </View>
+          ) : post.media.url ? (
+            <View style={styles.mediaWrapper}>
+              <Image
+                source={{ uri: post.media.url }}
+                style={styles.postImage}
+                contentFit="cover"
+                transition={300}
+              />
+              {post.media.status === 'PROCESSING' && (
+                <View style={styles.mediaOverlay}>
+                  <ActivityIndicator color="#ffffff" />
+                  <Text style={styles.mediaOverlayText}>Processing…</Text>
+                </View>
+              )}
+            </View>
+          ) : null
         )}
       </View>
 
@@ -154,11 +171,41 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.two,
     fontWeight: '400',
   },
+  mediaWrapper: {
+    position: 'relative',
+  },
   postImage: {
     width: '100%',
     aspectRatio: 1,
     borderRadius: 12,
     backgroundColor: '#1c1223',
+  },
+  mediaOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.one,
+    backgroundColor: 'rgba(0, 0, 0, 0.35)',
+  },
+  mediaOverlayText: {
+    color: '#ffffff',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  mediaFailed: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.one,
+  },
+  mediaFailedText: {
+    color: '#a892bf',
+    fontSize: 13,
+    fontWeight: '600',
   },
   footer: {
     flexDirection: 'row',

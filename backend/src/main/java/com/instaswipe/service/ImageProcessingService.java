@@ -42,7 +42,12 @@ public class ImageProcessingService {
         this.maxBytes = DataSize.parse(maxImageSize).toBytes();
     }
 
-    public ProcessedImage process(MultipartFile file) {
+    /**
+     * Cheap up-front validation run in the request thread before the raw bytes are
+     * accepted onto the processing queue: presence, size cap, and declared content-type.
+     * The real content check (decoding) happens later in {@link #process(byte[])}.
+     */
+    public void validateBasics(MultipartFile file) {
         if (file == null || file.isEmpty()) {
             throw new InvalidRequestException("An image file is required");
         }
@@ -54,11 +59,17 @@ public class ImageProcessingService {
         if (contentType == null || !ALLOWED_CONTENT_TYPES.contains(contentType.toLowerCase())) {
             throw new InvalidRequestException("Unsupported image type; allowed types: JPEG, PNG");
         }
+    }
 
+    /**
+     * Downscales raw image bytes to the maximum dimension and re-encodes them as
+     * compressed JPEG. Runs on the processing worker, off the request path.
+     */
+    public ProcessedImage process(byte[] rawBytes) {
         try {
             // Decoding is also the real content check: a spoofed content-type over
             // non-image bytes yields null here rather than a corrupt post.
-            BufferedImage source = ImageIO.read(new ByteArrayInputStream(file.getBytes()));
+            BufferedImage source = ImageIO.read(new ByteArrayInputStream(rawBytes));
             if (source == null) {
                 throw new InvalidRequestException("File is not a valid image");
             }

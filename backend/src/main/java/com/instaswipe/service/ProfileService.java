@@ -4,7 +4,9 @@ import com.instaswipe.dto.OnboardingStatusResponse;
 import com.instaswipe.dto.OwnProfileResponse;
 import com.instaswipe.dto.ProfileUpdateRequest;
 import com.instaswipe.dto.PublicProfileResponse;
+import com.instaswipe.event.ImageTarget;
 import com.instaswipe.model.Media;
+import com.instaswipe.model.MediaStatus;
 import com.instaswipe.model.User;
 import com.instaswipe.model.UserProfile;
 import com.instaswipe.repository.UserRepository;
@@ -61,29 +63,64 @@ public class ProfileService {
         profile.setGender(request.gender());
         profile.setInterests(request.interests());
         // The picture is optional on update; keep the existing one when no file is sent.
+        // A new picture is accepted (raw stored + queued) and only enqueued after the save.
+        MediaUploadService.AcceptedImage accepted = null;
+        String previousKey = null;
         MultipartFile picture = request.profilePicture();
         if (picture != null && !picture.isEmpty()) {
-            profile.setProfilePicture(mediaUploadService.storeImage(picture, userId));
+            previousKey = currentPictureKey(profile);
+            accepted = mediaUploadService.accept(picture, userId);
+            profile.setProfilePicture(accepted.pendingMedia());
         }
 
         user.setProfile(profile);
         userRepository.save(user);
+
+        if (accepted != null) {
+            mediaUploadService.enqueue(accepted.rawKey(), userId, ImageTarget.PROFILE, null, previousKey);
+        }
     }
 
-    /** Uploads a new profile picture, persists it, and returns its public URL. */
-    public String updateProfilePicture(String userId, MultipartFile file) {
+    /**
+     * Accepts a new profile picture: stores the raw bytes, persists a PROCESSING
+     * placeholder on the profile, and queues the resize/finalize work. Returns the
+     * pending {@link Media} (raw preview URL + PROCESSING status).
+     */
+    public Media updateProfilePicture(String userId, MultipartFile file) {
         User user = getUserOrThrow(userId);
-        Media media = mediaUploadService.storeImage(file, userId);
 
         UserProfile profile = user.getProfile();
         if (profile == null) {
             profile = new UserProfile();
         }
-        profile.setProfilePicture(media);
+        String previousKey = currentPictureKey(profile);
+
+        MediaUploadService.AcceptedImage accepted = mediaUploadService.accept(file, userId);
+        profile.setProfilePicture(accepted.pendingMedia());
 
         user.setProfile(profile);
         userRepository.save(user);
-        return media.getUrl();
+
+        mediaUploadService.enqueue(accepted.rawKey(), userId, ImageTarget.PROFILE, null, previousKey);
+        return accepted.pendingMedia();
+    }
+
+    /**
+     * Object key of the profile's current picture when it is safe to delete on replacement,
+     * or null otherwise. Only a finalized ({@link MediaStatus#READY}, or legacy {@code null})
+     * image is a valid deletion target: a PROCESSING placeholder's URL points at a temp raw
+     * object still owned by its own queued event, and deleting it would break that event.
+     */
+    private String currentPictureKey(UserProfile profile) {
+        Media current = profile.getProfilePicture();
+        if (current == null) {
+            return null;
+        }
+        MediaStatus status = current.getStatus();
+        if (status != null && status != MediaStatus.READY) {
+            return null;
+        }
+        return mediaStorageService.extractKeyFromUrl(current.getUrl());
     }
 
     public OwnProfileResponse getOwnProfile(String userId) {
