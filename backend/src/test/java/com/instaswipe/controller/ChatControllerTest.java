@@ -58,11 +58,7 @@ class ChatControllerTest {
 
     @BeforeEach
     void setUp() {
-        request = new ChatMessageRequest();
-        request.setChatRoomId("user123_user456");
-        request.setSenderId("user123");
-        request.setRecipientId("user456");
-        request.setContent("Hello there!");
+        request = new ChatMessageRequest("user123_user456", "user123", "user456", "Hello there!");
     }
 
     @Test
