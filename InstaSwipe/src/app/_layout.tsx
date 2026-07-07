@@ -37,6 +37,9 @@ export default function RootLayout() {
         if (response.ok) {
           const data = await response.json();
           setNeedsOnboarding(!!data.needsOnboarding);
+        } else if (response.status === 401) {
+          setIsAuthenticated(false);
+          setNeedsOnboarding(null);
         } else {
           // If the status check fails, skip onboarding to avoid blocking the user
           setNeedsOnboarding(false);

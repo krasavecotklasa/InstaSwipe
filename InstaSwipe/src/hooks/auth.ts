@@ -25,6 +25,13 @@ export interface AuthResponse {
   user: User;
 }
 
+interface AuthTokenResponse {
+  accessToken?: unknown;
+  refreshToken?: unknown;
+  access_token?: unknown;
+  refresh_token?: unknown;
+}
+
 export interface UserMeResponse {
   email: string;
 }
@@ -61,6 +68,13 @@ const normalizeTokenValue = (value: unknown): string => {
   }
 
   return value;
+};
+
+const getAuthTokensFromResponse = (data: AuthTokenResponse) => {
+  const accessToken = normalizeTokenValue(data.accessToken ?? data.access_token);
+  const refreshToken = normalizeTokenValue(data.refreshToken ?? data.refresh_token);
+
+  return { accessToken, refreshToken };
 };
 
 const setTokens = async (accessToken: string, refreshToken: string) => {
@@ -162,15 +176,21 @@ class API {
         });
 
         if (refreshResponse.ok) {
-          const data: AuthResponse = await refreshResponse.json();
-          await setTokens(data.accessToken, data.refreshToken);
+          try {
+            const data: AuthTokenResponse = await refreshResponse.json();
+            const tokens = getAuthTokensFromResponse(data);
+            await setTokens(tokens.accessToken, tokens.refreshToken);
 
-          // Retry original request with new token
-          headers['Authorization'] = `Bearer ${data.accessToken}`;
-          return fetch(`${API_BASE_URL}${endpoint}`, {
-            ...options,
-            headers,
-          });
+            // Retry original request with new token
+            headers['Authorization'] = `Bearer ${tokens.accessToken}`;
+            return fetch(`${API_BASE_URL}${endpoint}`, {
+              ...options,
+              headers,
+            });
+          } catch (error) {
+            console.warn('[Auth] Refresh response did not include valid tokens', error);
+            await clearTokens();
+          }
         } else {
           await clearTokens();
         }

@@ -3,12 +3,14 @@ import { SymbolView } from 'expo-symbols';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+
 export default function Header() {
     const theme = useTheme();
 
     if (Platform.OS !== 'ios' && Platform.OS !== 'android') {
         return null;
     }
+
     return (
         <View style={styles.header}>
             <ThemedText style={styles.logoText}>
