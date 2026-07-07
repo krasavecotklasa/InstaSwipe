@@ -116,7 +116,7 @@ const logout = async () => {
       await fetch(`${API_BASE_URL}${AUTH_BASE_PATH}/logout`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refresh_token: refreshToken }),
+        body: JSON.stringify({ refreshToken }),
       });
     } catch (error) {
       console.warn('[Auth] Logout request failed', error);
@@ -174,7 +174,7 @@ class API {
         const refreshResponse = await fetch(`${API_BASE_URL}${AUTH_BASE_PATH}/refresh`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ refresh_token: refreshToken }),
+          body: JSON.stringify({ refreshToken }),
         });
 
         if (refreshResponse.ok) {
