@@ -10,6 +10,7 @@ import org.springframework.data.domain.Page;
 
 import com.instaswipe.service.PostService;
 import com.instaswipe.service.MediaStorageService;
+import com.instaswipe.service.ProfileService;
 
 import com.instaswipe.model.Post;
 import com.instaswipe.model.Media;
@@ -22,6 +23,7 @@ import com.instaswipe.dto.PostResponse;
 public class PostController {
     private final PostService postService;
     private final MediaStorageService mediaStorageService;
+    private final ProfileService profileService;
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @ResponseStatus(HttpStatus.CREATED)
@@ -75,9 +77,17 @@ public class PostController {
                     .build();
         }
 
+        String displayName = null;
+        try {
+            displayName = profileService.getPublicProfile(currentUserId, post.getUserId()).displayName();
+        } catch (IllegalArgumentException e) {
+            // profile not available or not discoverable - leave displayName null
+        }
+
         return PostResponse.builder()
             .id(post.getId())
             .userId(post.getUserId())
+            .displayName(displayName)
             .caption(post.getCaption())
             .likeCount(post.getLikedBy() == null ? 0 : post.getLikedBy().size())
             .media(media)
