@@ -16,6 +16,7 @@ import com.instaswipe.model.Post;
 import com.instaswipe.model.Media;
 import com.instaswipe.dto.CreatePostRequest;
 import com.instaswipe.dto.PostResponse;
+import com.instaswipe.dto.PublicProfileResponse;
 
 @RestController
 @RequestMapping("/api/posts")
@@ -79,16 +80,20 @@ public class PostController {
         }
 
         String displayName = null;
+        String profilePictureUrl = null;
         try {
-            displayName = profileService.getPublicProfile(currentUserId, post.getUserId()).displayName();
+            PublicProfileResponse author = profileService.getPublicProfile(currentUserId, post.getUserId());
+            displayName = author.displayName();
+            profilePictureUrl = author.profilePictureUrl();
         } catch (IllegalArgumentException e) {
-            // profile not available or not discoverable - leave displayName null
+            // profile not available or not discoverable - leave author fields null
         }
 
         return PostResponse.builder()
             .id(post.getId())
             .userId(post.getUserId())
             .displayName(displayName)
+            .profilePictureUrl(profilePictureUrl)
             .caption(post.getCaption())
             .likeCount(post.getLikedBy() == null ? 0 : post.getLikedBy().size())
             .media(media)

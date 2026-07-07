@@ -160,21 +160,19 @@ public class MediaStorageService {
         if (url == null) {
             return null;
         }
-        // Check if already presigned (has AWS signature parameters)
-        if (url.contains("X-Amz-Signature") || url.contains("X-Amz-Algorithm")) {
-            return url; // Already presigned, return as-is
+        // Only objects we stored carry a "/<bucket>/" path segment; anything else (e.g. an
+        // external avatar placeholder) is returned untouched.
+        if (!url.contains("/" + bucket + "/")) {
+            return url;
         }
-        // If this deployment uses a public bucket, return the raw public URL (strip any query params).
-        if (publicBucket && url.contains(publicEndpoint) && url.contains(bucket)) {
-            return url.split("\\?")[0];
+        String key = extractKeyFromUrl(url);
+        if (key == null) {
+            return url;
         }
-
-        // Only convert if it looks like a public URL pointing to our bucket
-        if (url.contains(publicEndpoint) && url.contains(bucket)) {
-            return convertToPresignedUrl(url);
-        }
-        // If it's from a different source, return as-is
-        return url;
+        // Rebuild from the CURRENT public endpoint. The host was fixed at upload time and may be
+        // container-only (e.g. host.docker.internal), unreachable from a browser; rebuilding keeps
+        // stored URLs host-agnostic. Public buckets serve unsigned; otherwise mint a fresh presign.
+        return publicBucket ? buildPublicUrl(key) : getPresignedUrl(key);
     }
 
     private String buildPublicUrl(String key) {

@@ -15,6 +15,7 @@ interface BackendPostPayload {
     size?: number;
   };
   displayName: string;
+  profilePictureUrl?: string;
   createdAt: string;
   user?: {
     id?: string;
@@ -33,6 +34,7 @@ export const formatPost = (rawPost: BackendPostPayload | Post): Post => {
     id: rawPost.id,
     userId: backendPost.userId ?? 'unknown-user',
     username: backendPost.displayName,
+    profilePictureUrl: backendPost.profilePictureUrl,
     caption: backendPost.caption ?? '',
     likes: typeof backendPost.likeCount === 'number' ? backendPost.likeCount : 0,
     media: {
