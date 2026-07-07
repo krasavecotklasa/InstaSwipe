@@ -6,6 +6,7 @@ const API_PORT = process.env.EXPO_PUBLIC_API_PORT;
 const API_PREFIX_RAW = process.env.EXPO_PUBLIC_API_PREFIX || '/api';
 const API_PREFIX = API_PREFIX_RAW.startsWith('/') ? API_PREFIX_RAW : `/${API_PREFIX_RAW}`;
 const DISCOVERY_BASE_PATH = `${API_PREFIX}/discovery`;
+const MATCHES_BASE_PATH = `${API_PREFIX}/matches`;
 const API_BASE_URL = (API_PORT === '80' || API_PORT === '443')
   ? `http://${API_HOST}`
   : `http://${API_HOST}:${API_PORT}`;
@@ -57,6 +58,13 @@ export interface DiscoveryPreferences {
   gender: Gender | '';
   country: string;
   interests: string[];
+}
+
+export type SwipeStatus = 'PASSED' | 'LIKED' | 'MATCHED';
+
+export interface SwipeResult {
+  status: SwipeStatus;
+  matchId: string | null;
 }
 
 const DISCOVERY_PREFERENCES_KEY = 'discovery_preferences';
@@ -174,6 +182,34 @@ export class MatchAPI {
 
     return await response.json();
   }
+
+  private static async swipe(userId: string, action: 'love' | 'pass'): Promise<SwipeResult> {
+    const accessToken = await getAccessToken();
+    const response = await fetch(`${API_BASE_URL}${MATCHES_BASE_PATH}/${userId}/${action}`, {
+      method: 'POST',
+      headers: {
+        Accept: '*/*',
+        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+      },
+    });
+
+    if (!response.ok) {
+      const message = await response.text();
+      throw new Error(message || `Match request failed with status ${response.status}`);
+    }
+
+    return await response.json();
+  }
+
+  static async lovePerson(userId: string): Promise<SwipeResult> {
+    return MatchAPI.swipe(userId, 'love');
+  }
+
+  static async passPerson(userId: string): Promise<SwipeResult> {
+    return MatchAPI.swipe(userId, 'pass');
+  }
 }
 
 export const getDiscovery = MatchAPI.getDiscovery;
+export const lovePerson = MatchAPI.lovePerson;
+export const passPerson = MatchAPI.passPerson;
