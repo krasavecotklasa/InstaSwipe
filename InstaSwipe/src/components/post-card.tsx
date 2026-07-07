@@ -113,7 +113,7 @@ export function PostCard({ post }: PostCardProps) {
                 ? { ios: 'heart.fill', android: 'favorite', web: 'favorite' }
                 : { ios: 'heart', android: 'favorite_border', web: 'favorite_border' }) as any
             }
-            tintColor='#ff3b30'
+            tintColor={liked ? '#ff3b30' : '#a892bf'}
             size={22}
           />
           <Text style={[styles.interactionText, liked && styles.likedText]}>
