@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import {
+  KeyboardAvoidingView,
   Platform,
   StyleSheet,
   TextInput,
@@ -10,13 +11,14 @@ import {
   ScrollView,
   Image,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { API, OwnProfileResponse } from '@/hooks/auth';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { SymbolView } from 'expo-symbols';
 
 interface OnboardingGateProps {
   onOnboardSuccess: () => void;
@@ -47,6 +49,7 @@ export default function OnboardingGate({ onOnboardSuccess, mode = 'create', init
   const [profileImage, setProfileImage] = useState<ImagePicker.ImagePickerAsset | null>(null);
   const [loading, setLoading] = useState(false);
   const theme = useTheme();
+  const insets = useSafeAreaInsets();
   const currentProfilePictureUrl = initialProfile?.profilePictureUrl;
 
   useEffect(() => {
@@ -114,7 +117,7 @@ export default function OnboardingGate({ onOnboardSuccess, mode = 'create', init
           try {
             const data = JSON.parse(uploadResult.body);
             errorMsg = data.message || errorMsg;
-          } catch (e) {}
+          } catch (e) { }
           errorHandle(errorMsg);
         }
       } else {
@@ -165,110 +168,128 @@ export default function OnboardingGate({ onOnboardSuccess, mode = 'create', init
 
   return (
     <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea}>
-        <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
-          <ThemedText type="title" style={styles.title}>
-            {mode === 'update' ? 'Update your profile' : "Let's finish setting up your profile"}
-          </ThemedText>
+      <KeyboardAvoidingView
+        style={styles.keyboardAvoidingView}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={insets.top}
+      >
+        <SafeAreaView style={styles.safeArea}>
+          <ScrollView
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
+          >
+            <ThemedText type="title" style={styles.title}>
+              {mode === 'update' ? 'Update your profile' : "Let's finish setting up your profile"}
+            </ThemedText>
 
-          <View style={styles.form}>
-            <TouchableOpacity style={styles.avatarContainer} onPress={handlePickImage}>
-              {profileImage ? (
-                <Image source={{ uri: profileImage.uri }} style={styles.avatarImage} />
-              ) : currentProfilePictureUrl ? (
-                <Image source={{ uri: currentProfilePictureUrl }} style={styles.avatarImage} />
-              ) : (
-                <View style={[styles.avatarPlaceholder, { backgroundColor: theme.backgroundElement }]}>
-                  <ThemedText style={styles.avatarText}>
-                    {mode === 'update' ? 'Keep Photo' : 'Add Photo'}
+            <View style={styles.form}>
+              <TouchableOpacity style={styles.avatarContainer} onPress={handlePickImage}>
+                {profileImage ? (
+                  <Image source={{ uri: profileImage.uri }} style={styles.avatarImage} />
+                ) : currentProfilePictureUrl ? (
+                  <Image source={{ uri: currentProfilePictureUrl }} style={styles.avatarImage} />
+                ) : (
+                  <View style={[styles.avatarPlaceholder, { backgroundColor: theme.backgroundElement }]}>
+                    <ThemedText style={styles.avatarText}>
+                      {mode === 'update' ? 'Keep Photo' : 'Add Photo'}
+                    </ThemedText>
+                  </View>
+                )}
+              </TouchableOpacity>
+
+              <TextInput
+                style={[styles.input, { color: theme.text, borderColor: theme.tabActiveBorder }]}
+                placeholder="User Name"
+                placeholderTextColor={theme.iconMuted}
+                value={displayName}
+                onChangeText={setDisplayName}
+              />
+
+              <TextInput
+                style={[styles.input, styles.textArea, { color: theme.text, borderColor: theme.tabActiveBorder }]}
+                placeholder="Bio"
+                placeholderTextColor={theme.iconMuted}
+                value={bio}
+                onChangeText={setBio}
+                multiline
+                numberOfLines={3}
+              />
+
+              <TextInput
+                style={[styles.input, { color: theme.text, borderColor: theme.tabActiveBorder }]}
+                placeholder="Birth Date (YYYY-MM-DD)"
+                placeholderTextColor={theme.iconMuted}
+                value={birthDate}
+                onChangeText={setBirthDate}
+              />
+
+              <TextInput
+                style={[styles.input, { color: theme.text, borderColor: theme.tabActiveBorder }]}
+                placeholder="Country"
+                placeholderTextColor={theme.iconMuted}
+                value={country}
+                onChangeText={setCountry}
+              />
+
+              <ThemedText style={styles.label}>Gender</ThemedText>
+              <View style={styles.genderRow}>
+                {GendersDisplay.map((g, i) => (
+                  <TouchableOpacity
+                    key={i}
+                    style={[
+                      styles.genderButton,
+                      { borderColor: theme.tabActiveBorder },
+                      gender === GENDERS[i] && { backgroundColor: theme.backgroundElement, borderColor: theme.backgroundElement },
+                    ]}
+                    onPress={() => setGender(GENDERS[i])}
+                  >
+                    <ThemedText style={[styles.genderText, gender === GENDERS[i] && styles.genderTextSelected]}>
+                      {g}
+                    </ThemedText>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <TextInput
+                style={[styles.input, { color: theme.text, borderColor: theme.tabActiveBorder }]}
+                placeholder="3 interests (e.g. Reading, Exercising, Cooking)"
+                placeholderTextColor={theme.iconMuted}
+                value={interests}
+                onChangeText={setInterests}
+              />
+
+              <TouchableOpacity
+                style={[styles.buttonStyle]}
+                onPress={handleSubmit}
+                disabled={loading}
+              >
+                <SymbolView
+                  name={{ ios: 'save', android: 'save', web: 'save' } as any}
+                  tintColor='#8769ffbe'
+                  size={20}
+                />
+                {loading ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <ThemedText style={styles.buttonText}>
+                    {mode === 'update' ? 'Update profile' : 'Create profile'}
                   </ThemedText>
-                </View>
-              )}
-            </TouchableOpacity>
-
-            <TextInput
-              style={[styles.input, { color: theme.text, borderColor: theme.tabActiveBorder }]}
-              placeholder="User Name"
-              placeholderTextColor={theme.iconMuted}
-              value={displayName}
-              onChangeText={setDisplayName}
-            />
-
-            <TextInput
-              style={[styles.input, styles.textArea, { color: theme.text, borderColor: theme.tabActiveBorder }]}
-              placeholder="Bio"
-              placeholderTextColor={theme.iconMuted}
-              value={bio}
-              onChangeText={setBio}
-              multiline
-              numberOfLines={3}
-            />
-
-            <TextInput
-              style={[styles.input, { color: theme.text, borderColor: theme.tabActiveBorder }]}
-              placeholder="Birth Date (YYYY-MM-DD)"
-              placeholderTextColor={theme.iconMuted}
-              value={birthDate}
-              onChangeText={setBirthDate}
-            />
-
-            <TextInput
-              style={[styles.input, { color: theme.text, borderColor: theme.tabActiveBorder }]}
-              placeholder="Country"
-              placeholderTextColor={theme.iconMuted}
-              value={country}
-              onChangeText={setCountry}
-            />
-
-            <ThemedText style={styles.label}>Gender</ThemedText>
-            <View style={styles.genderRow}>
-              {GendersDisplay.map((g, i) => (
-                <TouchableOpacity
-                  key={i}
-                  style={[
-                    styles.genderButton,
-                    { borderColor: theme.tabActiveBorder },
-                    gender === GENDERS[i] && { backgroundColor: theme.backgroundElement, borderColor: theme.backgroundElement },
-                  ]}
-                  onPress={() => setGender(GENDERS[i])}
-                >
-                  <ThemedText style={[styles.genderText, gender === GENDERS[i] && styles.genderTextSelected]}>
-                    {g}
-                  </ThemedText>
-                </TouchableOpacity>
-              ))}
+                )}
+              </TouchableOpacity>
             </View>
-
-            <TextInput
-              style={[styles.input, { color: theme.text, borderColor: theme.tabActiveBorder }]}
-              placeholder="3 interests (e.g. Reading, Exercising, Cooking)"
-              placeholderTextColor={theme.iconMuted}
-              value={interests}
-              onChangeText={setInterests}
-            />
-
-            <TouchableOpacity
-              style={[styles.button, { backgroundColor: theme.backgroundElement }]}
-              onPress={handleSubmit}
-              disabled={loading}
-            >
-              {loading ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <ThemedText style={styles.buttonText}>
-                  {mode === 'update' ? 'Update profile' : 'Create profile'}
-                </ThemedText>
-              )}
-            </TouchableOpacity>
-          </View>
-        </ScrollView>
-      </SafeAreaView>
+          </ScrollView>
+        </SafeAreaView>
+      </KeyboardAvoidingView>
     </ThemedView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
+    flex: 1,
+  },
+  keyboardAvoidingView: {
     flex: 1,
   },
   safeArea: {
@@ -279,6 +300,7 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.six,
     flexGrow: 1,
     justifyContent: 'center',
+    paddingBottom: Spacing.six,
   },
   title: {
     textAlign: 'center',
@@ -345,12 +367,18 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: 'bold',
   },
-  button: {
-    height: 50,
+  buttonStyle: {
+    borderColor: '#6249cabe',
+    minHeight: 44,
+    maxHeight: 50,
+    minWidth: 200,
     borderRadius: 8,
-    justifyContent: 'center',
+    paddingHorizontal: Spacing.three,
     alignItems: 'center',
-    marginTop: Spacing.four,
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: Spacing.two,
+    borderWidth: 1,
   },
   buttonText: {
     color: '#fff',

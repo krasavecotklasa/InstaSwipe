@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   Platform,
@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 import { Image } from 'expo-image';
 import { SymbolView } from 'expo-symbols';
+import { useFocusEffect } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
@@ -56,9 +57,11 @@ export default function MatchScreen() {
   const [error, setError] = useState<string | null>(null);
   const [resultMessage, setResultMessage] = useState<string | null>(null);
 
-  useEffect(() => {
-    void loadProfiles();
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      void loadProfiles();
+    }, []),
+  );
 
   async function loadProfiles() {
     setLoading(true);
@@ -107,19 +110,7 @@ export default function MatchScreen() {
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
         <View style={styles.content}>
-          <View style={styles.header}>
-            <Pressable
-              onPress={loadProfiles}
-              disabled={loading || acting}
-              style={[styles.reloadButton, { borderColor: theme.tabActiveBorder, opacity: loading || acting ? 0.6 : 1 }]}
-            >
-              <SymbolView
-                name={{ ios: 'arrow.clockwise', android: 'refresh', web: 'refresh' } as any}
-                tintColor={theme.text}
-                size={18}
-              />
-            </Pressable>
-          </View>
+          <View style={styles.header} />
 
           {loading ? (
             <View style={styles.centerState}>
@@ -235,14 +226,6 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 30,
     lineHeight: 36,
-  },
-  reloadButton: {
-    width: 42,
-    height: 42,
-    borderRadius: 8,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   centerState: {
     flex: 1,
