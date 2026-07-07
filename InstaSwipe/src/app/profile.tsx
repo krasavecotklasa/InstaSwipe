@@ -200,14 +200,14 @@ export default function ProfileScreen() {
                         ({profile.email})
                       </ThemedText>
                     </ThemedText>
-                    <ThemedText type="small" themeColor="textSecondary">
-                      Birthday: <b>{profile.birthDate}</b>
+                    <ThemedText type="small" themeColor="textSecondary" style={styles.profileMetaDetail}>
+                      Birthday: {profile.birthDate}
                     </ThemedText>
-                    <ThemedText type="small" themeColor="textSecondary">
-                      Country: <b>{profile.country}</b>
+                    <ThemedText type="small" themeColor="textSecondary" style={styles.profileMetaDetail}>
+                      Country: {profile.country}
                     </ThemedText>
-                    <ThemedText type="small" themeColor="textSecondary">
-                      Gender: <b>{profile.gender}</b>
+                    <ThemedText type="small" themeColor="textSecondary" style={styles.profileMetaDetail}>
+                      Gender: {profile.gender}
                     </ThemedText>
                   </View>
                 </View>
@@ -525,6 +525,9 @@ const styles = StyleSheet.create({
   profileName: {
     fontSize: 18,
     lineHeight: 24,
+  },
+  profileMetaDetail: {
+    fontWeight: '800',
   },
   bio: {
     lineHeight: 22,
