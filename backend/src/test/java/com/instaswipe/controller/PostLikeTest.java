@@ -43,6 +43,20 @@ class PostLikeTest extends AbstractWebIntegrationTest {
     }
 
     @Test
+    void responseCarriesAuthorDisplayNameAndProfilePicture() {
+        User owner = user("owner@x.com"); // createDiscoverableUser sets name "owner" + pic URL
+        User liker = user("liker@x.com");
+        Post post = savePost(owner.getId());
+
+        ResponseEntity<PostResponse> response = client(tokenFor(liker)).post()
+                .uri("/api/posts/{postId}/like", post.getId())
+                .retrieve().toEntity(PostResponse.class);
+
+        assertThat(response.getBody().displayName()).isEqualTo("owner");
+        assertThat(response.getBody().profilePictureUrl()).isEqualTo("https://example.com/pic.jpg");
+    }
+
+    @Test
     void likeAddsCurrentUserAndReturnsUpdatedResponse() {
         User owner = user("owner@x.com");
         User liker = user("liker@x.com");

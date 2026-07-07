@@ -12,6 +12,7 @@ public record PostResponse(
         String id,
         String userId,
         String displayName,
+        String profilePictureUrl,
         String caption,
         int likeCount,
         Media media,

@@ -24,6 +24,7 @@ export interface Post {
   id: string;
   userId: string;
   username: string;
+  profilePictureUrl?: string;
   caption?: string;
   likes: number;
   likedByMe: boolean;
@@ -56,7 +57,7 @@ export function PostCard({ post }: PostCardProps) {
     <View style={[styles.card, { borderColor: theme.tabActiveBorder }]}>
       <View style={styles.header}>
         <Image
-          source={{ uri: post.username }}
+          source={post.profilePictureUrl ? { uri: post.profilePictureUrl } : undefined}
           style={styles.avatar}
           contentFit="cover"
           transition={200}
