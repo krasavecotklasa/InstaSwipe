@@ -87,7 +87,11 @@ export function PostCard({ post }: PostCardProps) {
                 source={{ uri: post.media.url }}
                 style={styles.postImage}
                 contentFit="cover"
-                transition={300}
+                // LCP image: skip the fade (cuts element-render delay) and hint the
+                // browser to fetch it ahead of the queue (expo-image maps this to
+                // <img fetchPriority> on web).
+                transition={0}
+                priority="high"
               />
               {post.media.status === 'PROCESSING' && (
                 <View style={styles.mediaOverlay}>
