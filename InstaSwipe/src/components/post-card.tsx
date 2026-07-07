@@ -4,29 +4,23 @@ import { Image } from 'expo-image';
 import { SymbolView } from 'expo-symbols';
 import { useTheme } from '@/hooks/use-theme';
 import { Spacing } from '@/constants/theme';
-/* "caption": "Skibidi",
-    "createdAt": "2026-07-03T07:33:08.993169400Z",
-    "id": "6a4765b48091b216cd247d01",
-    "likes": 123,
-    "media": {
-        "type": "IMAGE",
-        "url": "https://i1.sndcdn.com/artworks-YDQOy2Pru5CA2rhs-x1uzgA-t1080x1080.jpg",
-        "filename": "tung.jpg",
-        "size": 43580
-    },
-    "userId": "6a476198037f9e89b6f5da33" */
+import { likePost, unlikePost } from '@/hooks/posts';
+
+
 export interface Post {
-  caption: string;
-  createdAt: string;
   id: string;
+  userId: string;
+  username: string;
+  caption?: string;
   likes: number;
-  media: {
+  likedByMe: boolean;
+  media?: {
     type: 'IMAGE' | 'VIDEO';
     url: string;
     filename: string;
     size: number;
   };
-  userId: string;
+  createdAt: string;
 }
 
 interface PostCardProps {
@@ -35,15 +29,17 @@ interface PostCardProps {
 
 export function PostCard({ post }: PostCardProps) {
   const theme = useTheme();
-  const [liked, setLiked] = useState(false);
+  const [liked, setLiked] = useState(post.likedByMe);
   const [likeCount, setLikeCount] = useState(post.likes);
 
   const handleLike = () => {
     if (liked) {
       setLiked(false);
+      unlikePost(post.id);
       setLikeCount(prev => prev - 1);
     } else {
       setLiked(true);
+      likePost(post.id);
       setLikeCount(prev => prev + 1);
     }
   };
@@ -52,13 +48,13 @@ export function PostCard({ post }: PostCardProps) {
     <View style={[styles.card, { borderColor: theme.tabActiveBorder }]}>
       <View style={styles.header}>
         <Image
-          source={{ uri: post.userId }}
+          source={{ uri: post.username }}
           style={styles.avatar}
           contentFit="cover"
           transition={200}
         />
         <View style={styles.headerTextContainer}>
-          <Text style={styles.username}>{post.userId}</Text>
+          <Text style={styles.username}>{post.username}</Text>
           <Text style={[styles.date, { color: theme.textSecondary }]}>
             {post.createdAt}
           </Text>
@@ -67,7 +63,7 @@ export function PostCard({ post }: PostCardProps) {
 
       <View style={styles.body}>
         <Text style={styles.description}>{post.caption}</Text>
-        {post.media.url && (
+        {post.media?.url && (
           <Image
             source={{ uri: post.media.url }}
             style={styles.postImage}
