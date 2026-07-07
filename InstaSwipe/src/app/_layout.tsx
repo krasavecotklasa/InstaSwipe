@@ -51,16 +51,6 @@ export default function RootLayout() {
     checkOnboarding();
   }, [isAuthenticated]);
 
-  // Show nothing while checking auth or onboarding status to avoid flickering
-  if (isAuthenticated === null) {
-    return null;
-  }
-
-  // Still loading onboarding status
-  if (isAuthenticated && needsOnboarding === null) {
-    return null;
-  }
-
   const authContextValue = useMemo(
     () => ({
       onAuthSuccess: () => setIsAuthenticated(true),
@@ -72,6 +62,16 @@ export default function RootLayout() {
     }),
     [],
   );
+//
+  // Show nothing while checking auth or onboarding status to avoid flickering
+  if (isAuthenticated === null) {
+    return null;
+  }
+
+  // Still loading onboarding status
+  if (isAuthenticated && needsOnboarding === null) {
+    return null;
+  }
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>

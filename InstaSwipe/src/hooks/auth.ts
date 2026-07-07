@@ -1,8 +1,6 @@
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 
-// On Android emulators, 'localhost' refers to the emulator itself.
-// Use 10.0.2.2 to reach the host machine's loopback interface.
 const API_HOST = process.env.EXPO_PUBLIC_API_HOST;
 const API_PORT = process.env.EXPO_PUBLIC_API_PORT;
 const API_PREFIX_RAW = process.env.EXPO_PUBLIC_API_PREFIX || '/api';
@@ -42,10 +40,6 @@ export interface ProfileStatusResponse {
   emailVerified: boolean;
 }
 
-// FIX: Platform.OS is the only reliable signal. `typeof window` can be
-// truthy on native too (e.g. remote JS debugging via Chrome), which used
-// to make native builds think they were "web" and read/write tokens via
-// localStorage instead of SecureStore -- silently breaking auth on device.
 const isWebPlatform = () => Platform.OS === 'web';
 
 const getAccessToken = async () => {
@@ -154,9 +148,6 @@ class API {
         headers,
       });
     } catch (error) {
-      // FIX: previously an unreachable host / network failure / bad
-      // FormData part propagated as a bare, often opaque error. Surface
-      // something the caller (and you, in the console) can actually act on.
       console.error(`[API] Network request to ${fullUrl} failed:`, error);
       throw new Error(
         `Could not reach the server at ${API_HOST}:${API_PORT}. Check that the API is running and reachable from this device, and that EXPO_PUBLIC_API_HOST is set correctly.`
