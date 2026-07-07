@@ -11,6 +11,7 @@ import lombok.Data;
 public record PostResponse(
         String id,
         String userId,
+        String displayName,
         String caption,
         int likeCount,
         Media media,
