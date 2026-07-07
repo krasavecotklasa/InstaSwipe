@@ -3,6 +3,7 @@ package com.instaswipe.controller;
 import com.instaswipe.dto.OnboardingStatusResponse;
 import com.instaswipe.dto.ProfilePictureResponse;
 import com.instaswipe.dto.ProfileUpdateRequest;
+import com.instaswipe.model.Media;
 import com.instaswipe.repository.UserRepository;
 import com.instaswipe.service.ProfileService;
 import jakarta.validation.Valid;
@@ -42,8 +43,11 @@ public class ProfileController {
             @AuthenticationPrincipal String userId,
             @RequestParam("file") MultipartFile file) {
 
-        String url = profileService.updateProfilePicture(userId, file);
-        return ResponseEntity.ok(new ProfilePictureResponse(url));
+        Media media = profileService.updateProfilePicture(userId, file);
+        // Accepted for background processing; the raw preview URL is live immediately,
+        // the final compressed image replaces it once the worker finishes.
+        return ResponseEntity.accepted()
+                .body(new ProfilePictureResponse(media.getUrl(), media.getStatus()));
     }
 
     @GetMapping("/me")

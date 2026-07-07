@@ -66,7 +66,7 @@ public class PostController {
     private PostResponse toResponse(Post post, String currentUserId) {
         boolean likedByMe = post.getLikedBy() != null && post.getLikedBy().contains(currentUserId);
         
-        // Ensure media URL is presigned before returning
+        // Ensure media URL is presigned before returning, preserving processing status
         Media media = post.getMedia();
         if (media != null && media.getUrl() != null) {
             media = Media.builder()
@@ -74,6 +74,7 @@ public class PostController {
                     .filename(media.getFilename())
                     .size(media.getSize())
                     .url(mediaStorageService.ensurePresignedUrl(media.getUrl()))
+                    .status(media.getStatus())
                     .build();
         }
 

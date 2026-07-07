@@ -11,6 +11,7 @@ import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.NoSuchBucketException;
 import software.amazon.awssdk.services.s3.model.ObjectCannedACL;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
+import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
 import software.amazon.awssdk.services.s3.presigner.model.PresignedGetObjectRequest;
@@ -36,11 +37,12 @@ public class MediaStorageService {
     }
 
     /**
-     * Stores already-processed bytes and returns the public URL. The key is
-     * {@code <userId>/<uuid><extension>} so it stays a valid, flat object key.
+     * Stores bytes under {@code <userId>/<folder>/<uuid><extension>} and returns the
+     * stored object key. The folder segment keeps each user's raw uploads, posts, and
+     * profile pictures in separate prefixes (e.g. {@code tmp}, {@code posts}, {@code profile}).
      */
-    public String upload(byte[] data, String contentType, String extension, String userId) {
-        String key = userId + "/" + UUID.randomUUID() + extension;
+    public String upload(byte[] data, String contentType, String extension, String userId, String folder) {
+        String key = userId + "/" + folder + "/" + UUID.randomUUID() + extension;
 
         PutObjectRequest request = PutObjectRequest.builder()
                 .bucket(bucket)
@@ -56,6 +58,32 @@ public class MediaStorageService {
             s3Client.putObject(request, RequestBody.fromBytes(data));
         }
 
+        return key;
+    }
+
+    /** Downloads the raw bytes for the given object key. */
+    public byte[] download(String key) {
+        GetObjectRequest request = GetObjectRequest.builder()
+                .bucket(bucket)
+                .key(key)
+                .build();
+        return s3Client.getObjectAsBytes(request).asByteArray();
+    }
+
+    /** Deletes the given object key. No-op for a null key; S3 delete is idempotent for missing keys. */
+    public void delete(String key) {
+        if (key == null) {
+            return;
+        }
+        DeleteObjectRequest request = DeleteObjectRequest.builder()
+                .bucket(bucket)
+                .key(key)
+                .build();
+        s3Client.deleteObject(request);
+    }
+
+    /** Public URL for an already-stored object key. */
+    public String publicUrl(String key) {
         return buildPublicUrl(key);
     }
 
