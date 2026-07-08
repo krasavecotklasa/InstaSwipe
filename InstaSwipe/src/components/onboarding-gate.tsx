@@ -20,7 +20,6 @@ import { Spacing } from '@/constants/theme';
 import { normalizeMediaUrl } from '@/hooks/media';
 import { useTheme } from '@/hooks/use-theme';
 import { SymbolView } from 'expo-symbols';
-import { getImageValidationError } from '@/constants/media';
 
 interface OnboardingGateProps {
   onOnboardSuccess: () => void;
@@ -39,18 +38,13 @@ function errorHandle(error: string) {
 const GENDERS = ['MALE', 'FEMALE', 'NON_BINARY', 'OTHER'];
 const GendersDisplay = ['Male', 'Female', 'Non-Binary', 'Other'];
 
-const DISPLAY_NAME_MAX_LENGTH = 50;
-const BIO_MAX_LENGTH = 150;
-const COUNTRY_MAX_LENGTH = 60;
-const INTERESTS_MAX_LENGTH = 200;
-
-export default function OnboardingGate({ onOnboardSuccess }: OnboardingGateProps) {
-  const [displayName, setDisplayName] = useState('');
-  const [bio, setBio] = useState('');
-  const [birthDate, setBirthDate] = useState('');
-  const [country, setCountry] = useState('');
-  const [gender, setGender] = useState('MALE');
-  const [interests, setInterests] = useState('');
+export default function OnboardingGate({ onOnboardSuccess, mode = 'create', initialProfile }: OnboardingGateProps) {
+  const [displayName, setDisplayName] = useState(initialProfile?.displayName ?? '');
+  const [bio, setBio] = useState(initialProfile?.bio ?? '');
+  const [birthDate, setBirthDate] = useState(initialProfile?.birthDate ?? '');
+  const [country, setCountry] = useState(initialProfile?.country ?? '');
+  const [gender, setGender] = useState(initialProfile?.gender ?? GENDERS[0]);
+  const [interests, setInterests] = useState((initialProfile?.interests ?? []).join(', '));
   // FIX: keep the full picker asset (uri + mimeType), not just the uri string.
   // We need the real mime type to build a correct native FormData part below.
   const [profileImage, setProfileImage] = useState<ImagePicker.ImagePickerAsset | null>(null);
@@ -70,28 +64,15 @@ export default function OnboardingGate({ onOnboardSuccess }: OnboardingGateProps
   }, [initialProfile]);
 
   const handlePickImage = async () => {
-    try {
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 0.7,
-      });
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.7,
+    });
 
-      if (result.canceled || !result.assets || result.assets.length === 0) {
-        return;
-      }
-
-      const asset = result.assets[0];
-      const validationError = getImageValidationError(asset);
-      if (validationError) {
-        errorHandle(validationError);
-        return;
-      }
-
-      setProfileImage(asset);
-    } catch (error) {
-      errorHandle(error instanceof Error ? error.message : 'Could not open the image picker.');
+    if (!result.canceled && result.assets && result.assets.length > 0) {
+      setProfileImage(result.assets[0]);
     }
   };
 
@@ -218,28 +199,23 @@ export default function OnboardingGate({ onOnboardSuccess }: OnboardingGateProps
                 )}
               </TouchableOpacity>
 
-            <TextInput
-              style={[styles.input, { color: theme.text, borderColor: theme.tabActiveBorder }]}
-              placeholder="User Name"
-              placeholderTextColor={theme.iconMuted}
-              value={displayName}
-              onChangeText={setDisplayName}
-              maxLength={DISPLAY_NAME_MAX_LENGTH}
-            />
+              <TextInput
+                style={[styles.input, { color: theme.text, borderColor: theme.tabActiveBorder }]}
+                placeholder="User Name"
+                placeholderTextColor={theme.iconMuted}
+                value={displayName}
+                onChangeText={setDisplayName}
+              />
 
-            <TextInput
-              style={[styles.input, styles.textArea, { color: theme.text, borderColor: theme.tabActiveBorder }]}
-              placeholder="Bio"
-              placeholderTextColor={theme.iconMuted}
-              value={bio}
-              onChangeText={setBio}
-              multiline
-              numberOfLines={3}
-              maxLength={BIO_MAX_LENGTH}
-            />
-            <ThemedText style={[styles.charCount, { color: theme.iconMuted }]}>
-              {bio.length}/{BIO_MAX_LENGTH}
-            </ThemedText>
+              <TextInput
+                style={[styles.input, styles.textArea, { color: theme.text, borderColor: theme.tabActiveBorder }]}
+                placeholder="Bio"
+                placeholderTextColor={theme.iconMuted}
+                value={bio}
+                onChangeText={setBio}
+                multiline
+                numberOfLines={3}
+              />
 
               <TextInput
                 style={[styles.input, { color: theme.text, borderColor: theme.tabActiveBorder }]}
@@ -249,14 +225,13 @@ export default function OnboardingGate({ onOnboardSuccess }: OnboardingGateProps
                 onChangeText={setBirthDate}
               />
 
-            <TextInput
-              style={[styles.input, { color: theme.text, borderColor: theme.tabActiveBorder }]}
-              placeholder="Country"
-              placeholderTextColor={theme.iconMuted}
-              value={country}
-              onChangeText={setCountry}
-              maxLength={COUNTRY_MAX_LENGTH}
-            />
+              <TextInput
+                style={[styles.input, { color: theme.text, borderColor: theme.tabActiveBorder }]}
+                placeholder="Country"
+                placeholderTextColor={theme.iconMuted}
+                value={country}
+                onChangeText={setCountry}
+              />
 
               <ThemedText style={styles.label}>Gender</ThemedText>
               <View style={styles.genderRow}>
@@ -277,14 +252,13 @@ export default function OnboardingGate({ onOnboardSuccess }: OnboardingGateProps
                 ))}
               </View>
 
-            <TextInput
-              style={[styles.input, { color: theme.text, borderColor: theme.tabActiveBorder }]}
-              placeholder="3 interests (e.g. Reading, Exercising, Cooking)"
-              placeholderTextColor={theme.iconMuted}
-              value={interests}
-              onChangeText={setInterests}
-              maxLength={INTERESTS_MAX_LENGTH}
-            />
+              <TextInput
+                style={[styles.input, { color: theme.text, borderColor: theme.tabActiveBorder }]}
+                placeholder="3 interests (e.g. Reading, Exercising, Cooking)"
+                placeholderTextColor={theme.iconMuted}
+                value={interests}
+                onChangeText={setInterests}
+              />
 
               <TouchableOpacity
                 style={[styles.buttonStyle]}
@@ -369,11 +343,6 @@ const styles = StyleSheet.create({
     height: 100,
     textAlignVertical: 'top',
     paddingTop: Spacing.three,
-  },
-  charCount: {
-    fontSize: 12,
-    textAlign: 'right',
-    marginTop: -Spacing.two,
   },
   label: {
     fontWeight: '600',

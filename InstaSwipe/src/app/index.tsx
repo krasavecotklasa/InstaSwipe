@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, Platform, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useEffect, useState } from 'react';
+import { ActivityIndicator, FlatList, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { SymbolView } from 'expo-symbols';
 import { ThemedText } from '@/components/themed-text';
@@ -9,8 +9,6 @@ import PostComposer from '@/components/post-composer';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import Header from '@/components/header';
-import { fetchPostsByUserIds } from '@/hooks/posts';
-import { TARGET_USER_IDS } from '@/hooks/api';
 import { fetchFeed } from '@/hooks/posts';
 
 function ComposerEntry({ onPress }: { onPress: () => void }) {
@@ -43,37 +41,26 @@ export default function HomeScreen() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [composerVisible, setComposerVisible] = useState(false);
+
+  const loadPosts = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const nextPosts = await fetchFeed();
+      setPosts(nextPosts);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to load posts');
+      setPosts([]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    let isActive = true;
-
-    const loadPosts = async () => {
-      setIsLoading(true);
-      setError(null);
-
-      try {
-        const nextPosts = await fetchPostsByUserIds(TARGET_USER_IDS);
-        if (isActive) {
-          setPosts(nextPosts);
-        }
-      } catch (err) {
-        if (isActive) {
-          setError(err instanceof Error ? err.message : 'Unable to load posts');
-          setPosts([]);
-        }
-      } finally {
-        if (isActive) {
-          setIsLoading(false);
-        }
-      }
-    };
-
     loadPosts();
-
-    return () => {
-      isActive = false;
-    };
-  }, []);
+  }, [loadPosts]);
 
   return (
     <ThemedView style={styles.container}>
@@ -132,6 +119,33 @@ const styles = StyleSheet.create({
   listContent: {
     paddingTop: Spacing.three,
     paddingBottom: BottomTabInset + Spacing.four,
+  },
+  composer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+    paddingVertical: Spacing.two,
+    paddingHorizontal: Spacing.three,
+    marginBottom: Spacing.three,
+    borderWidth: 1,
+    borderRadius: 999,
+    backgroundColor: '#000000',
+    width: '100%',
+    maxWidth: Platform.OS === 'web' ? 500 : undefined,
+  },
+  composerPressed: {
+    opacity: 0.85,
+  },
+  composerBadge: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  composerText: {
+    fontSize: 15,
+    fontWeight: '600',
   },
   emptyState: {
     paddingVertical: Spacing.four,

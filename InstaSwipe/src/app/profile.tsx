@@ -27,10 +27,10 @@ import {
 } from '@/hooks/matches';
 import { normalizeMediaUrl } from '@/hooks/media';
 import { sendTestNotificationAsync } from '@/hooks/notifications';
-import { fetchPostsByUserId } from '@/hooks/posts';
 import { useTheme } from '@/hooks/use-theme';
 import Header from '@/components/header';
 import { TARGET_USER_ID } from '@/hooks/api';
+import { fetchFeed } from '@/hooks/posts';
 
 const DEFAULT_PREFS: DiscoveryPreferences = {
   minAge: '',
@@ -147,7 +147,7 @@ export default function ProfileScreen() {
       setPostsError(null);
 
       try {
-        const nextPosts = await fetchPostsByUserId(TARGET_USER_ID);
+        const nextPosts = await fetchFeed();
         if (isActive) {
           setPosts(nextPosts);
         }
