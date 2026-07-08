@@ -19,6 +19,7 @@ import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { createPost } from '@/hooks/posts';
+import { isSupportedImage, UNSUPPORTED_IMAGE_MESSAGE } from '@/constants/media';
 
 interface PostComposerProps {
   visible: boolean;
@@ -62,15 +63,27 @@ export default function PostComposer({ visible, onClose, onPosted }: PostCompose
   };
 
   const handlePickImage = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.7,
-    });
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.7,
+      });
 
-    if (!result.canceled && result.assets && result.assets.length > 0) {
-      setImage(result.assets[0]);
+      if (result.canceled || !result.assets || result.assets.length === 0) {
+        return;
+      }
+
+      const asset = result.assets[0];
+      if (!isSupportedImage(asset)) {
+        errorHandle(UNSUPPORTED_IMAGE_MESSAGE);
+        return;
+      }
+
+      setImage(asset);
+    } catch (error) {
+      errorHandle(error instanceof Error ? error.message : 'Could not open the image picker.');
     }
   };
 

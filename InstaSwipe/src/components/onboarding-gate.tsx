@@ -17,6 +17,7 @@ import { ThemedView } from '@/components/themed-view';
 import { API } from '@/hooks/auth';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { isSupportedImage, UNSUPPORTED_IMAGE_MESSAGE } from '@/constants/media';
 
 interface OnboardingGateProps {
   onOnboardSuccess: () => void;
@@ -52,15 +53,27 @@ export default function OnboardingGate({ onOnboardSuccess }: OnboardingGateProps
   const theme = useTheme();
 
   const handlePickImage = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.7,
-    });
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.7,
+      });
 
-    if (!result.canceled && result.assets && result.assets.length > 0) {
-      setProfileImage(result.assets[0]);
+      if (result.canceled || !result.assets || result.assets.length === 0) {
+        return;
+      }
+
+      const asset = result.assets[0];
+      if (!isSupportedImage(asset)) {
+        errorHandle(UNSUPPORTED_IMAGE_MESSAGE);
+        return;
+      }
+
+      setProfileImage(asset);
+    } catch (error) {
+      errorHandle(error instanceof Error ? error.message : 'Could not open the image picker.');
     }
   };
 
