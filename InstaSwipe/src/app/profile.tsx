@@ -14,6 +14,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { PostCard, type Post } from '@/components/post-card';
 import { BottomTabInset, Colors, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useAuthContext } from '@/hooks/auth-context';
 import { API, type OwnProfileResponse } from '@/hooks/auth';
@@ -25,6 +26,8 @@ import {
   setDiscoveryPreferences,
 } from '@/hooks/matches';
 import { normalizeMediaUrl } from '@/hooks/media';
+import { sendTestNotificationAsync } from '@/hooks/notifications';
+import { fetchPostsByUserId } from '@/hooks/posts';
 import { useTheme } from '@/hooks/use-theme';
 import Header from '@/components/header';
 
@@ -58,6 +61,9 @@ export default function ProfileScreen() {
   const [profile, setProfile] = useState<OwnProfileResponse | null>(null);
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [posts, setPosts] = useState<Post[]>([]);
+  const [loadingPosts, setLoadingPosts] = useState(false);
+  const [postsError, setPostsError] = useState<string | null>(null);
 
   const [minAge, setMinAge] = useState('');
   const [maxAge, setMaxAge] = useState('');
@@ -67,6 +73,9 @@ export default function ProfileScreen() {
   const [savingPrefs, setSavingPrefs] = useState(false);
   const [prefsSaved, setPrefsSaved] = useState(false);
   const [openingEditor, setOpeningEditor] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [sendingTestNotification, setSendingTestNotification] = useState(false);
+  const [notificationStatus, setNotificationStatus] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -123,6 +132,41 @@ export default function ProfileScreen() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!profile?.id) {
+      setPosts([]);
+      setLoadingPosts(false);
+      return;
+    }
+
+    let active = true;
+
+    (async () => {
+      setLoadingPosts(true);
+      setPostsError(null);
+
+      try {
+        const nextPosts = await fetchPostsByUserId(profile.id);
+        if (active) {
+          setPosts(nextPosts);
+        }
+      } catch (postsLoadError) {
+        if (active) {
+          setPostsError(postsLoadError instanceof Error ? postsLoadError.message : 'Unable to load posts');
+          setPosts([]);
+        }
+      } finally {
+        if (active) {
+          setLoadingPosts(false);
+        }
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, [profile?.id]);
+
   const savePreferences = async () => {
     setSavingPrefs(true);
     setPrefsSaved(false);
@@ -157,6 +201,22 @@ export default function ProfileScreen() {
     }
   };
 
+  const sendSampleNotification = async () => {
+    setSendingTestNotification(true);
+    setNotificationStatus(null);
+
+    try {
+      const result = await sendTestNotificationAsync();
+      setNotificationStatus(result.notifToken ? `Token: ${result.notifToken}` : 'Test notification sent without a push token');
+    } catch (notificationError) {
+      setNotificationStatus(
+        notificationError instanceof Error ? notificationError.message : 'Could not send test notification'
+      );
+    } finally {
+      setSendingTestNotification(false);
+    }
+  };
+
   const profilePicture = profile?.profilePictureUrl;
 
   return (
@@ -170,12 +230,6 @@ export default function ProfileScreen() {
           ]}
           showsVerticalScrollIndicator
         >
-          <View style={styles.header}>
-            <ThemedText type="subtitle" style={styles.title}>
-              Profile Settings
-            </ThemedText>
-          </View>
-
           {error && (
             <View style={[styles.notice, { borderColor: '#ef4444' }]}>
               <ThemedText type="small" style={styles.errorText}>
@@ -184,210 +238,291 @@ export default function ProfileScreen() {
             </View>
           )}
 
-          <View style={[styles.panel, { borderColor: theme.tabActiveBorder }]}>
-            <View style={styles.panelHeader}>
-              <ThemedText style={styles.panelHeaderText} type="smallBold">
-                Your profile
-              </ThemedText>
-            </View>
-
-            {loadingProfile ? (
+          {loadingProfile ? (
+            <View style={[styles.panel, { borderColor: theme.tabActiveBorder }]}>
               <View style={styles.loadingRow}>
                 <ActivityIndicator color={theme.text} />
                 <ThemedText type="small" themeColor="textSecondary">
                   Loading profile...
                 </ThemedText>
               </View>
-            ) : profile ? (
-              <View style={styles.profileBlock}>
-                <View style={styles.profileTopRow}>
-                  <Image
-                    source={profilePicture ? { uri: profilePicture } : undefined}
-                    style={styles.avatar}
-                    contentFit="cover"
-                  />
-
-                  <View style={styles.profileMeta}>
-                    <ThemedText type="smallBold" style={styles.profileName}>
-                      {profile.displayName} <ThemedText type="small" themeColor="textSecondary">
-                        ({profile.email})
-                      </ThemedText>
-                    </ThemedText>
-                    <ThemedText type="small" themeColor="textSecondary">
-                      Birthday: <ThemedText type="small" themeColor="textSecondary" style={styles.boldText}>
-                        {profile.birthDate}
-                      </ThemedText>
-                    </ThemedText>
-                    <ThemedText type="small" themeColor="textSecondary">
-                      Country: <ThemedText type="small" themeColor="textSecondary" style={styles.boldText}>
-                        {profile.country}
-                      </ThemedText>
-                    </ThemedText>
-                    <ThemedText type="small" themeColor="textSecondary">
-                      Gender: <ThemedText type="small" themeColor="textSecondary" style={styles.boldText}>
-                        {profile.gender}
-                      </ThemedText>
-                    </ThemedText>
-                  </View>
+            </View>
+          ) : profile ? (
+            <>
+              <View style={[styles.panel, { borderColor: theme.tabActiveBorder }]}>
+                <View style={styles.panelHeader}>
+                  <ThemedText style={styles.panelHeaderText} type="smallBold">
+                    Your profile
+                  </ThemedText>
+                  <TouchableOpacity
+                    onPress={() => setShowSettings((current) => !current)}
+                    style={[styles.iconButton, { borderColor: theme.tabActiveBorder }]}
+                    accessibilityRole="button"
+                    accessibilityLabel={showSettings ? 'Show posts' : 'Open settings'}
+                  >
+                    <SymbolView
+                      name={
+                        (showSettings
+                          ? { ios: 'xmark', android: 'close', web: 'close' }
+                          : { ios: 'gearshape', android: 'settings', web: 'settings' }) as any
+                      }
+                      tintColor='#8769ffbe'
+                      size={20}
+                    />
+                  </TouchableOpacity>
                 </View>
 
-                <View style={styles.bioInterestsRow}>
-                  <View style={[styles.bioColumn, { borderColor: theme.tabActiveBorder }]}>
-                    <ThemedText type="smallBold">Bio:</ThemedText>
-                    {!!profile.bio && (
-                      <ThemedText type="small" style={styles.bio}>
-                        {profile.bio}
+                <View style={styles.profileBlock}>
+                  <View style={styles.profileTopRow}>
+                    <Image
+                      source={profilePicture ? { uri: profilePicture } : undefined}
+                      style={styles.avatar}
+                      contentFit="cover"
+                    />
+
+                    <View style={styles.profileMeta}>
+                      <ThemedText type="smallBold" style={styles.profileName}>
+                        {profile.displayName} <ThemedText type="small" themeColor="textSecondary" style={styles.emailText}>
+                          ({profile.email})
+                        </ThemedText>
+                      </ThemedText>
+                      <ThemedText type="small" themeColor="textSecondary">
+                        Birthday: <ThemedText type="small" themeColor="textSecondary" style={styles.profileMetaDetail}>{profile.birthDate}</ThemedText>
+                      </ThemedText>
+                      <ThemedText type="small" themeColor="textSecondary">
+                        Country: <ThemedText type="small" themeColor="textSecondary" style={styles.profileMetaDetail}>{profile.country}</ThemedText>
+                      </ThemedText>
+                      <ThemedText type="small" themeColor="textSecondary">
+                        Gender: <ThemedText type="small" themeColor="textSecondary" style={styles.profileMetaDetail}>{profile.gender}</ThemedText>
+                      </ThemedText>
+                    </View>
+                  </View>
+
+                  <View style={styles.bioInterestsRow}>
+                    <View style={[styles.bioColumn, { borderColor: theme.tabActiveBorder }]}>
+                      <ThemedText type="smallBold">Bio:</ThemedText>
+                      {!!profile.bio && (
+                        <ThemedText type="small" style={styles.bio}>
+                          {profile.bio}
+                        </ThemedText>
+                      )}
+                    </View>
+
+                    <View style={[styles.interestsColumn, { borderColor: theme.tabActiveBorder }]}>
+                      <ThemedText type="smallBold">My interests:</ThemedText>
+                      <View style={styles.chips}>
+                        {(profile.interests ?? []).map((interest) => (
+                          <View key={interest} style={[styles.chip, { borderColor: theme.tabActiveBorder }]}>
+                            <ThemedText type="small" style={styles.chipText}>
+                              {interest}
+                            </ThemedText>
+                          </View>
+                        ))}
+                      </View>
+                    </View>
+                  </View>
+                </View>
+              </View>
+
+              {showSettings ? (
+                <>
+                  <View style={[styles.panel, { borderColor: theme.tabActiveBorder }]}>
+                    <View style={styles.panelHeader}>
+                      <ThemedText style={styles.panelHeaderText} type="smallBold">
+                        Profile settings
+                      </ThemedText>
+                    </View>
+
+                    <View style={styles.actionsRow}>
+                      <TouchableOpacity
+                        onPress={openEditor}
+                        disabled={openingEditor}
+                        style={[styles.buttonStyle, { borderColor: '#6249cabe' }]}
+                      >
+                        <SymbolView
+                          name={{ ios: 'square.and.pencil', android: 'edit', web: 'edit' } as any}
+                          tintColor='#8769ffbe'
+                          size={20}
+                        />
+                        <ThemedText type="smallBold">
+                          Update profile
+                        </ThemedText>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={sendSampleNotification}
+                        disabled={sendingTestNotification}
+                        style={[styles.buttonStyle, { borderColor: '#6249cabe' }]}
+                      >
+                        <SymbolView
+                          name={{ ios: 'bell.badge', android: 'notifications', web: 'notifications' } as any}
+                          tintColor='#8769ffbe'
+                          size={20}
+                        />
+                        <ThemedText type="smallBold">
+                          {sendingTestNotification ? 'Sending...' : 'Send test notification'}
+                        </ThemedText>
+                      </TouchableOpacity>
+                    </View>
+                    {notificationStatus && (
+                      <ThemedText type="small" themeColor="textSecondary" style={styles.notificationStatus}>
+                        {notificationStatus}
                       </ThemedText>
                     )}
                   </View>
 
-                  <View style={[styles.interestsColumn, { borderColor: theme.tabActiveBorder }]}>
-                    <ThemedText type="smallBold">My interests:</ThemedText>
-                    <View style={styles.chips}>
-                      {(profile.interests ?? []).map((interest) => (
-                        <View key={interest} style={[styles.chip, { borderColor: theme.tabActiveBorder }]}>
-                          <ThemedText type="small" style={styles.chipText}>
-                            {interest}
-                          </ThemedText>
-                        </View>
-                      ))}
+                  <View style={[styles.panel, { borderColor: theme.tabActiveBorder }]}>
+                    <View style={styles.panelHeader}>
+                      <ThemedText style={styles.panelHeaderText} type="smallBold">
+                        Discovery preferences
+                      </ThemedText>
+                      {prefsSaved && <ThemedText type="small" themeColor="textSecondary">
+                        Saved
+                      </ThemedText>}
+                    </View>
+
+                    <View style={styles.row}>
+                      <View style={styles.field}>
+                        <ThemedText type="smallBold">Minimum age</ThemedText>
+                        <TextInput
+                          value={minAge}
+                          onChangeText={setMinAge}
+                          keyboardType="number-pad"
+                          style={[styles.input, { borderColor: theme.tabActiveBorder, color: theme.text }]}
+                        />
+                      </View>
+                      <View style={styles.field}>
+                        <ThemedText type="smallBold">Maximum age</ThemedText>
+                        <TextInput
+                          value={maxAge}
+                          onChangeText={setMaxAge}
+                          keyboardType="number-pad"
+                          style={[styles.input, { borderColor: theme.tabActiveBorder, color: theme.text }]}
+                        />
+                      </View>
+                    </View>
+
+                    <View style={styles.field}>
+                      <ThemedText type="smallBold">Gender</ThemedText>
+                      <View style={styles.segmented}>
+                        {DISCOVERY_GENDERS.map((option) => {
+                          const selected = option === gender;
+
+                          return (
+                            <TouchableOpacity
+                              key={option}
+                              onPress={() => setGender(option)}
+                              style={[
+                                styles.segment,
+                                {
+                                  borderColor: theme.tabActiveBorder,
+                                  backgroundColor: selected ? theme.backgroundElement : 'transparent',
+                                },
+                              ]}
+                            >
+                              <ThemedText
+                                type="smallBold"
+                                style={[styles.segmentText, selected && styles.segmentTextSelected]}
+                              >
+                                {DISCOVERY_GENDER_LABELS[option]}
+                              </ThemedText>
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </View>
+                    </View>
+
+                    <View style={styles.field}>
+                      <ThemedText type="smallBold">Country</ThemedText>
+                      <TextInput
+                        value={country}
+                        onChangeText={setCountry}
+                        autoCapitalize="words"
+                        style={[styles.input, { borderColor: theme.tabActiveBorder, color: theme.text }]}
+                      />
+                    </View>
+
+                    <View style={styles.field}>
+                      <ThemedText type="smallBold">Interests</ThemedText>
+                      <TextInput
+                        value={interests}
+                        onChangeText={setInterests}
+                        autoCapitalize="words"
+                        style={[styles.input, { borderColor: theme.tabActiveBorder, color: theme.text }]}
+                      />
+                    </View>
+
+                    <View style={styles.actionsRow}>
+                      <TouchableOpacity
+                        onPress={savePreferences}
+                        disabled={savingPrefs}
+                        style={[styles.buttonStyle]}
+                      >
+                        <SymbolView
+                          name={{ ios: 'save', android: 'save', web: 'save' } as any}
+                          tintColor='#8769ffbe'
+                          size={20}
+                        />
+                        <ThemedText type="smallBold">
+                          Save changes
+                        </ThemedText>
+                      </TouchableOpacity>
                     </View>
                   </View>
-                </View>
 
-                <View style={styles.actionsRow}>
-                  <TouchableOpacity
-                    onPress={openEditor}
-                    disabled={openingEditor}
-                    style={[styles.buttonStyle, { borderColor: '#6249cabe' }]}
-                  >
-                    <SymbolView
-                      name={{ ios: 'square.and.pencil', android: 'edit', web: 'edit' } as any}
-                      tintColor='#8769ffbe'
-                      size={20}
-                    />
-                    <ThemedText type="smallBold">
-                      Update profile
-                    </ThemedText>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            ) : null}
-          </View>
-
-          <View style={[styles.panel, { borderColor: theme.tabActiveBorder }]}>
-            <View style={styles.panelHeader}>
-              <ThemedText style={styles.panelHeaderText} type="smallBold">
-                Discovery preferences
-              </ThemedText>
-              {prefsSaved && <ThemedText type="small" themeColor="textSecondary">
-                Saved
-              </ThemedText>}
-            </View>
-
-            <View style={styles.row}>
-              <View style={styles.field}>
-                <ThemedText type="smallBold">Minimum age</ThemedText>
-                <TextInput
-                  value={minAge}
-                  onChangeText={setMinAge}
-                  keyboardType="number-pad"
-                  style={[styles.input, { borderColor: theme.tabActiveBorder, color: theme.text }]}
-                />
-              </View>
-              <View style={styles.field}>
-                <ThemedText type="smallBold">Maximum age</ThemedText>
-                <TextInput
-                  value={maxAge}
-                  onChangeText={setMaxAge}
-                  keyboardType="number-pad"
-                  style={[styles.input, { borderColor: theme.tabActiveBorder, color: theme.text }]}
-                />
-              </View>
-            </View>
-
-            <View style={styles.field}>
-              <ThemedText type="smallBold">Gender</ThemedText>
-              <View style={styles.segmented}>
-                {DISCOVERY_GENDERS.map((option) => {
-                  const selected = option === gender;
-
-                  return (
+                  <View style={styles.actionsRow}>
                     <TouchableOpacity
-                      key={option}
-                      onPress={() => setGender(option)}
-                      style={[
-                        styles.segment,
-                        {
-                          borderColor: theme.tabActiveBorder,
-                          backgroundColor: selected ? theme.backgroundElement : 'transparent',
-                        },
-                      ]}
+                      onPress={onLogout}
+                      style={[styles.buttonStyle, { borderColor: '#ef4444' }]}
                     >
-                      <ThemedText
-                        type="smallBold"
-                        style={[styles.segmentText, selected && styles.segmentTextSelected]}
-                      >
-                        {DISCOVERY_GENDER_LABELS[option]}
+                      <SymbolView
+                        name={{ ios: 'rectangle.portrait.and.arrow.right', android: 'logout', web: 'logout' } as any}
+                        tintColor="#ef4444"
+                        size={20}
+                      />
+                      <ThemedText type="smallBold">
+                        Logout
                       </ThemedText>
                     </TouchableOpacity>
-                  );
-                })}
-              </View>
-            </View>
+                  </View>
+                </>
+              ) : (
+                <View style={styles.postsSection}>
+                  <View style={styles.postsHeader}>
+                    <ThemedText type="smallBold" style={styles.postsTitle}>
+                      Posts
+                    </ThemedText>
+                    <ThemedText type="small" themeColor="textSecondary">
+                      {posts.length} {posts.length === 1 ? 'post' : 'posts'}
+                    </ThemedText>
+                  </View>
 
-            <View style={styles.field}>
-              <ThemedText type="smallBold">Country</ThemedText>
-              <TextInput
-                value={country}
-                onChangeText={setCountry}
-                autoCapitalize="words"
-                style={[styles.input, { borderColor: theme.tabActiveBorder, color: theme.text }]}
-              />
-            </View>
-
-            <View style={styles.field}>
-              <ThemedText type="smallBold">Interests</ThemedText>
-              <TextInput
-                value={interests}
-                onChangeText={setInterests}
-                autoCapitalize="words"
-                style={[styles.input, { borderColor: theme.tabActiveBorder, color: theme.text }]}
-              />
-            </View>
-
-            <View style={styles.actionsRow}>
-              <TouchableOpacity
-                onPress={savePreferences}
-                disabled={savingPrefs}
-                style={[styles.buttonStyle]}
-              >
-                <SymbolView
-                  name={{ ios: 'save', android: 'save', web: 'save' } as any}
-                  tintColor='#8769ffbe'
-                  size={20}
-                />
-                <ThemedText type="smallBold">
-                  Save changes
-                </ThemedText>
-              </TouchableOpacity>
-            </View>
-          </View>
-          <View style={styles.actionsRow}>
-            <TouchableOpacity
-              onPress={onLogout}
-              style={[styles.buttonStyle, { borderColor: '#ef4444' }]}
-            >
-              <SymbolView
-                name={{ ios: 'rectangle.portrait.and.arrow.right', android: 'logout', web: 'logout' } as any}
-                tintColor="#ef4444"
-                size={20}
-              />
-              <ThemedText type="smallBold">
-                Logout
-              </ThemedText>
-            </TouchableOpacity>
-          </View>
+                  {loadingPosts ? (
+                    <View style={styles.emptyState}>
+                      <ActivityIndicator size="large" color={theme.text} />
+                    </View>
+                  ) : postsError ? (
+                    <View style={[styles.notice, { borderColor: '#ef4444' }]}>
+                      <ThemedText type="small" style={styles.errorText}>
+                        {postsError}
+                      </ThemedText>
+                    </View>
+                  ) : posts.length > 0 ? (
+                    <View style={styles.postsList}>
+                      {posts.map((post) => (
+                        <PostCard key={post.id} post={post} />
+                      ))}
+                    </View>
+                  ) : (
+                    <View style={styles.emptyState}>
+                      <ThemedText type="small" themeColor="textSecondary">
+                        No posts yet.
+                      </ThemedText>
+                    </View>
+                  )}
+                </View>
+              )}
+            </>
+          ) : null}
         </ScrollView>
       </SafeAreaView>
     </ThemedView>
@@ -409,13 +544,6 @@ const styles = StyleSheet.create({
   content: {
     padding: Spacing.three,
     gap: Spacing.three,
-  },
-  header: {
-    gap: Spacing.one,
-  },
-  title: {
-    fontSize: 30,
-    lineHeight: 36,
   },
   notice: {
     borderWidth: 1,
@@ -454,9 +582,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     backgroundColor: 'rgba(255, 255, 255, 0.06)',
-  },
-  textArea: {
-    minHeight: 56,
   },
   segmented: {
     flexDirection: 'row',
@@ -498,6 +623,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: Spacing.two,
     borderWidth: 1,
+  },
+  notificationStatus: {
+    fontWeight: '800',
   },
   loadingRow: {
     flexDirection: 'row',
@@ -552,6 +680,9 @@ const styles = StyleSheet.create({
     fontSize: 18,
     lineHeight: 24,
   },
+  emailText: {
+    fontWeight: '800',
+  },
   profileMetaDetail: {
     fontWeight: '800',
   },
@@ -564,6 +695,7 @@ const styles = StyleSheet.create({
     gap: Spacing.two,
   },
   chip: {
+    backgroundColor: '#2f2338',
     borderWidth: 1,
     borderRadius: 8,
     paddingHorizontal: Spacing.two,
@@ -574,16 +706,38 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   panelHeaderText: {
+    bottom: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  bioStyle: {
-    padding: Spacing.two,
+  iconButton: {
+    width: 44,
+    height: 44,
+    borderWidth: 1,
     borderRadius: 8,
-    maxWidth: 360,
-    minHeight: 100
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
   },
-  boldText: {
-    fontWeight: '800',
-  }
+  postsSection: {
+    gap: Spacing.three,
+  },
+  postsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Spacing.two,
+  },
+  postsTitle: {
+    fontSize: 18,
+    lineHeight: 24,
+  },
+  postsList: {
+    width: '100%',
+  },
+  emptyState: {
+    paddingVertical: Spacing.four,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 });

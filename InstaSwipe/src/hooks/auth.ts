@@ -41,6 +41,7 @@ export interface ProfileStatusResponse {
 }
 
 export interface OwnProfileResponse {
+  id: string;
   email: string;
   displayName: string;
   bio: string;
