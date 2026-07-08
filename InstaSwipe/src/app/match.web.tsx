@@ -1,4 +1,3 @@
-import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   Platform,
@@ -8,104 +7,25 @@ import {
 } from 'react-native';
 import { Image } from 'expo-image';
 import { SymbolView } from 'expo-symbols';
-import { useFocusEffect } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
-import {
-  DiscoveryProfile,
-  getDiscovery,
-  getDiscoveryPreferences,
-  lovePerson,
-  passPerson,
-  type DiscoveryPreferences,
-  type SwipeResult,
-} from '@/hooks/matches';
+import { useDiscoverySwipe } from '@/hooks/matches';
 import { useTheme } from '@/hooks/use-theme';
 import Header from '@/components/header';
 
-const PAGE_SIZE = 20;
-
-const toDiscoveryFilters = (preferences: DiscoveryPreferences) => ({
-  minAge: preferences.minAge === '' ? undefined : preferences.minAge,
-  maxAge: preferences.maxAge === '' ? undefined : preferences.maxAge,
-  gender: preferences.gender || undefined,
-  country: preferences.country,
-  interests: preferences.interests,
-  page: 0,
-  size: PAGE_SIZE,
-});
-
-const formatResultMessage = (result: SwipeResult) => {
-  if (result.status === 'MATCHED') {
-    return "It's a match!";
-  }
-
-  if (result.status === 'LIKED') {
-    return 'Liked';
-  }
-
-  return 'Passed';
-};
-
 export default function MatchScreen() {
   const theme = useTheme();
-  const [profiles, setProfiles] = useState<DiscoveryProfile[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [acting, setActing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [resultMessage, setResultMessage] = useState<string | null>(null);
-
-  useFocusEffect(
-    useCallback(() => {
-      void loadProfiles();
-    }, []),
-  );
-
-  async function loadProfiles() {
-    setLoading(true);
-    setError(null);
-    setResultMessage(null);
-
-    try {
-      const preferences = await getDiscoveryPreferences();
-      const result = await getDiscovery(toDiscoveryFilters(preferences));
-      setProfiles(result.content);
-    } catch (loadError) {
-      setProfiles([]);
-      setError(loadError instanceof Error ? loadError.message : 'Could not load matches');
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function handleDecision(action: 'love' | 'pass') {
-    const currentProfile = profiles[0];
-    if (!currentProfile || acting) {
-      return;
-    }
-
-    setActing(true);
-    setError(null);
-    setResultMessage(null);
-
-    try {
-      const result = action === 'love'
-        ? await lovePerson(currentProfile.id)
-        : await passPerson(currentProfile.id);
-
-      setResultMessage(formatResultMessage(result));
-      setProfiles((current) => current.slice(1));
-    } catch (decisionError) {
-      setError(decisionError instanceof Error ? decisionError.message : 'Could not save your choice');
-    } finally {
-      setActing(false);
-    }
-  }
-
-  const currentProfile = profiles[0];
+  const {
+    currentProfile,
+    loading,
+    acting,
+    error,
+    resultMessage,
+    handleDecision,
+  } = useDiscoverySwipe();
 
   return (
     <ThemedView style={styles.container}>
@@ -148,8 +68,6 @@ export default function MatchScreen() {
                   </View>
                 </View>
               </View>
-
-
 
               <View style={styles.actions}>
                 <Pressable

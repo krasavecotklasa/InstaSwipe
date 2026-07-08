@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import {
   ActivityIndicator,
   Animated,
@@ -10,111 +10,36 @@ import {
 } from 'react-native';
 import { Image } from 'expo-image';
 import { SymbolView } from 'expo-symbols';
-import { useFocusEffect } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, Spacing } from '@/constants/theme';
-import {
-  DiscoveryProfile,
-  getDiscovery,
-  getDiscoveryPreferences,
-  lovePerson,
-  passPerson,
-  type DiscoveryPreferences,
-  type SwipeResult,
-} from '@/hooks/matches';
+import { useDiscoverySwipe } from '@/hooks/matches';
 import { useTheme } from '@/hooks/use-theme';
 import Header from '@/components/header';
 
-const PAGE_SIZE = 20;
 const SWIPE_THRESHOLD = 120;
 const SWIPE_OUT_DISTANCE = 700;
-
-const toDiscoveryFilters = (preferences: DiscoveryPreferences) => ({
-  minAge: preferences.minAge === '' ? undefined : preferences.minAge,
-  maxAge: preferences.maxAge === '' ? undefined : preferences.maxAge,
-  gender: preferences.gender || undefined,
-  country: preferences.country,
-  interests: preferences.interests,
-  page: 0,
-  size: PAGE_SIZE,
-});
-
-const formatResultMessage = (result: SwipeResult) => {
-  if (result.status === 'MATCHED') {
-    return "It's a match!";
-  }
-
-  if (result.status === 'LIKED') {
-    return 'Liked';
-  }
-
-  return 'Passed';
-};
 
 export default function MatchScreen() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const position = useRef(new Animated.ValueXY()).current;
-  const [profiles, setProfiles] = useState<DiscoveryProfile[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [acting, setActing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [resultMessage, setResultMessage] = useState<string | null>(null);
-  const currentProfile = profiles[0];
+  const {
+    currentProfile,
+    loading,
+    acting,
+    error,
+    resultMessage,
+    beginDecision,
+    finishDecision,
+    handleDecision,
+  } = useDiscoverySwipe();
   const bottomClearance = BottomTabInset + insets.bottom - Spacing.three;
 
   useEffect(() => {
     position.setValue({ x: 0, y: 0 });
   }, [currentProfile?.id, position]);
-
-  useFocusEffect(
-    useCallback(() => {
-      void loadProfiles();
-    }, []),
-  );
-
-  async function loadProfiles() {
-    setLoading(true);
-    setError(null);
-    setResultMessage(null);
-
-    try {
-      const preferences = await getDiscoveryPreferences();
-      const result = await getDiscovery(toDiscoveryFilters(preferences));
-      setProfiles(result.content);
-    } catch (loadError) {
-      setProfiles([]);
-      setError(loadError instanceof Error ? loadError.message : 'Could not load matches');
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function handleDecision(action: 'love' | 'pass') {
-    if (!currentProfile || acting) {
-      return;
-    }
-
-    setActing(true);
-    setError(null);
-    setResultMessage(null);
-
-    try {
-      const result = action === 'love'
-        ? await lovePerson(currentProfile.id)
-        : await passPerson(currentProfile.id);
-
-      setResultMessage(formatResultMessage(result));
-      setProfiles((current) => current.slice(1));
-    } catch (decisionError) {
-      resetCardPosition();
-      setError(decisionError instanceof Error ? decisionError.message : 'Could not save your choice');
-    } finally {
-      setActing(false);
-    }
-  }
 
   const resetCardPosition = () => {
     Animated.spring(position, {
@@ -125,15 +50,26 @@ export default function MatchScreen() {
     }).start();
   };
 
+  // Take the single-decision lock at gesture release (before the animation), so a
+  // second swipe or a button tap during the 180ms animation can't queue a second
+  // decision. The lock is released inside finishDecision once the swipe resolves.
   const finishSwipe = (action: 'love' | 'pass') => {
+    if (!beginDecision()) {
+      resetCardPosition();
+      return;
+    }
+
     const toX = action === 'love' ? SWIPE_OUT_DISTANCE : -SWIPE_OUT_DISTANCE;
 
     Animated.timing(position, {
       toValue: { x: toX, y: 0 },
       duration: 180,
       useNativeDriver: true,
-    }).start(() => {
-      void handleDecision(action);
+    }).start(async () => {
+      const applied = await finishDecision(action);
+      if (!applied) {
+        resetCardPosition();
+      }
     });
   };
 
@@ -163,6 +99,7 @@ export default function MatchScreen() {
       },
       onPanResponderTerminate: resetCardPosition,
     }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [acting, currentProfile, position],
   );
 
