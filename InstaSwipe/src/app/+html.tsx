@@ -14,9 +14,10 @@ const apiOrigin = apiHost
     : `http://${apiHost}:${apiPort}`
   : undefined;
 
-// Origin serving post media (S3/MinIO). Set EXPO_PUBLIC_MEDIA_ORIGIN to the
-// public media host, e.g. http://localhost:9000 locally.
-const mediaOrigin = process.env.EXPO_PUBLIC_MEDIA_ORIGIN;
+// Origin serving post media (S3/MinIO). Set EXPO_PUBLIC_MEDIA_ORIGIN to override
+// it; otherwise we reuse the API host on port 9000 so local and device access
+// stay on the same machine.
+const mediaOrigin = process.env.EXPO_PUBLIC_MEDIA_ORIGIN ?? (apiHost ? `http://${apiHost}:9000` : undefined);
 
 // This file is web-only and runs during static rendering to shape the root HTML
 // document. It has no effect on native.

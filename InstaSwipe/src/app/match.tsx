@@ -24,6 +24,7 @@ import {
   type SwipeResult,
 } from '@/hooks/matches';
 import { useTheme } from '@/hooks/use-theme';
+import Header from '@/components/header';
 
 const PAGE_SIZE = 20;
 
@@ -109,6 +110,7 @@ export default function MatchScreen() {
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+        <Header />
         <View style={styles.content}>
           <View style={styles.header} />
 

@@ -3,7 +3,7 @@ import {
   ActivityIndicator,
   FlatList,
   Platform,
-  Pressable,
+  TouchableOpacity,
   StyleSheet,
   TextInput,
   View,
@@ -24,6 +24,7 @@ import {
   getDiscoveryPreferences,
 } from '@/hooks/matches';
 import { useTheme } from '@/hooks/use-theme';
+import Header from '@/components/header';
 
 const PAGE_SIZE = 100;
 
@@ -162,6 +163,7 @@ export default function SearchScreen() {
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+        <Header />
         <FlatList
           data={profiles}
           keyExtractor={(item) => item.id}
@@ -201,7 +203,7 @@ export default function SearchScreen() {
                       const selected = option === gender;
 
                       return (
-                        <Pressable
+                        <TouchableOpacity
                           key={option}
                           onPress={() => setGender(option)}
                           style={[
@@ -215,7 +217,7 @@ export default function SearchScreen() {
                           <ThemedText type="smallBold" style={selected && styles.segmentTextSelected}>
                             {DISCOVERY_GENDER_LABELS[option]}
                           </ThemedText>
-                        </Pressable>
+                        </TouchableOpacity>
                       );
                     })}
                   </View>
@@ -241,7 +243,7 @@ export default function SearchScreen() {
                   />
                 </View>
 
-                <Pressable
+                <TouchableOpacity
                   onPress={loadDiscovery}
                   disabled={loading}
                   style={[styles.buttonStyle, { opacity: loading ? 0.65 : 1 }]}
@@ -258,7 +260,7 @@ export default function SearchScreen() {
                   <ThemedText type="smallBold">
                     Search
                   </ThemedText>
-                </Pressable>
+                </TouchableOpacity>
               </View>
 
               {!!error && (
