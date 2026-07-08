@@ -1,8 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
-  Animated,
-  PanResponder,
   Platform,
   Pressable,
   StyleSheet,
@@ -11,11 +9,11 @@ import {
 import { Image } from 'expo-image';
 import { SymbolView } from 'expo-symbols';
 import { useFocusEffect } from 'expo-router';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { BottomTabInset, Spacing } from '@/constants/theme';
+import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import {
   DiscoveryProfile,
   getDiscovery,
@@ -29,8 +27,6 @@ import { useTheme } from '@/hooks/use-theme';
 import Header from '@/components/header';
 
 const PAGE_SIZE = 20;
-const SWIPE_THRESHOLD = 120;
-const SWIPE_OUT_DISTANCE = 700;
 
 const toDiscoveryFilters = (preferences: DiscoveryPreferences) => ({
   minAge: preferences.minAge === '' ? undefined : preferences.minAge,
@@ -56,19 +52,11 @@ const formatResultMessage = (result: SwipeResult) => {
 
 export default function MatchScreen() {
   const theme = useTheme();
-  const insets = useSafeAreaInsets();
-  const position = useRef(new Animated.ValueXY()).current;
   const [profiles, setProfiles] = useState<DiscoveryProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [acting, setActing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [resultMessage, setResultMessage] = useState<string | null>(null);
-  const currentProfile = profiles[0];
-  const bottomClearance = BottomTabInset + insets.bottom - Spacing.three;
-
-  useEffect(() => {
-    position.setValue({ x: 0, y: 0 });
-  }, [currentProfile?.id, position]);
 
   useFocusEffect(
     useCallback(() => {
@@ -94,6 +82,7 @@ export default function MatchScreen() {
   }
 
   async function handleDecision(action: 'love' | 'pass') {
+    const currentProfile = profiles[0];
     if (!currentProfile || acting) {
       return;
     }
@@ -110,98 +99,19 @@ export default function MatchScreen() {
       setResultMessage(formatResultMessage(result));
       setProfiles((current) => current.slice(1));
     } catch (decisionError) {
-      resetCardPosition();
       setError(decisionError instanceof Error ? decisionError.message : 'Could not save your choice');
     } finally {
       setActing(false);
     }
   }
 
-  const resetCardPosition = () => {
-    Animated.spring(position, {
-      toValue: { x: 0, y: 0 },
-      useNativeDriver: true,
-      friction: 6,
-      tension: 60,
-    }).start();
-  };
-
-  const finishSwipe = (action: 'love' | 'pass') => {
-    const toX = action === 'love' ? SWIPE_OUT_DISTANCE : -SWIPE_OUT_DISTANCE;
-
-    Animated.timing(position, {
-      toValue: { x: toX, y: 0 },
-      duration: 180,
-      useNativeDriver: true,
-    }).start(() => {
-      void handleDecision(action);
-    });
-  };
-
-  const panResponder = useMemo(
-    () => PanResponder.create({
-      onMoveShouldSetPanResponder: (_, gesture) => (
-        !acting &&
-        Boolean(currentProfile) &&
-        Math.abs(gesture.dx) > 8 &&
-        Math.abs(gesture.dx) > Math.abs(gesture.dy)
-      ),
-      onPanResponderMove: (_, gesture) => {
-        position.setValue({ x: gesture.dx, y: gesture.dy * 0.2 });
-      },
-      onPanResponderRelease: (_, gesture) => {
-        if (gesture.dx > SWIPE_THRESHOLD) {
-          finishSwipe('love');
-          return;
-        }
-
-        if (gesture.dx < -SWIPE_THRESHOLD) {
-          finishSwipe('pass');
-          return;
-        }
-
-        resetCardPosition();
-      },
-      onPanResponderTerminate: resetCardPosition,
-    }),
-    [acting, currentProfile, position],
-  );
-
-  const cardAnimatedStyle = {
-    transform: [
-      { translateX: position.x },
-      { translateY: position.y },
-      {
-        rotate: position.x.interpolate({
-          inputRange: [-260, 0, 260],
-          outputRange: ['-10deg', '0deg', '10deg'],
-          extrapolate: 'clamp',
-        }),
-      },
-    ],
-  };
-
-  const passBadgeStyle = {
-    opacity: position.x.interpolate({
-      inputRange: [-SWIPE_THRESHOLD, -40],
-      outputRange: [1, 0],
-      extrapolate: 'clamp',
-    }),
-  };
-
-  const loveBadgeStyle = {
-    opacity: position.x.interpolate({
-      inputRange: [40, SWIPE_THRESHOLD],
-      outputRange: [0, 1],
-      extrapolate: 'clamp',
-    }),
-  };
+  const currentProfile = profiles[0];
 
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
         <Header />
-        <View style={[styles.content, { paddingBottom: bottomClearance }]}>
+        <View style={styles.content}>
           <View style={styles.header} />
 
           {loading ? (
@@ -213,22 +123,13 @@ export default function MatchScreen() {
             </View>
           ) : currentProfile ? (
             <View style={styles.stage}>
-              <Animated.View
-                {...panResponder.panHandlers}
-                style={[styles.card, cardAnimatedStyle]}
-              >
+              <View style={[styles.card, { borderColor: theme.tabActiveBorder }]}>
                 <Image
                   source={currentProfile.profilePictureUrl ? { uri: currentProfile.profilePictureUrl } : undefined}
                   style={styles.portrait}
                   contentFit="cover"
                   transition={250}
                 />
-                <Animated.View style={[styles.decisionBadge, styles.passBadge, passBadgeStyle]}>
-                  <ThemedText style={styles.decisionText}>PASS</ThemedText>
-                </Animated.View>
-                <Animated.View style={[styles.decisionBadge, styles.loveBadge, loveBadgeStyle]}>
-                  <ThemedText style={styles.decisionText}>LIKE</ThemedText>
-                </Animated.View>
                 <View style={styles.profileOverlay}>
                   <ThemedText type="subtitle" style={styles.profileName}>
                     {currentProfile.displayName}, {currentProfile.age}
@@ -246,7 +147,9 @@ export default function MatchScreen() {
                     ))}
                   </View>
                 </View>
-              </Animated.View>
+              </View>
+
+
 
               <View style={styles.actions}>
                 <Pressable
@@ -257,7 +160,7 @@ export default function MatchScreen() {
                   <SymbolView
                     name={{ ios: 'xmark', android: 'close', web: 'close' } as any}
                     tintColor="#ffffff"
-                    size={24}
+                    size={34}
                   />
                 </Pressable>
                 <Pressable
@@ -268,7 +171,7 @@ export default function MatchScreen() {
                   <SymbolView
                     name={{ ios: 'heart.fill', android: 'favorite', web: 'favorite' } as any}
                     tintColor="#ffffff"
-                    size={24}
+                    size={34}
                   />
                 </Pressable>
               </View>
@@ -307,12 +210,15 @@ const styles = StyleSheet.create({
   },
   safeArea: {
     flex: 1,
+    maxWidth: MaxContentWidth,
     width: '100%',
     marginLeft: Platform.OS === 'web' ? 100 : 0,
   },
   content: {
     flex: 1,
-    backgroundColor: '#050208',
+    padding: Spacing.three,
+    paddingBottom: BottomTabInset + Spacing.four,
+    gap: Spacing.three,
   },
   header: {
     flexDirection: 'row',
@@ -337,13 +243,15 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    overflow: 'hidden',
+    gap: Spacing.three,
   },
   card: {
     width: '100%',
-    height: '100%',
+    maxWidth: 420,
+    aspectRatio: 3 / 4,
+    borderWidth: 1,
     overflow: 'hidden',
-    backgroundColor: 'rgba(0, 0, 0, 0.56)',
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
   },
   portrait: {
     width: '100%',
@@ -353,16 +261,15 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 0,
     right: 0,
-    bottom: 92,
-    paddingHorizontal: Platform.OS === 'web' ? Spacing.five : Spacing.three,
-    paddingVertical: Spacing.three,
-    backgroundColor: 'rgba(41, 22, 70, 0.5)',
+    bottom: 0,
+    padding: Spacing.two,
+    backgroundColor: 'rgba(41, 22, 70, 0.65)',
     gap: Spacing.one,
   },
   profileName: {
     color: '#ffffff',
-    fontSize: Platform.OS === 'web' ? 34 : 28,
-    lineHeight: Platform.OS === 'web' ? 40 : 34,
+    fontSize: 28,
+    lineHeight: 34,
   },
   profileMeta: {
     color: '#ffffff',
@@ -374,9 +281,10 @@ const styles = StyleSheet.create({
   },
   chips: {
     width: '100%',
+    maxWidth: 420,
     flexDirection: 'row',
     flexWrap: 'wrap',
-    justifyContent: 'flex-start',
+    justifyContent: 'flex-end',
     gap: Spacing.one,
   },
   chip: {
@@ -387,24 +295,16 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.one,
   },
   actions: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: Spacing.three,
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: Spacing.three,
+    gap: Spacing.four,
   },
   actionButton: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 72,
+    height: 72,
+    borderRadius: 36,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.28,
-    shadowRadius: 12,
   },
   passButton: {
     backgroundColor: '#ff3131',
@@ -416,49 +316,11 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   resultText: {
-    position: 'absolute',
-    top: Spacing.three,
-    alignSelf: 'center',
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two,
-    borderRadius: 8,
-    backgroundColor: 'rgba(34, 197, 94, 0.18)',
     textAlign: 'center',
     color: '#22c55e',
   },
   errorText: {
-    position: 'absolute',
-    top: Spacing.three,
-    alignSelf: 'center',
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two,
-    borderRadius: 8,
-    backgroundColor: 'rgba(239, 68, 68, 0.18)',
     textAlign: 'center',
     color: '#ef4444',
-  },
-  decisionBadge: {
-    position: 'absolute',
-    top: Platform.OS === 'web' ? Spacing.five : Spacing.four,
-    borderWidth: 3,
-    borderRadius: 8,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two,
-  },
-  passBadge: {
-    left: Spacing.four,
-    borderColor: '#ff3131',
-    transform: [{ rotate: '-10deg' }],
-  },
-  loveBadge: {
-    right: Spacing.four,
-    borderColor: '#17de60',
-    transform: [{ rotate: '10deg' }],
-  },
-  decisionText: {
-    color: '#ffffff',
-    fontSize: 22,
-    lineHeight: 26,
-    fontWeight: '800',
   },
 });

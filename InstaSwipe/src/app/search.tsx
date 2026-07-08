@@ -11,7 +11,6 @@ import {
 import { Image } from 'expo-image';
 import { SymbolView } from 'expo-symbols';
 import { SafeAreaView } from 'react-native-safe-area-context';
-
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
@@ -389,9 +388,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.10)',
   },
   profileImage: {
-    width: 88,
-    height: 112,
-    borderRadius: 8,
+    width: Platform.OS === 'web' ? 120 : 90,
+    height: Platform.OS === 'web' ? 120 : 90,
+    borderRadius: 64,
     backgroundColor: '#24172c',
   },
   profileBody: {
@@ -416,6 +415,7 @@ const styles = StyleSheet.create({
     marginTop: Spacing.two,
   },
   chip: {
+    backgroundColor: '#2f2338',
     borderWidth: 1,
     borderRadius: 8,
     paddingHorizontal: Spacing.two,
