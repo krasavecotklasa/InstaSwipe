@@ -26,6 +26,8 @@ interface PostComposerProps {
   onPosted?: () => void;
 }
 
+const CAPTION_MAX_LENGTH = 500;
+
 function errorHandle(error: string) {
   if (Platform.OS === 'web') {
     alert('Error: ' + error);
@@ -135,7 +137,11 @@ export default function PostComposer({ visible, onClose, onPosted }: PostCompose
                 onChangeText={setCaption}
                 multiline
                 numberOfLines={4}
+                maxLength={CAPTION_MAX_LENGTH}
               />
+              <ThemedText style={[styles.charCount, { color: theme.iconMuted }]}>
+                {caption.length}/{CAPTION_MAX_LENGTH}
+              </ThemedText>
 
               <TouchableOpacity
                 style={[styles.button, { backgroundColor: theme.backgroundElement }]}
@@ -225,6 +231,11 @@ const styles = StyleSheet.create({
     height: 120,
     textAlignVertical: 'top',
     paddingTop: Spacing.three,
+  },
+  charCount: {
+    fontSize: 12,
+    textAlign: 'right',
+    marginTop: -Spacing.two,
   },
   button: {
     height: 50,
