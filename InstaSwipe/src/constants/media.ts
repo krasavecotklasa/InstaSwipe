@@ -1,9 +1,15 @@
-// Mirrors the backend allow-list in ImageProcessingService.ALLOWED_CONTENT_TYPES.
-// Non-JPEG/PNG uploads are rejected server-side, so we validate at pick time to give
-// immediate feedback instead of a failed round-trip that surfaces as a raw error.
+// Mirrors the backend upload constraints so we can validate a picked image before
+// submitting it, giving immediate feedback instead of a failed round-trip that
+// surfaces as a raw error.
+//   - Types: ImageProcessingService.ALLOWED_CONTENT_TYPES
+//   - Size:  media.max-image-size (also enforced at the multipart layer in MediaConfig)
 export const SUPPORTED_IMAGE_MIME_TYPES = ['image/jpeg', 'image/jpg', 'image/png'];
 export const SUPPORTED_IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png'];
 export const SUPPORTED_IMAGE_LABEL = 'JPEG or PNG';
+
+// Spring's DataSize parses "10MB" as 10 * 1024 * 1024 bytes.
+export const MAX_IMAGE_SIZE_BYTES = 10 * 1024 * 1024;
+export const MAX_IMAGE_SIZE_LABEL = '10 MB';
 
 // Other image formats the OS/browser picker can return under `image/*` but the
 // backend won't accept. Used to reject a known-bad type while deferring anything
@@ -17,6 +23,7 @@ interface PickedAsset {
   mimeType?: string | null;
   fileName?: string | null;
   uri?: string;
+  fileSize?: number | null;
 }
 
 /**
@@ -39,4 +46,24 @@ export function isSupportedImage(asset: PickedAsset): boolean {
   return true;
 }
 
+/**
+ * True when the asset is within the backend size cap. When the picker doesn't
+ * report a size, returns true and lets the backend enforce the limit.
+ */
+export function isWithinImageSizeLimit(asset: PickedAsset): boolean {
+  return typeof asset.fileSize === 'number' ? asset.fileSize <= MAX_IMAGE_SIZE_BYTES : true;
+}
+
 export const UNSUPPORTED_IMAGE_MESSAGE = `Unsupported image type. Please choose a ${SUPPORTED_IMAGE_LABEL} file.`;
+export const IMAGE_TOO_LARGE_MESSAGE = `Image is too large. Please choose a file under ${MAX_IMAGE_SIZE_LABEL}.`;
+
+/** Returns the first validation error for a picked image, or null when it passes. */
+export function getImageValidationError(asset: PickedAsset): string | null {
+  if (!isSupportedImage(asset)) {
+    return UNSUPPORTED_IMAGE_MESSAGE;
+  }
+  if (!isWithinImageSizeLimit(asset)) {
+    return IMAGE_TOO_LARGE_MESSAGE;
+  }
+  return null;
+}

@@ -19,7 +19,7 @@ import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { createPost } from '@/hooks/posts';
-import { isSupportedImage, UNSUPPORTED_IMAGE_MESSAGE } from '@/constants/media';
+import { getImageValidationError } from '@/constants/media';
 
 interface PostComposerProps {
   visible: boolean;
@@ -76,8 +76,9 @@ export default function PostComposer({ visible, onClose, onPosted }: PostCompose
       }
 
       const asset = result.assets[0];
-      if (!isSupportedImage(asset)) {
-        errorHandle(UNSUPPORTED_IMAGE_MESSAGE);
+      const validationError = getImageValidationError(asset);
+      if (validationError) {
+        errorHandle(validationError);
         return;
       }
 

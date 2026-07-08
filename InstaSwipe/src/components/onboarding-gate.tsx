@@ -17,7 +17,7 @@ import { ThemedView } from '@/components/themed-view';
 import { API } from '@/hooks/auth';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { isSupportedImage, UNSUPPORTED_IMAGE_MESSAGE } from '@/constants/media';
+import { getImageValidationError } from '@/constants/media';
 
 interface OnboardingGateProps {
   onOnboardSuccess: () => void;
@@ -66,8 +66,9 @@ export default function OnboardingGate({ onOnboardSuccess }: OnboardingGateProps
       }
 
       const asset = result.assets[0];
-      if (!isSupportedImage(asset)) {
-        errorHandle(UNSUPPORTED_IMAGE_MESSAGE);
+      const validationError = getImageValidationError(asset);
+      if (validationError) {
+        errorHandle(validationError);
         return;
       }
 
