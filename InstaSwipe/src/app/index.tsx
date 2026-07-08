@@ -5,8 +5,8 @@ import { ThemedView } from '@/components/themed-view';
 import { PostCard, type Post } from '@/components/post-card';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import Header from '@/components/header';
-import { fetchPostsByUserId } from '@/hooks/posts';
-import { TARGET_USER_ID } from '@/hooks/api';
+import { fetchPostsByUserIds } from '@/hooks/posts';
+import { TARGET_USER_IDS } from '@/hooks/api';
 
 export default function HomeScreen() {
   const [posts, setPosts] = useState<Post[]>([]);
@@ -21,7 +21,7 @@ export default function HomeScreen() {
       setError(null);
 
       try {
-        const nextPosts = await fetchPostsByUserId(TARGET_USER_ID);
+        const nextPosts = await fetchPostsByUserIds(TARGET_USER_IDS);
         if (isActive) {
           setPosts(nextPosts);
         }
@@ -106,4 +106,3 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 });
-

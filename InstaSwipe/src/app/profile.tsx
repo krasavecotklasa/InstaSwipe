@@ -30,6 +30,7 @@ import { sendTestNotificationAsync } from '@/hooks/notifications';
 import { fetchPostsByUserId } from '@/hooks/posts';
 import { useTheme } from '@/hooks/use-theme';
 import Header from '@/components/header';
+import { TARGET_USER_ID } from '@/hooks/api';
 
 const DEFAULT_PREFS: DiscoveryPreferences = {
   minAge: '',
@@ -78,7 +79,7 @@ export default function ProfileScreen() {
   const [notificationStatus, setNotificationStatus] = useState<string | null>(null);
 
   useEffect(() => {
-    let active = true;
+    let isActive = true;
 
     (async () => {
       try {
@@ -87,7 +88,7 @@ export default function ProfileScreen() {
           getDiscoveryPreferences(),
         ]);
 
-        if (!active) {
+        if (!isActive) {
           return;
         }
 
@@ -117,18 +118,18 @@ export default function ProfileScreen() {
         setCountry(mergedPreferences.country);
         setInterests(toInputValue(mergedPreferences.interests));
       } catch (loadError) {
-        if (active) {
+        if (isActive) {
           setError(loadError instanceof Error ? loadError.message : 'Could not load profile');
         }
       } finally {
-        if (active) {
+        if (isActive) {
           setLoadingProfile(false);
         }
       }
     })();
 
     return () => {
-      active = false;
+      isActive = false;
     };
   }, []);
 
@@ -139,31 +140,31 @@ export default function ProfileScreen() {
       return;
     }
 
-    let active = true;
+    let isActive = true;
 
     (async () => {
       setLoadingPosts(true);
       setPostsError(null);
 
       try {
-        const nextPosts = await fetchPostsByUserId(profile.id);
-        if (active) {
+        const nextPosts = await fetchPostsByUserId(TARGET_USER_ID);
+        if (isActive) {
           setPosts(nextPosts);
         }
-      } catch (postsLoadError) {
-        if (active) {
-          setPostsError(postsLoadError instanceof Error ? postsLoadError.message : 'Unable to load posts');
+      } catch (err) {
+        if (isActive) {
+          setPostsError(err instanceof Error ? err.message : 'Unable to load posts');
           setPosts([]);
         }
       } finally {
-        if (active) {
+        if (isActive) {
           setLoadingPosts(false);
         }
       }
     })();
 
     return () => {
-      active = false;
+      isActive = false;
     };
   }, [profile?.id]);
 
@@ -206,8 +207,8 @@ export default function ProfileScreen() {
     setNotificationStatus(null);
 
     try {
-      const result = await sendTestNotificationAsync();
-      setNotificationStatus(result.notifToken ? `Token: ${result.notifToken}` : 'Test notification sent without a push token');
+      await sendTestNotificationAsync();
+      setNotificationStatus('Test notification sent successfully.');
     } catch (notificationError) {
       setNotificationStatus(
         notificationError instanceof Error ? notificationError.message : 'Could not send test notification'

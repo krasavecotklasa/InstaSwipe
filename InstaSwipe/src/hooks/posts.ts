@@ -160,6 +160,25 @@ export const fetchPostsByUserId = async (userId: string): Promise<Post[]> => {
   }
 };
 
+export const fetchPostsByUserIds = async (userIds: string[]): Promise<Post[]> => {
+  const uniqueUserIds = Array.from(new Set(userIds.map((userId) => userId.trim()).filter(Boolean)));
+
+  if (uniqueUserIds.length === 0) {
+    return [];
+  }
+
+  const postsByUser = await Promise.all(uniqueUserIds.map((userId) => fetchPostsByUserId(userId)));
+  const postsById = new Map<string, Post>();
+
+  postsByUser.flat().forEach((post) => {
+    if (post.id && !postsById.has(post.id)) {
+      postsById.set(post.id, post);
+    }
+  });
+
+  return Array.from(postsById.values());
+};
+
 export const usePosts = () => {
   const [posts, setPosts] = useState<Post[]>([]);
   const [isLoading, setIsLoading] = useState(true);
