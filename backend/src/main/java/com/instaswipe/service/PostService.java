@@ -9,16 +9,21 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 
+import java.util.Set;
+
 import com.instaswipe.event.ImageTarget;
 import com.instaswipe.exception.InvalidRequestException;
 import com.instaswipe.model.Post;
+import com.instaswipe.model.User;
 import com.instaswipe.repository.PostRepository;
+import com.instaswipe.repository.UserRepository;
 
 @Service
 @RequiredArgsConstructor
 public class PostService {
     private final PostRepository postRepository;
     private final MediaUploadService mediaUploadService;
+    private final UserRepository userRepository;
 
     public Post createPost(String userId, String caption, MultipartFile file) {
         boolean hasFile = file != null && !file.isEmpty();
@@ -64,5 +69,23 @@ public class PostService {
     public Page<Post> getPostsByUserId(String userId, int page, int size) {
         Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
         return postRepository.findByUserId(userId, pageable);
+    }
+
+    /**
+     * Feed for the current user: posts authored by users they have liked (swipe-right set),
+     * newest first. Empty liked set yields an empty page without hitting the posts collection.
+     */
+    public Page<Post> getFeed(String currentUserId, Pageable pageable) {
+        User currentUser = userRepository.findById(currentUserId)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        Set<String> likedUserIds = currentUser.getLikedUserIds();
+        if (likedUserIds == null || likedUserIds.isEmpty()) {
+            return Page.empty(pageable);
+        }
+
+        Pageable sorted = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(),
+                Sort.by("createdAt").descending());
+        return postRepository.findByUserIdIn(likedUserIds, sorted);
     }
 }
