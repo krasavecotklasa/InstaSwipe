@@ -1,8 +1,8 @@
 import * as Notifications from "expo-notifications";
 import * as Device from "expo-device";
 import { Platform } from "react-native";
-import { API_BASE_URL, API_PREFIX } from "@/hooks/api";
-import { getAccessToken } from "@/hooks/auth";
+import { API_PREFIX } from "@/hooks/api";
+import { authorizedFetch } from "@/hooks/auth";
 
 let notifToken: string = "";
 
@@ -51,6 +51,18 @@ export async function registerForPushNotificationsAsync() {
     return;
   }
 
+  // getDevicePushTokenAsync returns the native device token: an FCM token on
+  // Android, but a raw APNs token on iOS. The backend delivers pushes via
+  // Firebase, so only the Android FCM token is usable. Registering the iOS APNs
+  // token as an `fcmToken` would silently fail to deliver, so skip it until iOS
+  // FCM (GoogleService-Info.plist + messaging) is configured.
+  if (Platform.OS !== "android") {
+    console.warn(
+      "[Notifications] Push registration is only supported on Android in this build; skipping."
+    );
+    return;
+  }
+
   const token = await Notifications.getDevicePushTokenAsync();
 
   console.log("Firebase device push token:", token.data);
@@ -60,7 +72,7 @@ export async function registerForPushNotificationsAsync() {
 }
 
 export async function registerNotificationTokenAsync(fcmToken: string): Promise<Response> {
-  return request(`${API_PREFIX}/notifications/token`, {
+  return authorizedFetch(`${API_PREFIX}/notifications/token`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ fcmToken }),
@@ -68,42 +80,17 @@ export async function registerNotificationTokenAsync(fcmToken: string): Promise<
 }
 
 export async function notificationControllerSend(payload: SendNotificationPayload): Promise<Response> {
-  return request(`${API_PREFIX}/notifications/send`, {
+  return authorizedFetch(`${API_PREFIX}/notifications/send`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
 }
 
-async function request(path: string, init: RequestInit = {}): Promise<Response> {
-  const accessToken = await getAccessToken();
-  const headers: Record<string, string> = {
-    ...((init.headers as Record<string, string>) || {}),
-  };
-
-  if (accessToken) {
-    headers.Authorization = `Bearer ${accessToken}`;
-  }
-
-  return fetch(`${API_BASE_URL}${path}`, {
-    ...init,
-    headers,
-  });
-}
-
 export async function sendTestNotificationAsync() {
+  // registerForPushNotificationsAsync already requests permissions and only
+  // returns a token when they're granted, so we don't re-check them here.
   const token = await registerForPushNotificationsAsync();
-  const { status: existingStatus } = await Notifications.getPermissionsAsync();
-  let finalStatus = existingStatus;
-
-  if (existingStatus !== "granted") {
-    const { status } = await Notifications.requestPermissionsAsync();
-    finalStatus = status;
-  }
-
-  if (finalStatus !== "granted") {
-    throw new Error("Notification permissions were not granted");
-  }
 
   if (token) {
     const response = await registerNotificationTokenAsync(token);
