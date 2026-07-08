@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -17,6 +17,7 @@ import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import {
   DISCOVERY_GENDER_LABELS,
   DISCOVERY_GENDERS,
+  type DiscoveryFilters,
   DiscoveryProfile,
   Gender,
   getDiscovery,
@@ -26,6 +27,11 @@ import { useTheme } from '@/hooks/use-theme';
 import Header from '@/components/header';
 
 const PAGE_SIZE = 100;
+
+// Includes an "Any" option ('') so a user can browse all genders; '' means the
+// gender filter is omitted from the discovery request.
+const GENDER_OPTIONS: (Gender | '')[] = ['', ...DISCOVERY_GENDERS];
+const genderOptionLabel = (option: Gender | '') => (option === '' ? 'Any' : DISCOVERY_GENDER_LABELS[option]);
 
 const parseAge = (value: string) => {
   const trimmed = value.trim();
@@ -55,14 +61,22 @@ export default function SearchScreen() {
   const theme = useTheme();
   const [minAge, setMinAge] = useState('18');
   const [maxAge, setMaxAge] = useState('67');
-  const [gender, setGender] = useState<Gender>(DISCOVERY_GENDERS[0]);
+  const [gender, setGender] = useState<Gender | ''>('');
   const [country, setCountry] = useState('');
   const [interests, setInterests] = useState('');
   const [profiles, setProfiles] = useState<DiscoveryProfile[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [hydrating, setHydrating] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [totalElements, setTotalElements] = useState(0);
+
+  const pageRef = useRef(0);
+  const hasMoreRef = useRef(false);
+  const loadingMoreRef = useRef(false);
+  // Filters used by the current result set, snapshotted at search time so paging
+  // stays consistent even if the user edits the inputs without pressing Search.
+  const activeFiltersRef = useRef<DiscoveryFilters | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -75,7 +89,7 @@ export default function SearchScreen() {
 
       setMinAge(String(savedPreferences.minAge));
       setMaxAge(String(savedPreferences.maxAge));
-      setGender((savedPreferences.gender as Gender) || DISCOVERY_GENDERS[0]);
+      setGender(savedPreferences.gender);
       setCountry(savedPreferences.country);
       setInterests(toInputValue(savedPreferences.interests));
       setHydrating(false);
@@ -96,22 +110,27 @@ export default function SearchScreen() {
   }, [hydrating]);
 
   async function loadDiscovery() {
+    const filters: DiscoveryFilters = {
+      minAge: parseAge(minAge),
+      maxAge: parseAge(maxAge),
+      gender: gender || undefined,
+      country,
+      interests: parseInterests(interests),
+      size: PAGE_SIZE,
+    };
+    activeFiltersRef.current = filters;
+    pageRef.current = 0;
+    hasMoreRef.current = false;
+
     setLoading(true);
     setError(null);
 
     try {
-      const result = await getDiscovery({
-        minAge: parseAge(minAge),
-        maxAge: parseAge(maxAge),
-        gender,
-        country,
-        interests: parseInterests(interests),
-        page: 0,
-        size: PAGE_SIZE,
-      });
+      const result = await getDiscovery({ ...filters, page: 0 });
 
       setProfiles(result.content);
       setTotalElements(result.totalElements);
+      hasMoreRef.current = !result.last;
     } catch (loadError) {
       setProfiles([]);
       setTotalElements(0);
@@ -121,7 +140,29 @@ export default function SearchScreen() {
     }
   }
 
-  const renderProfile = ({ item }: { item: DiscoveryProfile }) => (
+  const loadMoreResults = useCallback(async () => {
+    const filters = activeFiltersRef.current;
+    if (!filters || loadingMoreRef.current || !hasMoreRef.current) {
+      return;
+    }
+    loadingMoreRef.current = true;
+    setLoadingMore(true);
+
+    try {
+      const nextPage = pageRef.current + 1;
+      const result = await getDiscovery({ ...filters, page: nextPage });
+      pageRef.current = nextPage;
+      hasMoreRef.current = !result.last;
+      setProfiles((current) => [...current, ...result.content]);
+    } catch {
+      // Keep the results already loaded; the next scroll will retry.
+    } finally {
+      loadingMoreRef.current = false;
+      setLoadingMore(false);
+    }
+  }, []);
+
+  const renderProfile = useCallback(({ item }: { item: DiscoveryProfile }) => (
     <View style={[styles.profileCard, { borderColor: theme.tabActiveBorder }]}>
       <Image
         source={item.profilePictureUrl ? { uri: item.profilePictureUrl } : undefined}
@@ -157,7 +198,7 @@ export default function SearchScreen() {
         </View>
       </View>
     </View>
-  );
+  ), [theme]);
 
   return (
     <ThemedView style={styles.container}>
@@ -167,6 +208,8 @@ export default function SearchScreen() {
           data={profiles}
           keyExtractor={(item) => item.id}
           renderItem={renderProfile}
+          onEndReached={loadMoreResults}
+          onEndReachedThreshold={0.5}
           ListHeaderComponent={
             <View style={styles.header}>
               <ThemedText type="subtitle" style={styles.title}>
@@ -198,12 +241,12 @@ export default function SearchScreen() {
                 <View style={styles.field}>
                   <ThemedText type="smallBold">Gender</ThemedText>
                   <View style={styles.segmented}>
-                    {DISCOVERY_GENDERS.map((option) => {
+                    {GENDER_OPTIONS.map((option) => {
                       const selected = option === gender;
 
                       return (
                         <TouchableOpacity
-                          key={option}
+                          key={option || 'any'}
                           onPress={() => setGender(option)}
                           style={[
                             styles.segment,
@@ -214,7 +257,7 @@ export default function SearchScreen() {
                           ]}
                         >
                           <ThemedText type="smallBold" style={selected && styles.segmentTextSelected}>
-                            {DISCOVERY_GENDER_LABELS[option]}
+                            {genderOptionLabel(option)}
                           </ThemedText>
                         </TouchableOpacity>
                       );
@@ -280,6 +323,11 @@ export default function SearchScreen() {
               <ThemedText type="small" themeColor="textSecondary" style={styles.emptyText}>
                 No profiles loaded yet.
               </ThemedText>
+            ) : null
+          }
+          ListFooterComponent={
+            loadingMore ? (
+              <ActivityIndicator color={theme.text} style={styles.footerLoader} />
             ) : null
           }
           contentContainerStyle={styles.listContent}
@@ -377,6 +425,9 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     textAlign: 'center',
+    paddingVertical: Spacing.four,
+  },
+  footerLoader: {
     paddingVertical: Spacing.four,
   },
   profileCard: {
