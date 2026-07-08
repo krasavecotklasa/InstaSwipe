@@ -200,14 +200,20 @@ export default function ProfileScreen() {
                         ({profile.email})
                       </ThemedText>
                     </ThemedText>
-                    <ThemedText type="small" themeColor="textSecondary" style={styles.profileMetaDetail}>
-                      Birthday: {profile.birthDate}
+                    <ThemedText type="small" themeColor="textSecondary">
+                      Birthday: <ThemedText type="small" themeColor="textSecondary" style={styles.boldText}>
+                        {profile.birthDate}
+                      </ThemedText>
                     </ThemedText>
-                    <ThemedText type="small" themeColor="textSecondary" style={styles.profileMetaDetail}>
-                      Country: {profile.country}
+                    <ThemedText type="small" themeColor="textSecondary">
+                      Country: <ThemedText type="small" themeColor="textSecondary" style={styles.boldText}>
+                        {profile.country}
+                      </ThemedText>
                     </ThemedText>
-                    <ThemedText type="small" themeColor="textSecondary" style={styles.profileMetaDetail}>
-                      Gender: {profile.gender}
+                    <ThemedText type="small" themeColor="textSecondary">
+                      Gender: <ThemedText type="small" themeColor="textSecondary" style={styles.boldText}>
+                        {profile.gender}
+                      </ThemedText>
                     </ThemedText>
                   </View>
                 </View>
@@ -556,5 +562,8 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     maxWidth: 360,
     minHeight: 100
+  },
+  boldText: {
+    fontWeight: '800',
   }
 });
