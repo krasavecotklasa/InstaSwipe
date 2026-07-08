@@ -1,7 +1,21 @@
 import { useEffect, useState } from 'react';
+import { Platform } from 'react-native';
 import type { Post } from '@/components/post-card';
 import { getAccessToken } from '@/hooks/auth';
 import { API_BASE_URL, API_PREFIX, POSTS_BASE_PATH } from '@/hooks/api';
+
+// The picker asset carries a local `uri` plus an optional `mimeType`; that's all
+// createPost needs to build the multipart part, so we avoid importing the full
+// expo-image-picker type here.
+export interface NewPostImage {
+  uri: string;
+  mimeType?: string;
+}
+
+export interface NewPostInput {
+  caption: string;
+  image: NewPostImage | null;
+}
 
 interface BackendPostPayload {
   id: string;
@@ -129,14 +143,10 @@ export const fetchPosts = async (): Promise<Post[]> => {
   }
 };
 
-export const fetchPostsByUserId = async (userId: string): Promise<Post[]> => {
-  if (!userId) {
-    return [];
-  }
-
+export const fetchFeed = async (): Promise<Post[]> => {
   try {
     const accessToken = await getAccessToken();
-    const response = await fetch(`${API_BASE_URL}${API_PREFIX}/posts/user/${encodeURIComponent(userId)}`, {
+    const response = await fetch(`${API_BASE_URL}${API_PREFIX}/posts/feed`, {
       method: 'GET',
       headers: {
         Accept: 'application/json',
@@ -145,8 +155,7 @@ export const fetchPostsByUserId = async (userId: string): Promise<Post[]> => {
     });
 
     if (!response.ok) {
-      const allPosts = await fetchPosts();
-      return allPosts.filter((post) => post.userId === userId);
+      throw new Error(`Feed request failed with status ${response.status}`);
     }
 
     const data = await response.json();
@@ -154,9 +163,78 @@ export const fetchPostsByUserId = async (userId: string): Promise<Post[]> => {
 
     return normalized.map((post) => formatPost(post)).filter((post) => Boolean(post.id));
   } catch (error) {
-    console.warn('[Posts] Unable to fetch posts for user', userId, error);
-    return FALLBACK_POSTS.filter((post) => post.userId === userId);
+    console.warn('[Posts] Unable to fetch feed', error);
+    return FALLBACK_POSTS;
   }
+};
+
+export const createPost = async ({ caption, image }: NewPostInput): Promise<Post> => {
+  const trimmedCaption = caption.trim();
+  if (!trimmedCaption && !image) {
+    throw new Error('Add a caption or a photo to share a post.');
+  }
+
+  const accessToken = await getAccessToken();
+  const url = `${API_BASE_URL}${POSTS_BASE_PATH}`;
+
+  const filename = image ? image.uri.split('/').pop() || 'post.jpg' : '';
+  const inferredType = image
+    ? image.mimeType || (filename.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg')
+    : '';
+
+  // Native + image: use FileSystem.uploadAsync to sidestep the React Native fetch
+  // multipart bug (same workaround the onboarding profile upload relies on).
+  if (Platform.OS !== 'web' && image) {
+    const FileSystem = await import('expo-file-system/legacy');
+    const uploadResult = await FileSystem.uploadAsync(url, image.uri, {
+      httpMethod: 'POST',
+      uploadType: FileSystem.FileSystemUploadType.MULTIPART,
+      fieldName: 'file',
+      mimeType: inferredType,
+      headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
+      parameters: { caption: trimmedCaption },
+    });
+
+    if (uploadResult.status >= 200 && uploadResult.status < 300) {
+      return formatPost(JSON.parse(uploadResult.body));
+    }
+
+    let message = 'Could not share your post';
+    try {
+      message = JSON.parse(uploadResult.body).message || message;
+    } catch {}
+    throw new Error(message);
+  }
+
+  // Web, or native text-only post.
+  const formData = new FormData();
+  formData.append('caption', trimmedCaption);
+
+  if (image) {
+    if (Platform.OS === 'web') {
+      const res = await fetch(image.uri);
+      const blob = await res.blob();
+      formData.append('file', blob, filename);
+    } else {
+      formData.append('file', { uri: image.uri, name: filename, type: inferredType } as any);
+    }
+  }
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+    },
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Could not share your post');
+  }
+
+  return formatPost(await response.json());
 };
 
 export const usePosts = () => {

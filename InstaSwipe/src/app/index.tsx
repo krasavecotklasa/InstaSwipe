@@ -1,48 +1,66 @@
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, Platform, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useEffect, useState } from 'react';
+import { ActivityIndicator, FlatList, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { SymbolView } from 'expo-symbols';
+import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { PostCard, type Post } from '@/components/post-card';
+import PostComposer from '@/components/post-composer';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
 import Header from '@/components/header';
-import { fetchPostsByUserId } from '@/hooks/posts';
-import { TARGET_USER_ID } from '@/hooks/api';
+import { fetchFeed } from '@/hooks/posts';
+
+function ComposerEntry({ onPress }: { onPress: () => void }) {
+  const theme = useTheme();
+
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.composer,
+        { borderColor: theme.tabActiveBorder },
+        pressed && styles.composerPressed,
+      ]}
+    >
+      <View style={[styles.composerBadge, { backgroundColor: theme.backgroundElement }]}>
+        <SymbolView
+          name={{ ios: 'plus', android: 'add', web: 'add' } as any}
+          tintColor="#ffffff"
+          size={22}
+        />
+      </View>
+      <ThemedText style={[styles.composerText, { color: theme.iconMuted }]}>
+        Share a new post
+      </ThemedText>
+    </Pressable>
+  );
+}
 
 export default function HomeScreen() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [composerVisible, setComposerVisible] = useState(false);
+
+  const loadPosts = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const nextPosts = await fetchFeed();
+      setPosts(nextPosts);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to load posts');
+      setPosts([]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    let isActive = true;
-
-    const loadPosts = async () => {
-      setIsLoading(true);
-      setError(null);
-
-      try {
-        const nextPosts = await fetchPostsByUserId(TARGET_USER_ID);
-        if (isActive) {
-          setPosts(nextPosts);
-        }
-      } catch (err) {
-        if (isActive) {
-          setError(err instanceof Error ? err.message : 'Unable to load posts');
-          setPosts([]);
-        }
-      } finally {
-        if (isActive) {
-          setIsLoading(false);
-        }
-      }
-    };
-
     loadPosts();
-
-    return () => {
-      isActive = false;
-    };
-  }, []);
+  }, [loadPosts]);
 
   return (
     <ThemedView style={styles.container}>
@@ -53,6 +71,7 @@ export default function HomeScreen() {
           data={posts}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => <PostCard post={item} />}
+          ListHeaderComponent={<ComposerEntry onPress={() => setComposerVisible(true)} />}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={true}
           scrollEnabled={true}
@@ -72,6 +91,12 @@ export default function HomeScreen() {
               </View>
             )
           }
+        />
+
+        <PostComposer
+          visible={composerVisible}
+          onClose={() => setComposerVisible(false)}
+          onPosted={loadPosts}
         />
       </SafeAreaView>
     </ThemedView>
@@ -95,6 +120,33 @@ const styles = StyleSheet.create({
     paddingTop: Spacing.three,
     paddingBottom: BottomTabInset + Spacing.four,
   },
+  composer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+    paddingVertical: Spacing.two,
+    paddingHorizontal: Spacing.three,
+    marginBottom: Spacing.three,
+    borderWidth: 1,
+    borderRadius: 999,
+    backgroundColor: '#000000',
+    width: '100%',
+    maxWidth: Platform.OS === 'web' ? 500 : undefined,
+  },
+  composerPressed: {
+    opacity: 0.85,
+  },
+  composerBadge: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  composerText: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
   emptyState: {
     paddingVertical: Spacing.four,
     alignItems: 'center',
@@ -106,4 +158,3 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 });
-
