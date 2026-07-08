@@ -37,3 +37,6 @@ secrets/
 minio-data/
 mongo-data/
 rabbitmq-data/
+
+# Local docs (not committed)
+BACKEND_DOCS_BG.md
