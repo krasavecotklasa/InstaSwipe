@@ -9,14 +9,14 @@ import { Platform } from 'react-native';
 
 export const Colors = {
   light: {
-    text: '#40194a',
-    background: '#f9f0f4ff',
-    backgroundElement: '#c8a7dd',
-    backgroundSelected: '#e8d8f4',
-    textSecondary: '#60646C',
+    text: '#0f0913',
+    background: '#fff6fa',
+    backgroundElement: '#ae89c4',
+    backgroundSelected: '#f3e3ff',
+    textSecondary: '#656b78',
     iconMuted: '#8a7698',
-    tabActiveBackground: '#f3e2ff',
-    tabActiveBorder: '#c8a7dd',
+    tabActiveBackground: '#ffffff',
+    tabActiveBorder: '#c2accf',
   },
   dark: {
     text: '#b6a9cac9',
