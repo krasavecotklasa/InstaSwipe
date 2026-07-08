@@ -19,12 +19,15 @@ import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { createPost } from '@/hooks/posts';
+import { getImageValidationError } from '@/constants/media';
 
 interface PostComposerProps {
   visible: boolean;
   onClose: () => void;
   onPosted?: () => void;
 }
+
+const CAPTION_MAX_LENGTH = 500;
 
 function errorHandle(error: string) {
   if (Platform.OS === 'web') {
@@ -60,15 +63,28 @@ export default function PostComposer({ visible, onClose, onPosted }: PostCompose
   };
 
   const handlePickImage = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.7,
-    });
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.7,
+      });
 
-    if (!result.canceled && result.assets && result.assets.length > 0) {
-      setImage(result.assets[0]);
+      if (result.canceled || !result.assets || result.assets.length === 0) {
+        return;
+      }
+
+      const asset = result.assets[0];
+      const validationError = getImageValidationError(asset);
+      if (validationError) {
+        errorHandle(validationError);
+        return;
+      }
+
+      setImage(asset);
+    } catch (error) {
+      errorHandle(error instanceof Error ? error.message : 'Could not open the image picker.');
     }
   };
 
@@ -135,7 +151,11 @@ export default function PostComposer({ visible, onClose, onPosted }: PostCompose
                 onChangeText={setCaption}
                 multiline
                 numberOfLines={4}
+                maxLength={CAPTION_MAX_LENGTH}
               />
+              <ThemedText style={[styles.charCount, { color: theme.iconMuted }]}>
+                {caption.length}/{CAPTION_MAX_LENGTH}
+              </ThemedText>
 
               <TouchableOpacity
                 style={[styles.button, { backgroundColor: theme.backgroundElement }]}
@@ -225,6 +245,11 @@ const styles = StyleSheet.create({
     height: 120,
     textAlignVertical: 'top',
     paddingTop: Spacing.three,
+  },
+  charCount: {
+    fontSize: 12,
+    textAlign: 'right',
+    marginTop: -Spacing.two,
   },
   button: {
     height: 50,

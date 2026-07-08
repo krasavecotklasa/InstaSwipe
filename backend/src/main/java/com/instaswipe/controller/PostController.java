@@ -1,5 +1,6 @@
 package com.instaswipe.controller;
 
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -32,7 +33,7 @@ public class PostController {
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @ResponseStatus(HttpStatus.CREATED)
     public PostResponse createPost(
-        @ModelAttribute CreatePostRequest request,
+        @Valid @ModelAttribute CreatePostRequest request,
         @AuthenticationPrincipal String userId) {
         Post post = postService.createPost(userId, request.caption(), request.file());
         return toResponse(post, userId);

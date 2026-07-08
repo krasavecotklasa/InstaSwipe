@@ -178,6 +178,28 @@ class ProfileUpdateAndPictureTest extends AbstractWebIntegrationTest {
     }
 
     @Test
+    void updateProfileRejectsBioOverMaxLength() {
+        User user = bareUser("longbio@x.com");
+        MultipartBodyBuilder body = new MultipartBodyBuilder();
+        body.part("displayName", "Ada");
+        body.part("bio", "b".repeat(151));
+        body.part("birthDate", "1995-01-01");
+        body.part("country", "UK");
+        body.part("gender", "FEMALE");
+        body.part("interests", "math");
+        body.part("interests", "chess");
+        body.part("interests", "poetry");
+
+        ResponseEntity<Void> response = client(tokenFor(user)).put()
+                .uri("/api/profile/update")
+                .contentType(MediaType.MULTIPART_FORM_DATA)
+                .body(body.build())
+                .retrieve().toBodilessEntity();
+
+        assertThat(response.getStatusCode().value()).isEqualTo(400);
+    }
+
+    @Test
     void updateProfileWithoutPictureKeepsExisting() {
         User user = createDiscoverableUser("keep@x.com", Gender.FEMALE, "US",
                 LocalDate.now().minusYears(30), List.of("art", "film", "music"));

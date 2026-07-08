@@ -18,8 +18,10 @@ import java.util.List;
  */
 public record ProfileUpdateRequest(
         @NotBlank(message = "Display name cannot be blank")
+        @Size(max = 50, message = "Display name cannot exceed 50 characters")
         String displayName,
         @NotBlank(message = "Bio cannot be blank")
+        @Size(max = 150, message = "Bio cannot exceed 150 characters")
         String bio,
         @NotNull(message = "Birth date is required")
         @Past(message = "Birth date must be in the past")
@@ -27,12 +29,13 @@ public record ProfileUpdateRequest(
         @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
         LocalDate birthDate,
         @NotBlank(message = "Country cannot be blank")
+        @Size(max = 60, message = "Country cannot exceed 60 characters")
         String country,
         @NotNull(message = "Gender selection is required")
         Gender gender,
         @NotNull(message = "Interests selection is required")
-        @Size(min = 3, message = "You must select at least 3 interests")
-        List<String> interests,
+        @Size(min = 3, max = 20, message = "You must select between 3 and 20 interests")
+        List<@Size(max = 30, message = "Each interest cannot exceed 30 characters") String> interests,
         MultipartFile profilePicture
 ) {
 }
