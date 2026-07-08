@@ -8,10 +8,3 @@ export const POSTS_BASE_PATH = `${API_PREFIX}/posts`;
 export const API_BASE_URL = (API_PORT === '80' || API_PORT === '443')
   ? `http://${API_HOST}`
   : `http://${API_HOST}:${API_PORT}`;
-
-
-export const TARGET_USER_ID = '6a4ba6f05b37f5f9f3f3899a';
-export const TARGET_USER_IDS = (process.env.EXPO_PUBLIC_TARGET_USER_IDS ?? TARGET_USER_ID)
-  .split(',')
-  .map((id) => id.trim())
-  .filter(Boolean);

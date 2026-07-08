@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Platform } from 'react-native';
 import type { Post } from '@/components/post-card';
-import { getAccessToken } from '@/hooks/auth';
+import { authorizedFetch, getAccessToken } from '@/hooks/auth';
 import { API_BASE_URL, API_PREFIX, POSTS_BASE_PATH } from '@/hooks/api';
 
 // The picker asset carries a local `uri` plus an optional `mimeType`; that's all
@@ -68,13 +68,11 @@ export const formatPost = (rawPost: BackendPostPayload | Post): Post => {
 
 const _likeFunction = async (postId: string, method: string): Promise<Response | null> => {
   try {
-    const accessToken = await getAccessToken();
-    const response = fetch(`${API_BASE_URL}${POSTS_BASE_PATH}/${postId}/${method}`, {
-          method: 'POST',
-          headers: {
-            Accept: 'application/json',
-            ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-          },
+    const response = await authorizedFetch(`${POSTS_BASE_PATH}/${postId}/${method}`, {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+      },
     });
 
     return response;
@@ -120,12 +118,10 @@ const normalizePostsPayload = (payload: unknown): BackendPostPayload[] => {
 
 export const fetchPosts = async (): Promise<Post[]> => {
   try {
-    const accessToken = await getAccessToken();
-    const response = await fetch(`${API_BASE_URL}${API_PREFIX}/posts`, {
+    const response = await authorizedFetch(`${API_PREFIX}/posts`, {
       method: 'GET',
       headers: {
         Accept: 'application/json',
-        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
       },
     });
 
@@ -145,12 +141,10 @@ export const fetchPosts = async (): Promise<Post[]> => {
 
 export const fetchFeed = async (): Promise<Post[]> => {
   try {
-    const accessToken = await getAccessToken();
-    const response = await fetch(`${API_BASE_URL}${API_PREFIX}/posts/feed`, {
+    const response = await authorizedFetch(`${API_PREFIX}/posts/feed`, {
       method: 'GET',
       headers: {
         Accept: 'application/json',
-        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
       },
     });
 
@@ -164,6 +158,31 @@ export const fetchFeed = async (): Promise<Post[]> => {
     return normalized.map((post) => formatPost(post)).filter((post) => Boolean(post.id));
   } catch (error) {
     console.warn('[Posts] Unable to fetch feed', error);
+    return FALLBACK_POSTS;
+  }
+};
+
+// Posts authored by a specific user, via GET /api/posts/user/{userId}. Used by the
+// profile screen to show the signed-in user's own posts (not the global feed).
+export const fetchUserPosts = async (userId: string, page = 0, size = 20): Promise<Post[]> => {
+  try {
+    const response = await authorizedFetch(`${POSTS_BASE_PATH}/user/${userId}?page=${page}&size=${size}`, {
+      method: 'GET',
+      headers: {
+        Accept: 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`User posts request failed with status ${response.status}`);
+    }
+
+    const data = await response.json();
+    const normalized = normalizePostsPayload(data);
+
+    return normalized.map((post) => formatPost(post)).filter((post) => Boolean(post.id));
+  } catch (error) {
+    console.warn('[Posts] Unable to fetch user posts', error);
     return FALLBACK_POSTS;
   }
 };

@@ -22,6 +22,7 @@ import {
   DISCOVERY_GENDER_LABELS,
   DISCOVERY_GENDERS,
   type DiscoveryPreferences,
+  type Gender,
   getDiscoveryPreferences,
   setDiscoveryPreferences,
 } from '@/hooks/matches';
@@ -29,16 +30,20 @@ import { normalizeMediaUrl } from '@/hooks/media';
 import { sendTestNotificationAsync } from '@/hooks/notifications';
 import { useTheme } from '@/hooks/use-theme';
 import Header from '@/components/header';
-import { TARGET_USER_ID } from '@/hooks/api';
-import { fetchFeed } from '@/hooks/posts';
+import { fetchUserPosts } from '@/hooks/posts';
 
 const DEFAULT_PREFS: DiscoveryPreferences = {
   minAge: '',
   maxAge: '',
-  gender: DISCOVERY_GENDERS[0],
+  gender: '',
   country: '',
   interests: [],
 };
+
+// Includes an "Any" option ('') so a user can search all genders; '' means no
+// gender filter, which is what the backend expects when the param is omitted.
+const GENDER_OPTIONS: (Gender | '')[] = ['', ...DISCOVERY_GENDERS];
+const genderOptionLabel = (option: Gender | '') => (option === '' ? 'Any' : DISCOVERY_GENDER_LABELS[option]);
 
 const toInputValue = (value: string[] | string | number | undefined) => {
   if (Array.isArray(value)) {
@@ -68,7 +73,7 @@ export default function ProfileScreen() {
 
   const [minAge, setMinAge] = useState('');
   const [maxAge, setMaxAge] = useState('');
-  const [gender, setGender] = useState(DISCOVERY_GENDERS[0]);
+  const [gender, setGender] = useState<Gender | ''>('');
   const [country, setCountry] = useState('');
   const [interests, setInterests] = useState('');
   const [savingPrefs, setSavingPrefs] = useState(false);
@@ -105,7 +110,7 @@ export default function ProfileScreen() {
 
         const mergedPreferences = {
           ...DEFAULT_PREFS,
-          gender: savedPreferences.gender || DISCOVERY_GENDERS[0],
+          gender: savedPreferences.gender,
           country: savedPreferences.country || '',
           interests: savedPreferences.interests || [],
           minAge: savedPreferences.minAge || '',
@@ -134,7 +139,8 @@ export default function ProfileScreen() {
   }, []);
 
   useEffect(() => {
-    if (!profile?.id) {
+    const userId = profile?.id;
+    if (!userId) {
       setPosts([]);
       setLoadingPosts(false);
       return;
@@ -147,7 +153,7 @@ export default function ProfileScreen() {
       setPostsError(null);
 
       try {
-        const nextPosts = await fetchFeed();
+        const nextPosts = await fetchUserPosts(userId);
         if (isActive) {
           setPosts(nextPosts);
         }
@@ -405,12 +411,12 @@ export default function ProfileScreen() {
                     <View style={styles.field}>
                       <ThemedText type="smallBold">Gender</ThemedText>
                       <View style={styles.segmented}>
-                        {DISCOVERY_GENDERS.map((option) => {
+                        {GENDER_OPTIONS.map((option) => {
                           const selected = option === gender;
 
                           return (
                             <TouchableOpacity
-                              key={option}
+                              key={option || 'any'}
                               onPress={() => setGender(option)}
                               style={[
                                 styles.segment,
@@ -424,7 +430,7 @@ export default function ProfileScreen() {
                                 type="smallBold"
                                 style={[styles.segmentText, selected && styles.segmentTextSelected]}
                               >
-                                {DISCOVERY_GENDER_LABELS[option]}
+                                {genderOptionLabel(option)}
                               </ThemedText>
                             </TouchableOpacity>
                           );
