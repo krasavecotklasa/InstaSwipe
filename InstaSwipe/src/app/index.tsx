@@ -1,12 +1,43 @@
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, Platform, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { SymbolView } from 'expo-symbols';
+import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { PostCard, type Post } from '@/components/post-card';
+import PostComposer from '@/components/post-composer';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
 import Header from '@/components/header';
 import { fetchPostsByUserIds } from '@/hooks/posts';
 import { TARGET_USER_IDS } from '@/hooks/api';
+import { fetchFeed } from '@/hooks/posts';
+
+function ComposerEntry({ onPress }: { onPress: () => void }) {
+  const theme = useTheme();
+
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.composer,
+        { borderColor: theme.tabActiveBorder },
+        pressed && styles.composerPressed,
+      ]}
+    >
+      <View style={[styles.composerBadge, { backgroundColor: theme.backgroundElement }]}>
+        <SymbolView
+          name={{ ios: 'plus', android: 'add', web: 'add' } as any}
+          tintColor="#ffffff"
+          size={22}
+        />
+      </View>
+      <ThemedText style={[styles.composerText, { color: theme.iconMuted }]}>
+        Share a new post
+      </ThemedText>
+    </Pressable>
+  );
+}
 
 export default function HomeScreen() {
   const [posts, setPosts] = useState<Post[]>([]);
@@ -53,6 +84,7 @@ export default function HomeScreen() {
           data={posts}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => <PostCard post={item} />}
+          ListHeaderComponent={<ComposerEntry onPress={() => setComposerVisible(true)} />}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={true}
           scrollEnabled={true}
@@ -72,6 +104,12 @@ export default function HomeScreen() {
               </View>
             )
           }
+        />
+
+        <PostComposer
+          visible={composerVisible}
+          onClose={() => setComposerVisible(false)}
+          onPosted={loadPosts}
         />
       </SafeAreaView>
     </ThemedView>

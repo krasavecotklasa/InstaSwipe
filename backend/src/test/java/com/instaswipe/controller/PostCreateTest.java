@@ -144,6 +144,19 @@ class PostCreateTest extends AbstractWebIntegrationTest {
     }
 
     @Test
+    void rejectsCaptionOverMaxLength() {
+        MultipartBodyBuilder body = new MultipartBodyBuilder();
+        body.part("caption", "x".repeat(501));
+
+        ResponseEntity<Void> response = client(tokenFor(author())).post().uri("/api/posts")
+                .contentType(MediaType.MULTIPART_FORM_DATA)
+                .body(body.build())
+                .retrieve().toBodilessEntity();
+
+        assertThat(response.getStatusCode().value()).isEqualTo(400);
+    }
+
+    @Test
     void anonymousIsRejected() {
         MultipartBodyBuilder body = new MultipartBodyBuilder();
         body.part("caption", "hi");

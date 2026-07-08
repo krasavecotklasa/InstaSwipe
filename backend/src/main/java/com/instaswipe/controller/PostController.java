@@ -1,5 +1,6 @@
 package com.instaswipe.controller;
 
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -7,6 +8,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 
 import com.instaswipe.service.PostService;
 import com.instaswipe.service.MediaStorageService;
@@ -15,6 +18,7 @@ import com.instaswipe.service.ProfileService;
 import com.instaswipe.model.Post;
 import com.instaswipe.model.Media;
 import com.instaswipe.dto.CreatePostRequest;
+import com.instaswipe.dto.PageResponse;
 import com.instaswipe.dto.PostResponse;
 import com.instaswipe.dto.PublicProfileResponse;
 
@@ -29,12 +33,19 @@ public class PostController {
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @ResponseStatus(HttpStatus.CREATED)
     public PostResponse createPost(
-        @ModelAttribute CreatePostRequest request,
+        @Valid @ModelAttribute CreatePostRequest request,
         @AuthenticationPrincipal String userId) {
         Post post = postService.createPost(userId, request.caption(), request.file());
         return toResponse(post, userId);
     }
 
+    @GetMapping("/feed")
+    public PageResponse<PostResponse> getFeed(
+        @AuthenticationPrincipal String currentUserId,
+        @PageableDefault(size = 20) Pageable pageable) {
+        Page<Post> posts = postService.getFeed(currentUserId, pageable);
+        return PageResponse.from(posts.map(post -> toResponse(post, currentUserId)));
+    }
 
     @GetMapping("/user/{userId}")
     public Page<PostResponse> getUserPosts(
