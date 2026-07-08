@@ -17,6 +17,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { API, OwnProfileResponse } from '@/hooks/auth';
 import { Spacing } from '@/constants/theme';
+import { getImageValidationError } from '@/constants/media';
 import { normalizeMediaUrl } from '@/hooks/media';
 import { useTheme } from '@/hooks/use-theme';
 import { SymbolView } from 'expo-symbols';
@@ -37,6 +38,11 @@ function errorHandle(error: string) {
 
 const GENDERS = ['MALE', 'FEMALE', 'NON_BINARY', 'OTHER'];
 const GendersDisplay = ['Male', 'Female', 'Non-Binary', 'Other'];
+
+const DISPLAY_NAME_MAX_LENGTH = 50;
+const BIO_MAX_LENGTH = 150;
+const COUNTRY_MAX_LENGTH = 60;
+const INTERESTS_MAX_LENGTH = 200;
 
 export default function OnboardingGate({ onOnboardSuccess, mode = 'create', initialProfile }: OnboardingGateProps) {
   const [displayName, setDisplayName] = useState(initialProfile?.displayName ?? '');
@@ -64,15 +70,28 @@ export default function OnboardingGate({ onOnboardSuccess, mode = 'create', init
   }, [initialProfile]);
 
   const handlePickImage = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.7,
-    });
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.7,
+      });
 
-    if (!result.canceled && result.assets && result.assets.length > 0) {
-      setProfileImage(result.assets[0]);
+      if (result.canceled || !result.assets || result.assets.length === 0) {
+        return;
+      }
+
+      const asset = result.assets[0];
+      const validationError = getImageValidationError(asset);
+      if (validationError) {
+        errorHandle(validationError);
+        return;
+      }
+
+      setProfileImage(asset);
+    } catch (error) {
+      errorHandle(error instanceof Error ? error.message : 'Could not open the image picker.');
     }
   };
 
@@ -205,6 +224,7 @@ export default function OnboardingGate({ onOnboardSuccess, mode = 'create', init
                 placeholderTextColor={theme.iconMuted}
                 value={displayName}
                 onChangeText={setDisplayName}
+                maxLength={DISPLAY_NAME_MAX_LENGTH}
               />
 
               <TextInput
@@ -215,7 +235,11 @@ export default function OnboardingGate({ onOnboardSuccess, mode = 'create', init
                 onChangeText={setBio}
                 multiline
                 numberOfLines={3}
+                maxLength={BIO_MAX_LENGTH}
               />
+              <ThemedText style={[styles.charCount, { color: theme.iconMuted }]}>
+                {bio.length}/{BIO_MAX_LENGTH}
+              </ThemedText>
 
               <TextInput
                 style={[styles.input, { color: theme.text, borderColor: theme.tabActiveBorder }]}
@@ -231,6 +255,7 @@ export default function OnboardingGate({ onOnboardSuccess, mode = 'create', init
                 placeholderTextColor={theme.iconMuted}
                 value={country}
                 onChangeText={setCountry}
+                maxLength={COUNTRY_MAX_LENGTH}
               />
 
               <ThemedText style={styles.label}>Gender</ThemedText>
@@ -258,6 +283,7 @@ export default function OnboardingGate({ onOnboardSuccess, mode = 'create', init
                 placeholderTextColor={theme.iconMuted}
                 value={interests}
                 onChangeText={setInterests}
+                maxLength={INTERESTS_MAX_LENGTH}
               />
 
               <TouchableOpacity
@@ -343,6 +369,11 @@ const styles = StyleSheet.create({
     height: 100,
     textAlignVertical: 'top',
     paddingTop: Spacing.three,
+  },
+  charCount: {
+    fontSize: 12,
+    textAlign: 'right',
+    marginTop: -Spacing.two,
   },
   label: {
     fontWeight: '600',
