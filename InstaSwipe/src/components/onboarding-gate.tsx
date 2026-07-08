@@ -17,6 +17,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { API, OwnProfileResponse } from '@/hooks/auth';
 import { Spacing } from '@/constants/theme';
+import { normalizeMediaUrl } from '@/hooks/media';
 import { useTheme } from '@/hooks/use-theme';
 import { SymbolView } from 'expo-symbols';
 
@@ -50,7 +51,7 @@ export default function OnboardingGate({ onOnboardSuccess, mode = 'create', init
   const [loading, setLoading] = useState(false);
   const theme = useTheme();
   const insets = useSafeAreaInsets();
-  const currentProfilePictureUrl = initialProfile?.profilePictureUrl;
+  const currentProfilePictureUrl = normalizeMediaUrl(initialProfile?.profilePictureUrl);
 
   useEffect(() => {
     setDisplayName(initialProfile?.displayName ?? '');

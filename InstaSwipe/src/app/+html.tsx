@@ -1,5 +1,6 @@
 import { ScrollViewStyleReset } from 'expo-router/html';
 import { type PropsWithChildren } from 'react';
+import { getMediaOrigin } from '@/hooks/media';
 
 // Origins the very first paint depends on. Deriving them here (from the same
 // EXPO_PUBLIC_* vars the app uses) lets the browser open the API + media
@@ -17,7 +18,7 @@ const apiOrigin = apiHost
 // Origin serving post media (S3/MinIO). Set EXPO_PUBLIC_MEDIA_ORIGIN to override
 // it; otherwise we reuse the API host on port 9000 so local and device access
 // stay on the same machine.
-const mediaOrigin = process.env.EXPO_PUBLIC_MEDIA_ORIGIN ?? (apiHost ? `http://${apiHost}:9000` : undefined);
+const mediaOrigin = process.env.EXPO_PUBLIC_MEDIA_ORIGIN ?? getMediaOrigin();
 
 // This file is web-only and runs during static rendering to shape the root HTML
 // document. It has no effect on native.

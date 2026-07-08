@@ -1,6 +1,8 @@
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 
+import { normalizeMediaUrl } from '@/hooks/media';
+
 const API_HOST = process.env.EXPO_PUBLIC_API_HOST;
 const API_PORT = process.env.EXPO_PUBLIC_API_PORT;
 const API_PREFIX_RAW = process.env.EXPO_PUBLIC_API_PREFIX || '/api';
@@ -151,6 +153,11 @@ export const getDiscoveryPreferences = async (): Promise<DiscoveryPreferences> =
   }
 };
 
+const normalizeDiscoveryProfile = (profile: DiscoveryProfile): DiscoveryProfile => ({
+  ...profile,
+  profilePictureUrl: normalizeMediaUrl(profile.profilePictureUrl),
+});
+
 export const setDiscoveryPreferences = async (preferences: Partial<DiscoveryPreferences>) => {
   const normalized = normalizeDiscoveryPreferences(preferences);
   const serialized = JSON.stringify(normalized);
@@ -180,7 +187,12 @@ export class MatchAPI {
       throw new Error(message || `Discovery request failed with status ${response.status}`);
     }
 
-    return await response.json();
+    const data = await response.json();
+
+    return {
+      ...data,
+      content: Array.isArray(data?.content) ? data.content.map(normalizeDiscoveryProfile) : [],
+    };
   }
 
   private static async swipe(userId: string, action: 'love' | 'pass'): Promise<SwipeResult> {

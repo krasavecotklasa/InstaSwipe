@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Platform,
-  Pressable,
   ScrollView,
   StyleSheet,
   TextInput,
@@ -25,6 +24,7 @@ import {
   getDiscoveryPreferences,
   setDiscoveryPreferences,
 } from '@/hooks/matches';
+import { normalizeMediaUrl } from '@/hooks/media';
 import { useTheme } from '@/hooks/use-theme';
 import Header from '@/components/header';
 
@@ -88,7 +88,10 @@ export default function ProfileScreen() {
         }
 
         const profileData: OwnProfileResponse = await profileResponse.json();
-        setProfile(profileData);
+        setProfile({
+          ...profileData,
+          profilePictureUrl: normalizeMediaUrl(profileData.profilePictureUrl),
+        });
 
         const mergedPreferences = {
           ...DEFAULT_PREFS,

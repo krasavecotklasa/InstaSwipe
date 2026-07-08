@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import type { Post } from '@/components/post-card';
 import { getAccessToken } from '@/hooks/auth';
 import { API_BASE_URL, API_PREFIX, POSTS_BASE_PATH } from '@/hooks/api';
+import { normalizeMediaUrl } from '@/hooks/media';
 
 interface BackendPostPayload {
   id: string;
@@ -34,12 +35,12 @@ export const formatPost = (rawPost: BackendPostPayload | Post): Post => {
     id: rawPost.id,
     userId: backendPost.userId ?? 'unknown-user',
     username: backendPost.displayName,
-    profilePictureUrl: backendPost.profilePictureUrl,
+    profilePictureUrl: normalizeMediaUrl(backendPost.profilePictureUrl ?? undefined) ?? undefined,
     caption: backendPost.caption ?? '',
     likes: typeof backendPost.likeCount === 'number' ? backendPost.likeCount : 0,
     media: {
       type: backendPost.media?.type === 'VIDEO' ? 'VIDEO' : 'IMAGE',
-      url: backendPost.media?.url ?? '',
+      url: normalizeMediaUrl(backendPost.media?.url ?? undefined) ?? '',
       filename: backendPost.media?.filename ?? 'post-media',
       size: backendPost.media?.size ?? 0,
     },
