@@ -29,13 +29,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
   },
   safeArea: {
-
+    flex: 1,
+    maxWidth: MaxContentWidth,
+    width: '100%',
+    marginLeft: Platform.OS === 'web' ? 100 : 0,
   },
   heroSection: {
     alignItems: 'center',
     justifyContent: 'center',
     flex: 1,
     paddingHorizontal: Spacing.four,
+    paddingBottom: BottomTabInset + Spacing.three,
     gap: Spacing.four,
   },
   title: {
