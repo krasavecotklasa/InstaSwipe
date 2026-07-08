@@ -6,11 +6,12 @@ import {
   ScrollView,
   StyleSheet,
   TextInput,
+  TouchableOpacity,
   View,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { SymbolView } from 'expo-symbols';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -25,6 +26,7 @@ import {
   setDiscoveryPreferences,
 } from '@/hooks/matches';
 import { useTheme } from '@/hooks/use-theme';
+import Header from '@/components/header';
 
 const DEFAULT_PREFS: DiscoveryPreferences = {
   minAge: '',
@@ -51,6 +53,7 @@ const parseInterests = (value: string) => {
 
 export default function ProfileScreen() {
   const theme = useTheme();
+  const insets = useSafeAreaInsets();
   const { onEditProfile, onLogout } = useAuthContext();
   const [profile, setProfile] = useState<OwnProfileResponse | null>(null);
   const [loadingProfile, setLoadingProfile] = useState(true);
@@ -156,7 +159,14 @@ export default function ProfileScreen() {
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator>
+        <Header />
+        <ScrollView
+          contentContainerStyle={[
+            styles.content,
+            { paddingBottom: BottomTabInset + insets.bottom + Spacing.five },
+          ]}
+          showsVerticalScrollIndicator
+        >
           <View style={styles.header}>
             <ThemedText type="subtitle" style={styles.title}>
               Profile Settings
@@ -243,7 +253,7 @@ export default function ProfileScreen() {
                 </View>
 
                 <View style={styles.actionsRow}>
-                  <Pressable
+                  <TouchableOpacity
                     onPress={openEditor}
                     disabled={openingEditor}
                     style={[styles.buttonStyle, { borderColor: '#6249cabe' }]}
@@ -256,7 +266,7 @@ export default function ProfileScreen() {
                     <ThemedText type="smallBold">
                       Update profile
                     </ThemedText>
-                  </Pressable>
+                  </TouchableOpacity>
                 </View>
               </View>
             ) : null}
@@ -300,7 +310,7 @@ export default function ProfileScreen() {
                   const selected = option === gender;
 
                   return (
-                    <Pressable
+                    <TouchableOpacity
                       key={option}
                       onPress={() => setGender(option)}
                       style={[
@@ -311,10 +321,13 @@ export default function ProfileScreen() {
                         },
                       ]}
                     >
-                      <ThemedText type="smallBold" style={selected && styles.segmentTextSelected}>
+                      <ThemedText
+                        type="smallBold"
+                        style={[styles.segmentText, selected && styles.segmentTextSelected]}
+                      >
                         {DISCOVERY_GENDER_LABELS[option]}
                       </ThemedText>
-                    </Pressable>
+                    </TouchableOpacity>
                   );
                 })}
               </View>
@@ -341,7 +354,7 @@ export default function ProfileScreen() {
             </View>
 
             <View style={styles.actionsRow}>
-              <Pressable
+              <TouchableOpacity
                 onPress={savePreferences}
                 disabled={savingPrefs}
                 style={[styles.buttonStyle]}
@@ -354,11 +367,11 @@ export default function ProfileScreen() {
                 <ThemedText type="smallBold">
                   Save changes
                 </ThemedText>
-              </Pressable>
+              </TouchableOpacity>
             </View>
           </View>
           <View style={styles.actionsRow}>
-            <Pressable
+            <TouchableOpacity
               onPress={onLogout}
               style={[styles.buttonStyle, { borderColor: '#ef4444' }]}
             >
@@ -370,7 +383,7 @@ export default function ProfileScreen() {
               <ThemedText type="smallBold">
                 Logout
               </ThemedText>
-            </Pressable>
+            </TouchableOpacity>
           </View>
         </ScrollView>
       </SafeAreaView>
@@ -392,7 +405,6 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: Spacing.three,
-    paddingBottom: BottomTabInset + Spacing.four,
     gap: Spacing.three,
   },
   header: {
@@ -450,13 +462,18 @@ const styles = StyleSheet.create({
   },
   segment: {
     flexGrow: 1,
-    maxWidth: '25%',
+    minWidth: '22%',
     minHeight: 40,
     borderWidth: 1,
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: Spacing.two,
+  },
+  segmentText: {
+    fontSize: 13,
+    lineHeight: 18,
+    textAlign: 'center',
   },
   segmentTextSelected: {
     color: '#ffffff',
