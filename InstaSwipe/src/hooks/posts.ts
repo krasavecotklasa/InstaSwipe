@@ -39,6 +39,13 @@ interface BackendPostPayload {
   likedByMe: boolean;
 }
 
+export interface UserPostsPage {
+  posts: Post[];
+  page: number;
+  size: number;
+  last: boolean;
+}
+
 const FALLBACK_POSTS: Post[] = [];
 
 export const formatPost = (rawPost: BackendPostPayload | Post): Post => {
@@ -116,6 +123,41 @@ const normalizePostsPayload = (payload: unknown): BackendPostPayload[] => {
   return [];
 };
 
+const normalizeUserPostsPage = (payload: unknown, page: number, size: number): UserPostsPage => {
+  const normalizedPosts = normalizePostsPayload(payload)
+    .map((post) => formatPost(post))
+    .filter((post) => Boolean(post.id));
+
+  if (payload && typeof payload === 'object') {
+    const record = payload as Record<string, unknown>;
+    const responsePage = typeof record.number === 'number'
+      ? record.number
+      : typeof record.page === 'number'
+        ? record.page
+        : page;
+    const responseSize = typeof record.size === 'number' ? record.size : size;
+    const totalPages = typeof record.totalPages === 'number' ? record.totalPages : undefined;
+
+    return {
+      posts: normalizedPosts,
+      page: responsePage,
+      size: responseSize,
+      last: typeof record.last === 'boolean'
+        ? record.last
+        : totalPages == null
+          ? normalizedPosts.length < size
+          : responsePage >= totalPages - 1,
+    };
+  }
+
+  return {
+    posts: normalizedPosts,
+    page,
+    size,
+    last: normalizedPosts.length < size,
+  };
+};
+
 export const fetchPosts = async (): Promise<Post[]> => {
   try {
     const response = await authorizedFetch(`${API_PREFIX}/posts`, {
@@ -162,9 +204,8 @@ export const fetchFeed = async (): Promise<Post[]> => {
   }
 };
 
-// Posts authored by a specific user, via GET /api/posts/user/{userId}. Used by the
-// profile screen to show the signed-in user's own posts (not the global feed).
-export const fetchUserPosts = async (userId: string, page = 0, size = 20): Promise<Post[]> => {
+// Posts authored by a specific user, via GET /api/posts/user/{userId}.
+export const fetchUserPostsPage = async (userId: string, page = 0, size = 20): Promise<UserPostsPage> => {
   try {
     const response = await authorizedFetch(`${POSTS_BASE_PATH}/user/${userId}?page=${page}&size=${size}`, {
       method: 'GET',
@@ -178,13 +219,23 @@ export const fetchUserPosts = async (userId: string, page = 0, size = 20): Promi
     }
 
     const data = await response.json();
-    const normalized = normalizePostsPayload(data);
 
-    return normalized.map((post) => formatPost(post)).filter((post) => Boolean(post.id));
+    return normalizeUserPostsPage(data, page, size);
   } catch (error) {
     console.warn('[Posts] Unable to fetch user posts', error);
-    return FALLBACK_POSTS;
+    return {
+      posts: FALLBACK_POSTS,
+      page,
+      size,
+      last: true,
+    };
   }
+};
+
+// Used by the profile screen to show the signed-in user's own posts (not the global feed).
+export const fetchUserPosts = async (userId: string, page = 0, size = 20): Promise<Post[]> => {
+  const response = await fetchUserPostsPage(userId, page, size);
+  return response.posts;
 };
 
 export const createPost = async ({ caption, image }: NewPostInput): Promise<Post> => {
