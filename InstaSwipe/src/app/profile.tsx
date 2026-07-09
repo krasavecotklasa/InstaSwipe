@@ -289,7 +289,7 @@ export default function ProfileScreen() {
 
                     <View style={styles.profileMeta}>
                       <ThemedText type="smallBold" style={styles.profileName}>
-                        {profile.displayName} <ThemedText type="small" themeColor="textSecondary" style={styles.emailText}>
+                        {profile.displayName} <ThemedText type="small" themeColor="textSecondary">
                           ({profile.email})
                         </ThemedText>
                       </ThemedText>
@@ -426,10 +426,7 @@ export default function ProfileScreen() {
                                 },
                               ]}
                             >
-                              <ThemedText
-                                type="smallBold"
-                                style={[styles.segmentText, selected && styles.segmentTextSelected]}
-                              >
+                              <ThemedText type="smallBold" style={selected && styles.segmentTextSelected}>
                                 {genderOptionLabel(option)}
                               </ThemedText>
                             </TouchableOpacity>
@@ -685,6 +682,7 @@ const styles = StyleSheet.create({
   },
   profileName: {
     fontSize: 18,
+    fontWeight: '800',
     lineHeight: 24,
   },
   emailText: {

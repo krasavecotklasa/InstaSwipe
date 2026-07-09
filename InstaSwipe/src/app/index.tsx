@@ -19,19 +19,19 @@ function ComposerEntry({ onPress }: { onPress: () => void }) {
       onPress={onPress}
       style={({ pressed }) => [
         styles.composer,
-        { borderColor: theme.tabActiveBorder },
+        { borderColor: '#6249cabe' },
         pressed && styles.composerPressed,
       ]}
     >
-      <View style={[styles.composerBadge, { backgroundColor: theme.backgroundElement }]}>
+      <View style={[styles.composerBadge]}>
         <SymbolView
           name={{ ios: 'plus', android: 'add', web: 'add' } as any}
-          tintColor="#ffffff"
+          tintColor="#8769ffbe"
           size={22}
         />
       </View>
       <ThemedText style={[styles.composerText, { color: theme.iconMuted }]}>
-        Share a new post
+        Create a new post
       </ThemedText>
     </Pressable>
   );
@@ -123,15 +123,17 @@ const styles = StyleSheet.create({
   composer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.two,
-    paddingVertical: Spacing.two,
-    paddingHorizontal: Spacing.three,
+    justifyContent: 'center',
+    gap: Spacing.one,
+    paddingVertical: Spacing.one,
+    marginHorizontal: 'auto',
+    paddingHorizontal: Spacing.one,
     marginBottom: Spacing.three,
     borderWidth: 1,
-    borderRadius: 999,
+    borderRadius: 8,
     backgroundColor: '#000000',
     width: '100%',
-    maxWidth: Platform.OS === 'web' ? 500 : undefined,
+    maxWidth: Platform.OS === 'web' ? '75%' : 'auto',
   },
   composerPressed: {
     opacity: 0.85,
@@ -139,7 +141,7 @@ const styles = StyleSheet.create({
   composerBadge: {
     width: 40,
     height: 40,
-    borderRadius: 20,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },
