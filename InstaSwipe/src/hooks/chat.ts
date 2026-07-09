@@ -126,8 +126,9 @@ const createStompClient = (token: string): Client =>
     reconnectDelay: 4000,
     heartbeatIncoming: 10000,
     heartbeatOutgoing: 10000,
-    // Silence the verbose default frame logging.
-    debug: () => {},
+    // TEMP diagnostic: log every STOMP frame so we can see the exact SUBSCRIBE
+    // destination and any ERROR frame from the broker.
+    debug: (msg) => console.log('[STOMP]', msg),
   });
 
 export interface UseChatRoom {
@@ -203,7 +204,7 @@ export function useChatRoom(matchId: string, otherUserId: string): UseChatRoom {
           return;
         }
         setConnected(true);
-        subscription = client.subscribe(`/user/queue/chat/${matchId}`, (frame: IMessage) => {
+        subscription = client.subscribe(`/user/queue/${matchId}`, (frame: IMessage) => {
           try {
             upsert(JSON.parse(frame.body) as ChatMessage);
           } catch {
@@ -212,6 +213,9 @@ export function useChatRoom(matchId: string, otherUserId: string): UseChatRoom {
         });
       };
       client.onStompError = (frame) => {
+        // TEMP diagnostic: surface the full ERROR frame (headers + body) so we can
+        // see which destination the broker rejected.
+        console.log('[STOMP ERROR] headers=', JSON.stringify(frame.headers), 'body=', frame.body);
         if (active) {
           setError(frame.headers['message'] || 'Chat connection error');
         }
