@@ -16,6 +16,17 @@ app:
   jwt:
     # Set APP_JWT_SECRET (random 32+ bytes) in every real environment.
     secret: ${APP_JWT_SECRET:local-dev-only-secret-change-me-at-least-32-bytes!!}
+  
+  email:
+    # Set APP_EMAIL_API_KEY in every real environment using Resend API key from https://resend.com
+    api-key: ${APP_EMAIL_API_KEY:}
+    from-email: ${APP_EMAIL_FROM:noreply@instaswipe.com}
+    from-name: ${APP_EMAIL_FROM_NAME:InstaSwipe}
+    enabled: ${APP_EMAIL_ENABLED:true}
+
+otp: 
+  expiry-minutes: 10
+  length: 6
 
 s3:
   endpoint: http://minio:9000
