@@ -335,14 +335,15 @@ export default function ProfileScreen() {
                 </View>
               </View>
 
-              {showSettings ? (
-                <>
-                  <View style={[styles.filters, { borderColor: theme.tabActiveBorder }]}>
-                    <View style={styles.panelHeader}>
-                      <ThemedText style={styles.panelHeaderText} type="smallBold">
-                        Profile settings
-                      </ThemedText>
-                    </View>
+              <View style={styles.postsSection}>
+                <View style={styles.postsHeader}>
+                  <ThemedText type="smallBold" style={styles.postsTitle}>
+                    Posts
+                  </ThemedText>
+                  <ThemedText type="small" themeColor="textSecondary">
+                    {posts.length} {posts.length === 1 ? 'post' : 'posts'}
+                  </ThemedText>
+                </View>
 
                 {loadingPosts ? (
                   <View style={styles.emptyState}>
@@ -590,12 +591,6 @@ const styles = StyleSheet.create({
     color: '#ef4444',
   },
   panel: {
-    borderWidth: 1,
-    padding: Spacing.three,
-    gap: Spacing.three,
-    backgroundColor: 'rgba(0, 0, 0, 0.08)',
-  },
-  filters: {
     borderWidth: 1,
     padding: Spacing.three,
     gap: Spacing.three,
