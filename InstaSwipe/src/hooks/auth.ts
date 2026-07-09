@@ -40,6 +40,18 @@ export interface ProfileStatusResponse {
   emailVerified: boolean;
 }
 
+export interface OwnProfileResponse {
+  id: string;
+  email: string;
+  displayName: string;
+  bio: string;
+  birthDate: string;
+  country: string;
+  gender: string;
+  interests: string[];
+  profilePictureUrl: string | null;
+}
+
 const isWebPlatform = () => Platform.OS === 'web';
 
 const getAccessToken = async () => {
@@ -119,76 +131,84 @@ const isFormDataBody = (body: unknown): body is FormData => {
   return typeof FormData !== 'undefined' && body instanceof FormData;
 };
 
-class API {
-  private static async request(endpoint: string, options: RequestInit = {}): Promise<Response> {
-    const accessToken = await getAccessToken();
-    const headers: any = {
-      ...((options.headers as any) || {}),
-    };
+// Shared authenticated fetch: attaches the bearer token and, on a 401, refreshes
+// the session once and retries. Every authenticated caller (auth, discovery,
+// matches, posts, notifications) must go through this so token expiry is handled
+// in one place instead of surfacing as a raw 401 on individual screens.
+export const authorizedFetch = async (endpoint: string, options: RequestInit = {}): Promise<Response> => {
+  const accessToken = await getAccessToken();
+  const headers: any = {
+    ...((options.headers as any) || {}),
+  };
 
-    if (!headers['Content-Type'] && !isFormDataBody(options.body)) {
-      headers['Content-Type'] = 'application/json';
-    }
+  if (!headers['Content-Type'] && !isFormDataBody(options.body)) {
+    headers['Content-Type'] = 'application/json';
+  }
 
-    if (isFormDataBody(options.body)) {
-      delete headers['Content-Type'];
-    }
+  if (isFormDataBody(options.body)) {
+    delete headers['Content-Type'];
+  }
 
-    if (accessToken) {
-      headers['Authorization'] = `Bearer ${accessToken}`;
-    }
+  if (accessToken) {
+    headers['Authorization'] = `Bearer ${accessToken}`;
+  }
 
-    const fullUrl = `${API_BASE_URL}${endpoint}`;
-    console.log(`[API] ${options.method || 'GET'} ${fullUrl}`);
+  const fullUrl = `${API_BASE_URL}${endpoint}`;
+  console.log(`[API] ${options.method || 'GET'} ${fullUrl}`);
 
-    let response: Response;
-    try {
-      response = await fetch(fullUrl, {
-        ...options,
-        headers,
+  let response: Response;
+  try {
+    response = await fetch(fullUrl, {
+      ...options,
+      headers,
+    });
+  } catch (error) {
+    console.error(`[API] Network request to ${fullUrl} failed:`, error);
+    throw new Error(
+      `Could not reach the server at ${API_HOST}:${API_PORT}. Check that the API is running and reachable from this device, and that EXPO_PUBLIC_API_HOST is set correctly.`
+    );
+  }
+
+  console.log(`[API] Response: ${response.status} ${response.statusText}`);
+
+  // Handle session expiry and refresh
+  if (response.status === 401 && !endpoint.includes(`${AUTH_BASE_PATH}/`)) {
+    const refreshToken = await getRefreshToken();
+    if (refreshToken) {
+      const refreshResponse = await fetch(`${API_BASE_URL}${AUTH_BASE_PATH}/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refreshToken }),
       });
-    } catch (error) {
-      console.error(`[API] Network request to ${fullUrl} failed:`, error);
-      throw new Error(
-        `Could not reach the server at ${API_HOST}:${API_PORT}. Check that the API is running and reachable from this device, and that EXPO_PUBLIC_API_HOST is set correctly.`
-      );
-    }
 
-    console.log(`[API] Response: ${response.status} ${response.statusText}`);
+      if (refreshResponse.ok) {
+        try {
+          const data: AuthTokenResponse = await refreshResponse.json();
+          const tokens = getAuthTokensFromResponse(data);
+          await setTokens(tokens.accessToken, tokens.refreshToken);
 
-    // Handle session expiry and refresh
-    if (response.status === 401 && !endpoint.includes(`${AUTH_BASE_PATH}/`)) {
-      const refreshToken = await getRefreshToken();
-      if (refreshToken) {
-        const refreshResponse = await fetch(`${API_BASE_URL}${AUTH_BASE_PATH}/refresh`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ refreshToken }),
-        });
-
-        if (refreshResponse.ok) {
-          try {
-            const data: AuthTokenResponse = await refreshResponse.json();
-            const tokens = getAuthTokensFromResponse(data);
-            await setTokens(tokens.accessToken, tokens.refreshToken);
-
-            // Retry original request with new token
-            headers['Authorization'] = `Bearer ${tokens.accessToken}`;
-            return fetch(`${API_BASE_URL}${endpoint}`, {
-              ...options,
-              headers,
-            });
-          } catch (error) {
-            console.warn('[Auth] Refresh response did not include valid tokens', error);
-            await clearTokens();
-          }
-        } else {
+          // Retry original request with new token
+          headers['Authorization'] = `Bearer ${tokens.accessToken}`;
+          return fetch(`${API_BASE_URL}${endpoint}`, {
+            ...options,
+            headers,
+          });
+        } catch (error) {
+          console.warn('[Auth] Refresh response did not include valid tokens', error);
           await clearTokens();
         }
+      } else {
+        await clearTokens();
       }
     }
+  }
 
-    return response;
+  return response;
+};
+
+class API {
+  private static async request(endpoint: string, options: RequestInit = {}): Promise<Response> {
+    return authorizedFetch(endpoint, options);
   }
 
   static async register(payload: any): Promise<Response> {
@@ -214,6 +234,12 @@ class API {
 
   static async getProfileStatus(): Promise<Response> {
     return this.request(`${PROFILE_BASE_PATH}/status`, {
+      method: 'GET',
+    });
+  }
+
+  static async getOwnProfile(): Promise<Response> {
+    return this.request(`${PROFILE_BASE_PATH}/me`, {
       method: 'GET',
     });
   }

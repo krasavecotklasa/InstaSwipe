@@ -67,14 +67,15 @@ export function TabButton({ isFocused, iconName, ...props }: TabButtonProps) {
 
 export function CustomTabList(props: TabListProps) {
   const scheme = useColorScheme();
+  const colors = Colors[scheme === 'unspecified' ? 'light' : scheme];
 
   return (
-    <View {...props} style={[styles.tabListContainer, { backgroundColor: Colors.dark.background }]}>
+    <View {...props} style={[styles.tabListContainer, { backgroundColor: colors.background, borderRightColor: colors.tabActiveBorder }]}>
       <ThemedText style={styles.brandText}>
         InstaSwipe
       </ThemedText>
 
-      {props.children}
+      <View style={styles.tabButtonGroup}>{props.children}</View>
     </View>
   );
 }
@@ -91,8 +92,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexDirection: 'column',
     borderRightWidth: 0.5,
-    borderRightColor: '#000000',
     zIndex: 100,
+  },
+  tabButtonGroup: {
+    flex: 1,
+    width: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: Spacing.three,
   },
   innerContainer: {
     paddingVertical: Spacing.two,
@@ -106,8 +113,8 @@ const styles = StyleSheet.create({
   },
   brandText: {
     fontSize: 16,
-    fontWeight: '600',
-    marginBottom: Spacing.three,
+    fontWeight: '700',
+    marginBottom: Spacing.two,
     color: '#7157db',
   },
   pressed: {
@@ -116,14 +123,15 @@ const styles = StyleSheet.create({
   tabButton: {
     justifyContent: 'center',
     alignItems: 'center',
+    marginVertical: Spacing.one,
   },
   tabButtonView: {
-    paddingVertical: Spacing.one,
-    paddingHorizontal: Spacing.three,
-    borderRadius: Spacing.three,
+    paddingVertical: Spacing.two,
+    paddingHorizontal: Spacing.four,
+    borderRadius: Spacing.four,
     borderWidth: 1,
-    minWidth: 36,
-    minHeight: 36,
+    minWidth: 48,
+    minHeight: 48,
     justifyContent: 'center',
     alignItems: 'center',
   },

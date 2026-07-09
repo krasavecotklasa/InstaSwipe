@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import {
+  KeyboardAvoidingView,
   StyleSheet,
   TextInput,
   TouchableOpacity,
@@ -8,8 +9,9 @@ import {
   ActivityIndicator,
   Switch,
   Platform,
+  ScrollView,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { API, setTokens } from '@/hooks/auth';
@@ -62,6 +64,7 @@ function LoginView({ onAuthSuccess, onGoToRegister }: LoginViewProps) {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const theme = useTheme();
+  const insets = useSafeAreaInsets();
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -97,51 +100,63 @@ function LoginView({ onAuthSuccess, onGoToRegister }: LoginViewProps) {
 
   return (
     <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea}>
-        <View style={styles.content}>
-          <ThemedText type="title" style={styles.title}>InstaSwipe</ThemedText>
-          <View style={styles.form}>
-            <TextInput
-              style={[styles.input, { color: theme.text, borderColor: theme.tabActiveBorder }]}
-              placeholder="Email"
-              placeholderTextColor={theme.iconMuted}
-              value={email}
-              onChangeText={setEmail}
-              autoCapitalize="none"
-              keyboardType="email-address"
-            />
-            <TextInput
-              style={[styles.input, { color: theme.text, borderColor: theme.tabActiveBorder }]}
-              placeholder="Password"
-              placeholderTextColor={theme.iconMuted}
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-            />
+      <KeyboardAvoidingView
+        style={styles.keyboardAvoidingView}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={insets.top}
+      >
+        <SafeAreaView style={styles.safeArea}>
+          <ScrollView
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
+          >
+            <View style={styles.content}>
+              <ThemedText type="title" style={styles.title}>InstaSwipe</ThemedText>
+              <View style={styles.form}>
+                <TextInput
+                  style={[styles.input, { color: theme.text, borderColor: theme.tabActiveBorder }]}
+                  placeholder="Email"
+                  placeholderTextColor={theme.iconMuted}
+                  value={email}
+                  onChangeText={setEmail}
+                  autoCapitalize="none"
+                  keyboardType="email-address"
+                />
+                <TextInput
+                  style={[styles.input, { color: theme.text, borderColor: theme.tabActiveBorder }]}
+                  placeholder="Password"
+                  placeholderTextColor={theme.iconMuted}
+                  value={password}
+                  onChangeText={setPassword}
+                  secureTextEntry
+                />
 
-            <TouchableOpacity
-              style={[styles.button, { backgroundColor: theme.backgroundElement }]}
-              onPress={handleLogin}
-              disabled={loading}
-            >
-              {loading ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <ThemedText style={styles.buttonText}>Login</ThemedText>
-              )}
-            </TouchableOpacity>
-          </View>
+                <TouchableOpacity
+                  style={[styles.button, { backgroundColor: theme.backgroundElement }]}
+                  onPress={handleLogin}
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <ThemedText style={styles.buttonText}>Login</ThemedText>
+                  )}
+                </TouchableOpacity>
+              </View>
 
-          <View style={styles.footer}>
-            <ThemedText>Don't have an account? </ThemedText>
-            <TouchableOpacity onPress={onGoToRegister}>
-              <ThemedText style={{ color: theme.backgroundElement, fontWeight: 'bold' }}>
-                Register
-              </ThemedText>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </SafeAreaView>
+              <View style={styles.footer}>
+                <ThemedText>Don't have an account? </ThemedText>
+                <TouchableOpacity onPress={onGoToRegister}>
+                  <ThemedText style={{ color: theme.backgroundElement, fontWeight: 'bold' }}>
+                    Register
+                  </ThemedText>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </ScrollView>
+        </SafeAreaView>
+      </KeyboardAvoidingView>
     </ThemedView>
   );
 }
@@ -160,6 +175,7 @@ function RegisterView({ onAuthSuccess, onGoToLogin }: RegisterViewProps) {
   const [isAgeConfirmed, setIsAgeConfirmed] = useState(false);
   const [loading, setLoading] = useState(false);
   const theme = useTheme();
+  const insets = useSafeAreaInsets();
 
   const handleRegister = async () => {
     if (!email || !password || !confirmPassword) {
@@ -212,72 +228,84 @@ function RegisterView({ onAuthSuccess, onGoToLogin }: RegisterViewProps) {
 
   return (
     <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea}>
-        <View style={styles.content}>
-          <ThemedText type="title" style={styles.title}>Register</ThemedText>
+      <KeyboardAvoidingView
+        style={styles.keyboardAvoidingView}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={insets.top}
+      >
+        <SafeAreaView style={styles.safeArea}>
+          <ScrollView
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
+          >
+            <View style={styles.content}>
+              <ThemedText type="title" style={styles.title}>Register</ThemedText>
 
-          <View style={styles.form}>
-            <TextInput
-              style={[styles.input, { color: theme.text, borderColor: theme.tabActiveBorder }]}
-              placeholder="Email"
-              placeholderTextColor={theme.iconMuted}
-              value={email}
-              onChangeText={setEmail}
-              autoCapitalize="none"
-              keyboardType="email-address"
-            />
-            <TextInput
-              style={[styles.input, { color: theme.text, borderColor: theme.tabActiveBorder }]}
-              placeholder="Password"
-              placeholderTextColor={theme.iconMuted}
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-            />
-            <TextInput
-              style={[styles.input, { color: theme.text, borderColor: theme.tabActiveBorder }]}
-              placeholder="Confirm Password"
-              placeholderTextColor={theme.iconMuted}
-              value={confirmPassword}
-              onChangeText={setConfirmPassword}
-              secureTextEntry
-            />
+              <View style={styles.form}>
+                <TextInput
+                  style={[styles.input, { color: theme.text, borderColor: theme.tabActiveBorder }]}
+                  placeholder="Email"
+                  placeholderTextColor={theme.iconMuted}
+                  value={email}
+                  onChangeText={setEmail}
+                  autoCapitalize="none"
+                  keyboardType="email-address"
+                />
+                <TextInput
+                  style={[styles.input, { color: theme.text, borderColor: theme.tabActiveBorder }]}
+                  placeholder="Password"
+                  placeholderTextColor={theme.iconMuted}
+                  value={password}
+                  onChangeText={setPassword}
+                  secureTextEntry
+                />
+                <TextInput
+                  style={[styles.input, { color: theme.text, borderColor: theme.tabActiveBorder }]}
+                  placeholder="Confirm Password"
+                  placeholderTextColor={theme.iconMuted}
+                  value={confirmPassword}
+                  onChangeText={setConfirmPassword}
+                  secureTextEntry
+                />
 
-            <View style={styles.ageRow}>
-              <Switch
-                value={isAgeConfirmed}
-                onValueChange={setIsAgeConfirmed}
-                trackColor={{ false: '#555', true: '#6c63ff' }}
-                thumbColor={isAgeConfirmed ? '#fff' : '#ccc'}
-              />
-              <ThemedText style={styles.ageLabel}>
-                By registering, I confirm I am at least 18 years old.
-              </ThemedText>
+                <View style={styles.ageRow}>
+                  <Switch
+                    value={isAgeConfirmed}
+                    onValueChange={setIsAgeConfirmed}
+                    trackColor={{ false: '#555', true: '#6c63ff' }}
+                    thumbColor={isAgeConfirmed ? '#fff' : '#ccc'}
+                  />
+                  <ThemedText style={styles.ageLabel}>
+                    By registering, I confirm I am at least 18 years old.
+                  </ThemedText>
+                </View>
+
+                <TouchableOpacity
+                  style={[styles.button, { backgroundColor: theme.backgroundElement }]}
+                  onPress={handleRegister}
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <ThemedText style={styles.buttonText}>Register</ThemedText>
+                  )}
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.footer}>
+                <ThemedText>Already have an account? </ThemedText>
+                <TouchableOpacity onPress={onGoToLogin}>
+                  <ThemedText style={{ color: theme.backgroundElement, fontWeight: 'bold' }}>
+                    Login
+                  </ThemedText>
+                </TouchableOpacity>
+              </View>
             </View>
-
-            <TouchableOpacity
-              style={[styles.button, { backgroundColor: theme.backgroundElement }]}
-              onPress={handleRegister}
-              disabled={loading}
-            >
-              {loading ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <ThemedText style={styles.buttonText}>Register</ThemedText>
-              )}
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.footer}>
-            <ThemedText>Already have an account? </ThemedText>
-            <TouchableOpacity onPress={onGoToLogin}>
-              <ThemedText style={{ color: theme.backgroundElement, fontWeight: 'bold' }}>
-                Login
-              </ThemedText>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </SafeAreaView>
+          </ScrollView>
+        </SafeAreaView>
+      </KeyboardAvoidingView>
     </ThemedView>
   );
 }
@@ -288,10 +316,17 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  keyboardAvoidingView: {
+    flex: 1,
+  },
   safeArea: {
     flex: 1,
-    paddingHorizontal: Spacing.four,
+  },
+  scrollContent: {
+    flexGrow: 1,
     justifyContent: 'center',
+    paddingHorizontal: Spacing.four,
+    paddingVertical: Spacing.six,
   },
   content: {
     width: '100%',

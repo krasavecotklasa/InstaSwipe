@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "17506825061",
+    "project_id": "instaswipe-91005",
+    "storage_bucket": "instaswipe-91005.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:17506825061:android:b66ac291ae392fbee3e78c",
+        "android_client_info": {
+          "package_name": "com.anonymous.InstaSwipe"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDJxb8XfdtXJpr14WEes3CHhEdnuNaWL84"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

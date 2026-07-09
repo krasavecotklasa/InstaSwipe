@@ -4,11 +4,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+import Header from '@/components/header';
 
 export default function MessagesScreen() {
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
+        <Header />
         <ThemedView style={styles.heroSection}>
           <ThemedText type="title" style={styles.title}>
             Messages Screen
@@ -28,11 +30,8 @@ const styles = StyleSheet.create({
   },
   safeArea: {
     flex: 1,
-    paddingHorizontal: Spacing.four,
-    alignItems: 'center',
-    gap: Spacing.three,
-    paddingBottom: BottomTabInset + Spacing.three,
     maxWidth: MaxContentWidth,
+    width: '100%',
     marginLeft: Platform.OS === 'web' ? 100 : 0,
   },
   heroSection: {
@@ -40,6 +39,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     flex: 1,
     paddingHorizontal: Spacing.four,
+    paddingBottom: BottomTabInset + Spacing.three,
     gap: Spacing.four,
   },
   title: {
