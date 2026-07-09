@@ -30,6 +30,9 @@ public class OtpService {
     private static final int PBKDF2_ITERATIONS = 120_000;
     private static final int SALT_LENGTH_BYTES = 16;
     private static final int KEY_LENGTH_BITS = 256;
+    private static final int DEFAULT_OTP_LENGTH = 6;
+    private static final int MAX_OTP_LENGTH = 9;
+    private static final int MAX_VERIFICATION_ATTEMPTS = 5;
 
     private final PasswordResetTokenRepository passwordResetTokenRepository;
     private final UserRepository userRepository;
@@ -49,18 +52,15 @@ public class OtpService {
         String code = generateCode();
         Instant expiresAt = Instant.now().plusSeconds(expiryMinutes * 60L);
 
-        log.warn(code);
-
         PasswordResetToken token = PasswordResetToken.builder()
                 .email(email)
-                // .code(code)
                 .tokenHash(hash(email + ":" + code))
                 .expiresAt(expiresAt)
                 .used(false)
                 .build();
 
         passwordResetTokenRepository.save(token);
-        emailService.sendPasswordResetEmail(email, code);
+        emailService.sendPasswordResetEmail(email, code, expiryMinutes);
     }
 
     private PasswordResetToken findValidToken(String email, String code) {
@@ -70,10 +70,28 @@ public class OtpService {
             return null;
 
         PasswordResetToken token = tokenOpt.get();
-        boolean valid = verify(email + ":" + code, token.getTokenHash())
-                && Instant.now().isBefore(token.getExpiresAt());
 
-        return valid ? token : null;
+        // Lock the token out once too many wrong codes have been tried, so a
+        // 6-digit OTP can't be brute-forced within its validity window.
+        if (token.getAttempts() >= MAX_VERIFICATION_ATTEMPTS) {
+            return null;
+        }
+
+        boolean notExpired = Instant.now().isBefore(token.getExpiresAt());
+        boolean matches = verify(email + ":" + code, token.getTokenHash());
+
+        if (matches && notExpired) {
+            return token;
+        }
+
+        // Only wrong codes count against the attempt budget; an expired-but-correct
+        // code is already dead and doesn't need to burn attempts.
+        if (!matches) {
+            token.setAttempts(token.getAttempts() + 1);
+            passwordResetTokenRepository.save(token);
+        }
+
+        return null;
     }
 
     public boolean verifyOtp(String email, String code) {
@@ -97,9 +115,11 @@ public class OtpService {
     }
 
     private String generateCode() {
-        SecureRandom random = new SecureRandom();
-        int max = (int) Math.pow(10, otpLength);
-        return String.format("%0" + otpLength + "d", random.nextInt(max));
+        // Guard against an unset/misconfigured length (0 would build the invalid
+        // pattern "%00d") and cap it so 10^length stays within int range.
+        int length = otpLength > 0 ? Math.min(otpLength, MAX_OTP_LENGTH) : DEFAULT_OTP_LENGTH;
+        int bound = (int) Math.pow(10, length);
+        return String.format("%0" + length + "d", secureRandom.nextInt(bound));
     }
 
     private String hash(String value) {

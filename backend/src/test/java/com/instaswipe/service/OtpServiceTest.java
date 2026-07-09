@@ -4,6 +4,7 @@ import com.instaswipe.model.PasswordResetToken;
 import com.instaswipe.model.User;
 import com.instaswipe.repository.PasswordResetTokenRepository;
 import com.instaswipe.repository.UserRepository;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -11,6 +12,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.lang.reflect.Method;
 import java.time.Instant;
@@ -42,6 +44,14 @@ class OtpServiceTest {
     @InjectMocks
     private OtpService otpService;
 
+    @BeforeEach
+    void setUp() {
+        // @Value fields are not populated by @InjectMocks; set the same defaults
+        // the container would inject so generateCode()/expiry behave like production.
+        ReflectionTestUtils.setField(otpService, "otpLength", 6);
+        ReflectionTestUtils.setField(otpService, "expiryMinutes", 10);
+    }
+
     @Test
     void sendOtpStoresSaltedPasswordHashForToken() {
         ArgumentCaptor<PasswordResetToken> tokenCaptor = ArgumentCaptor.forClass(PasswordResetToken.class);
@@ -50,7 +60,7 @@ class OtpServiceTest {
         otpService.sendOtp("user@example.com");
 
         verify(passwordResetTokenRepository).save(tokenCaptor.capture());
-        verify(emailService).sendPasswordResetEmail(eq("user@example.com"), codeCaptor.capture());
+        verify(emailService).sendPasswordResetEmail(eq("user@example.com"), codeCaptor.capture(), eq(10));
 
         String code = codeCaptor.getValue();
         String tokenHash = tokenCaptor.getValue().getTokenHash();
