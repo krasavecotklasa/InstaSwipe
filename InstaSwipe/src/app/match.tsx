@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
+  GestureResponderEvent,
   Modal,
   NativeScrollEvent,
   NativeSyntheticEvent,
@@ -26,6 +27,8 @@ import Header from '@/components/header';
 
 const SWIPE_THRESHOLD = 120;
 const SWIPE_OUT_DISTANCE = 700;
+const PROFILE_OPEN_THRESHOLD = 90;
+const PROFILE_CLOSE_THRESHOLD = 80;
 const PROFILE_POSTS_PAGE_SIZE = 10;
 const PROFILE_POSTS_LOAD_DISTANCE = 280;
 
@@ -33,6 +36,7 @@ export default function MatchScreen() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const position = useRef(new Animated.ValueXY()).current;
+  const sheetDragStartYRef = useRef<number | null>(null);
   const {
     currentProfile,
     loading,
@@ -129,8 +133,26 @@ export default function MatchScreen() {
     const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
     const distanceFromBottom = contentSize.height - (contentOffset.y + layoutMeasurement.height);
 
+    if (contentOffset.y < -PROFILE_CLOSE_THRESHOLD) {
+      closeProfileModal();
+      return;
+    }
+
     if (distanceFromBottom <= PROFILE_POSTS_LOAD_DISTANCE) {
       loadMoreProfilePosts();
+    }
+  };
+
+  const handleSheetTouchStart = (event: GestureResponderEvent) => {
+    sheetDragStartYRef.current = event.nativeEvent.pageY;
+  };
+
+  const handleSheetTouchEnd = (event: GestureResponderEvent) => {
+    const startY = sheetDragStartYRef.current;
+    sheetDragStartYRef.current = null;
+
+    if (startY != null && event.nativeEvent.pageY - startY > PROFILE_CLOSE_THRESHOLD) {
+      closeProfileModal();
     }
   };
 
@@ -171,11 +193,17 @@ export default function MatchScreen() {
       onMoveShouldSetPanResponder: (_, gesture) => (
         !acting &&
         Boolean(currentProfile) &&
-        Math.abs(gesture.dx) > 8 &&
-        Math.abs(gesture.dx) > Math.abs(gesture.dy)
+        (
+          (Math.abs(gesture.dx) > 8 && Math.abs(gesture.dx) > Math.abs(gesture.dy)) ||
+          (gesture.dy < -10 && Math.abs(gesture.dy) > Math.abs(gesture.dx))
+        )
       ),
       onPanResponderMove: (_, gesture) => {
-        position.setValue({ x: gesture.dx, y: gesture.dy * 0.2 });
+        if (Math.abs(gesture.dx) > Math.abs(gesture.dy)) {
+          position.setValue({ x: gesture.dx, y: gesture.dy * 0.2 });
+        } else {
+          position.setValue({ x: 0, y: Math.min(0, gesture.dy * 0.18) });
+        }
       },
       onPanResponderRelease: (_, gesture) => {
         if (gesture.dx > SWIPE_THRESHOLD) {
@@ -185,6 +213,12 @@ export default function MatchScreen() {
 
         if (gesture.dx < -SWIPE_THRESHOLD) {
           finishSwipe('pass');
+          return;
+        }
+
+        if (gesture.dy < -PROFILE_OPEN_THRESHOLD && Math.abs(gesture.dy) > Math.abs(gesture.dx)) {
+          openProfileModal();
+          resetCardPosition();
           return;
         }
 
@@ -355,7 +389,12 @@ export default function MatchScreen() {
           >
             {profileModalProfile && (
               <>
-                <View style={[styles.modalHeader, { borderBottomColor: theme.tabActiveBorder }]}>
+                <View
+                  onTouchStart={handleSheetTouchStart}
+                  onTouchEnd={handleSheetTouchEnd}
+                  style={[styles.modalHeader, { borderBottomColor: theme.tabActiveBorder }]}
+                >
+                  <View style={styles.sheetHandle} />
                   <Image
                     source={profileModalProfile.profilePictureUrl ? { uri: profileModalProfile.profilePictureUrl } : undefined}
                     style={styles.modalAvatar}
@@ -622,11 +661,15 @@ const styles = StyleSheet.create({
   },
   modalBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.72)',
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0, 0, 0, 0.35)',
   },
   profileModal: {
-    flex: 1,
-    borderWidth: 0,
+    height: '75%',
+    borderTopLeftRadius: 18,
+    borderTopRightRadius: 18,
+    borderWidth: 1,
+    overflow: 'hidden',
   },
   modalHeader: {
     minHeight: 72,
@@ -636,6 +679,16 @@ const styles = StyleSheet.create({
     gap: Spacing.two,
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.two,
+  },
+  sheetHandle: {
+    position: 'absolute',
+    top: Spacing.one,
+    left: '50%',
+    width: 44,
+    height: 4,
+    marginLeft: -22,
+    borderRadius: 2,
+    backgroundColor: 'rgba(168, 146, 191, 0.55)',
   },
   modalAvatar: {
     width: 44,
