@@ -24,6 +24,11 @@ public class PasswordResetToken {
     @Indexed
     private String userId;
 
+    @Indexed
+    private String email;
+
+    // private String code;
+
     @Indexed(unique = true)
     private String tokenHash;
 
