@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import {
   ActivityIndicator,
   Platform,
@@ -9,11 +10,12 @@ import { Image } from 'expo-image';
 import { SymbolView } from 'expo-symbols';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import DiscoveryProfileModal from '@/components/discovery-profile-modal';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+import { type DiscoveryProfile, useDiscoverySwipe } from '@/hooks/matches';
 import { MAX_VISIBLE_MATCH_INTERESTS } from '@/constants/interests';
-import { useDiscoverySwipe } from '@/hooks/matches';
 import { useTheme } from '@/hooks/use-theme';
 import Header from '@/components/header';
 
@@ -27,6 +29,19 @@ export default function MatchScreen() {
     resultMessage,
     handleDecision,
   } = useDiscoverySwipe();
+  const [profileModalProfile, setProfileModalProfile] = useState<DiscoveryProfile | null>(null);
+
+  const openProfileModal = () => {
+    if (!currentProfile) {
+      return;
+    }
+
+    setProfileModalProfile(currentProfile);
+  };
+
+  const closeProfileModal = () => {
+    setProfileModalProfile(null);
+  };
 
   return (
     <ThemedView style={styles.container}>
@@ -77,6 +92,7 @@ export default function MatchScreen() {
                 </View>
               </View>
 
+              {/* Pass button */}
               <View style={styles.actions}>
                 <Pressable
                   onPress={() => handleDecision('pass')}
@@ -89,6 +105,22 @@ export default function MatchScreen() {
                     size={34}
                   />
                 </Pressable>
+
+                {/* Profile button */}
+
+                <Pressable
+                  onPress={openProfileModal}
+                  disabled={acting}
+                  style={[styles.actionButton, styles.profileButton, acting && styles.disabledButton]}
+                >
+                  <SymbolView
+                    name={{ ios: 'person.crop.circle', android: 'person', web: 'person' } as any}
+                    tintColor="#ffffff"
+                    size={34}
+                  />
+                </Pressable>
+
+                {/* Like button */}
                 <Pressable
                   onPress={() => handleDecision('love')}
                   disabled={acting}
@@ -124,6 +156,12 @@ export default function MatchScreen() {
           )}
         </View>
       </SafeAreaView>
+
+      <DiscoveryProfileModal
+        visible={Boolean(profileModalProfile)}
+        profile={profileModalProfile}
+        onClose={closeProfileModal}
+      />
     </ThemedView>
   );
 }
@@ -200,17 +238,12 @@ const styles = StyleSheet.create({
   profileMeta: {
     color: '#ffffff',
   },
-  bio: {
-    width: '100%',
-    maxWidth: 420,
-    textAlign: 'center',
-  },
   chips: {
     width: '100%',
     maxWidth: 420,
     flexDirection: 'row',
     flexWrap: 'wrap',
-    justifyContent: 'flex-end',
+    justifyContent: 'flex-start',
     gap: Spacing.one,
   },
   chip: {
@@ -223,6 +256,7 @@ const styles = StyleSheet.create({
   actions: {
     flexDirection: 'row',
     justifyContent: 'center',
+    alignItems: 'center',
     gap: Spacing.four,
   },
   actionButton: {
@@ -237,6 +271,9 @@ const styles = StyleSheet.create({
   },
   loveButton: {
     backgroundColor: '#17de60',
+  },
+  profileButton: {
+    backgroundColor: '#d3dc2b',
   },
   disabledButton: {
     opacity: 0.6,

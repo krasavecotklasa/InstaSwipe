@@ -107,8 +107,10 @@ export default function ProfileScreen() {
         }
 
         const profileData: OwnProfileResponse = await profileResponse.json();
+        const profileId = profileData.id ?? profileData.userId;
         setProfile({
           ...profileData,
+          id: profileId,
           profilePictureUrl: normalizeMediaUrl(profileData.profilePictureUrl),
         });
 
@@ -291,7 +293,7 @@ export default function ProfileScreen() {
 
                     <View style={styles.profileMeta}>
                       <ThemedText type="smallBold" style={styles.profileName}>
-                        {profile.displayName} <ThemedText type="small" themeColor="textSecondary" style={styles.emailText}>
+                        {profile.displayName} <ThemedText type="small" themeColor="textSecondary">
                           ({profile.email})
                         </ThemedText>
                       </ThemedText>
@@ -747,6 +749,7 @@ const styles = StyleSheet.create({
   },
   profileName: {
     fontSize: 18,
+    fontWeight: '800',
     lineHeight: 24,
   },
   emailText: {

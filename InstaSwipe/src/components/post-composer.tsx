@@ -16,7 +16,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { SymbolView } from 'expo-symbols';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Spacing } from '@/constants/theme';
+import { Colors, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { createPost } from '@/hooks/posts';
 import { getImageValidationError } from '@/constants/media';
@@ -158,14 +158,20 @@ export default function PostComposer({ visible, onClose, onPosted }: PostCompose
               </ThemedText>
 
               <TouchableOpacity
-                style={[styles.button, { backgroundColor: theme.backgroundElement }]}
+                style={[styles.buttonStyle, { borderColor: '#6249cabe' }]}
                 onPress={handleSubmit}
                 disabled={loading}
               >
+
+                <SymbolView 
+                  name={{ ios: 'paperplane.fill', android: 'send', web: 'send' } as any}
+                  tintColor="#8769ffbe"
+                  size={20} 
+                />
                 {loading ? (
                   <ActivityIndicator color="#fff" />
                 ) : (
-                  <ThemedText style={styles.buttonText}>Share post</ThemedText>
+                  <ThemedText type='smallBold'>Share post</ThemedText>
                 )}
               </TouchableOpacity>
             </View>
@@ -251,16 +257,23 @@ const styles = StyleSheet.create({
     textAlign: 'right',
     marginTop: -Spacing.two,
   },
-  button: {
+  buttonStyle: {
+    borderColor: '#6249cabe',
+    minHeight: 44,
+    maxHeight: 50,
+    minWidth: 200,
+    borderRadius: 8,
+    paddingHorizontal: Spacing.three,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: Spacing.two,
+    borderWidth: 1,
+  },button: {
     height: 50,
     borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
     marginTop: Spacing.four,
-  },
-  buttonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
   },
 });

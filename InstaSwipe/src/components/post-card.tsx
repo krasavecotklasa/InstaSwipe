@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, StyleSheet, Pressable, Text, Platform, ActivityIndicator } from 'react-native';
-import { Image } from 'expo-image';
+import { Image, type ImageLoadEventData } from 'expo-image';
 import { SymbolView } from 'expo-symbols';
 import { useTheme } from '@/hooks/use-theme';
 import { Spacing } from '@/constants/theme';
@@ -34,12 +34,26 @@ export interface Post {
 
 interface PostCardProps {
   post: Post;
+  onAuthorPress?: (userId: string) => void;
 }
 
-export function PostCard({ post }: PostCardProps) {
+const DEFAULT_POST_IMAGE_ASPECT_RATIO = 3 / 2;
+const MIN_POST_IMAGE_ASPECT_RATIO = 4 / 5;
+const MAX_POST_IMAGE_ASPECT_RATIO = 16 / 9;
+
+const clampPostImageAspectRatio = (ratio: number) => {
+  return Math.min(MAX_POST_IMAGE_ASPECT_RATIO, Math.max(MIN_POST_IMAGE_ASPECT_RATIO, ratio));
+};
+
+export function PostCard({ post, onAuthorPress }: PostCardProps) {
   const theme = useTheme();
   const [liked, setLiked] = useState(post.likedByMe);
   const [likeCount, setLikeCount] = useState(post.likes);
+  const [postImageAspectRatio, setPostImageAspectRatio] = useState(DEFAULT_POST_IMAGE_ASPECT_RATIO);
+
+  useEffect(() => {
+    setPostImageAspectRatio(DEFAULT_POST_IMAGE_ASPECT_RATIO);
+  }, [post.media?.url]);
 
   const handleLike = () => {
     if (liked) {
@@ -53,9 +67,24 @@ export function PostCard({ post }: PostCardProps) {
     }
   };
 
+  const handlePostImageLoad = (event: ImageLoadEventData) => {
+    const { width, height } = event.source;
+
+    if (width > 0 && height > 0) {
+      setPostImageAspectRatio(clampPostImageAspectRatio(width / height));
+    }
+  };
+
   return (
     <View style={[styles.card, { borderColor: theme.tabActiveBorder }]}>
-      <View style={styles.header}>
+      <Pressable
+        onPress={onAuthorPress ? () => onAuthorPress(post.userId) : undefined}
+        disabled={!onAuthorPress}
+        style={({ pressed }) => [
+          styles.header,
+          pressed && styles.headerPressed,
+        ]}
+      >
         <Image
           source={post.profilePictureUrl ? { uri: post.profilePictureUrl } : undefined}
           style={styles.avatar}
@@ -68,7 +97,7 @@ export function PostCard({ post }: PostCardProps) {
             {post.createdAt}
           </Text>
         </View>
-      </View>
+      </Pressable>
 
       <View style={styles.body}>
         <Text style={styles.description}>{post.caption}</Text>
@@ -86,8 +115,9 @@ export function PostCard({ post }: PostCardProps) {
             <View style={styles.mediaWrapper}>
               <Image
                 source={{ uri: post.media.url }}
-                style={styles.postImage}
+                style={[styles.postImage, { aspectRatio: postImageAspectRatio }]}
                 contentFit="cover"
+                onLoad={handlePostImageLoad}
                 // LCP image: skip the fade (cuts element-render delay) and hint the
                 // browser to fetch it ahead of the queue (expo-image maps this to
                 // <img fetchPriority> on web).
@@ -138,15 +168,19 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: '#000000',
     borderWidth: 1,
-    padding: Platform.OS === 'web' ? Spacing.two : Spacing.three,
+    padding: Spacing.three,
     marginBottom: Spacing.three,
-    width: Platform.OS === 'web' ? '100%' : '100%',
+    marginHorizontal: 'auto',
+    width: Platform.OS === 'web' ? '100%' : '95%',
     maxWidth: Platform.OS === 'web' ? 500 : undefined,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: Spacing.two,
+  },
+  headerPressed: {
+    opacity: 0.78,
   },
   avatar: {
     width: 44,
@@ -187,8 +221,9 @@ const styles = StyleSheet.create({
   },
   postImage: {
     width: '100%',
-    aspectRatio: 1,
-    borderRadius: 12,
+    height: undefined,
+    aspectRatio: 3 / 2,
+    borderRadius: 8,
     backgroundColor: '#1c1223',
   },
   mediaOverlay: {
@@ -197,7 +232,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    borderRadius: 12,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
     gap: Spacing.one,
@@ -205,7 +240,7 @@ const styles = StyleSheet.create({
   },
   mediaOverlayText: {
     color: '#ffffff',
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '600',
   },
   mediaFailed: {

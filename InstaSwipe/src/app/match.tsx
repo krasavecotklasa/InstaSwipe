@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
@@ -11,16 +11,18 @@ import {
 import { Image } from 'expo-image';
 import { SymbolView } from 'expo-symbols';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import DiscoveryProfileModal from '@/components/discovery-profile-modal';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, Spacing } from '@/constants/theme';
+import { type DiscoveryProfile, useDiscoverySwipe } from '@/hooks/matches';
 import { MAX_VISIBLE_MATCH_INTERESTS } from '@/constants/interests';
-import { useDiscoverySwipe } from '@/hooks/matches';
 import { useTheme } from '@/hooks/use-theme';
 import Header from '@/components/header';
 
 const SWIPE_THRESHOLD = 120;
 const SWIPE_OUT_DISTANCE = 700;
+const PROFILE_OPEN_THRESHOLD = 90;
 
 export default function MatchScreen() {
   const theme = useTheme();
@@ -37,10 +39,23 @@ export default function MatchScreen() {
     handleDecision,
   } = useDiscoverySwipe();
   const bottomClearance = BottomTabInset + insets.bottom - Spacing.three;
+  const [profileModalProfile, setProfileModalProfile] = useState<DiscoveryProfile | null>(null);
 
   useEffect(() => {
     position.setValue({ x: 0, y: 0 });
   }, [currentProfile?.id, position]);
+
+  const openProfileModal = () => {
+    if (!currentProfile) {
+      return;
+    }
+
+    setProfileModalProfile(currentProfile);
+  };
+
+  const closeProfileModal = () => {
+    setProfileModalProfile(null);
+  };
 
   const resetCardPosition = () => {
     Animated.spring(position, {
@@ -79,11 +94,17 @@ export default function MatchScreen() {
       onMoveShouldSetPanResponder: (_, gesture) => (
         !acting &&
         Boolean(currentProfile) &&
-        Math.abs(gesture.dx) > 8 &&
-        Math.abs(gesture.dx) > Math.abs(gesture.dy)
+        (
+          (Math.abs(gesture.dx) > 8 && Math.abs(gesture.dx) > Math.abs(gesture.dy)) ||
+          (gesture.dy < -10 && Math.abs(gesture.dy) > Math.abs(gesture.dx))
+        )
       ),
       onPanResponderMove: (_, gesture) => {
-        position.setValue({ x: gesture.dx, y: gesture.dy * 0.2 });
+        if (Math.abs(gesture.dx) > Math.abs(gesture.dy)) {
+          position.setValue({ x: gesture.dx, y: gesture.dy * 0.2 });
+        } else {
+          position.setValue({ x: 0, y: Math.min(0, gesture.dy * 0.18) });
+        }
       },
       onPanResponderRelease: (_, gesture) => {
         if (gesture.dx > SWIPE_THRESHOLD) {
@@ -93,6 +114,12 @@ export default function MatchScreen() {
 
         if (gesture.dx < -SWIPE_THRESHOLD) {
           finishSwipe('pass');
+          return;
+        }
+
+        if (gesture.dy < -PROFILE_OPEN_THRESHOLD && Math.abs(gesture.dy) > Math.abs(gesture.dx)) {
+          openProfileModal();
+          resetCardPosition();
           return;
         }
 
@@ -205,6 +232,17 @@ export default function MatchScreen() {
                   />
                 </Pressable>
                 <Pressable
+                  onPress={openProfileModal}
+                  disabled={acting}
+                  style={[styles.actionButton, styles.profileButton, acting && styles.disabledButton]}
+                >
+                  <SymbolView
+                    name={{ ios: 'person.crop.circle', android: 'person', web: 'person' } as any}
+                    tintColor="#ffffff"
+                    size={24}
+                  />
+                </Pressable>
+                <Pressable
                   onPress={() => handleDecision('love')}
                   disabled={acting}
                   style={[styles.actionButton, styles.loveButton, acting && styles.disabledButton]}
@@ -239,6 +277,12 @@ export default function MatchScreen() {
           )}
         </View>
       </SafeAreaView>
+
+      <DiscoveryProfileModal
+        visible={Boolean(profileModalProfile)}
+        profile={profileModalProfile}
+        onClose={closeProfileModal}
+      />
     </ThemedView>
   );
 }
@@ -355,6 +399,9 @@ const styles = StyleSheet.create({
   },
   loveButton: {
     backgroundColor: '#17de60',
+  },
+  profileButton: {
+    backgroundColor: '#d3dc2b',
   },
   disabledButton: {
     opacity: 0.6,
