@@ -333,7 +333,7 @@ export default function ProfileScreen() {
 
               {showSettings ? (
                 <>
-                  <View style={[styles.panel, { borderColor: theme.tabActiveBorder }]}>
+                  <View style={[styles.filters, { borderColor: theme.tabActiveBorder }]}>
                     <View style={styles.panelHeader}>
                       <ThemedText style={styles.panelHeaderText} type="smallBold">
                         Profile settings
@@ -559,6 +559,12 @@ const styles = StyleSheet.create({
     color: '#ef4444',
   },
   panel: {
+    borderWidth: 1,
+    padding: Spacing.three,
+    gap: Spacing.three,
+    backgroundColor: 'rgba(0, 0, 0, 0.08)',
+  },
+  filters: {
     borderWidth: 1,
     padding: Spacing.three,
     gap: Spacing.three,

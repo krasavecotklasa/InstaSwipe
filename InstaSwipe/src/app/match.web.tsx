@@ -286,16 +286,12 @@ export default function MatchScreen() {
                 >
                   <View style={styles.bioInterestsRow}>
                     <View style={[styles.bioColumn, { borderColor: theme.tabActiveBorder }]}>
-                      <ThemedText type="smallBold">Bio:</ThemedText>
+                      <ThemedText type="smallBold">About:</ThemedText>
                       {!!profileModalProfile.bio && (
                         <ThemedText type="small" style={styles.bio}>
                           {profileModalProfile.bio}
                         </ThemedText>
                       )}
-                    </View>
-
-                    <View style={[styles.interestsColumn, { borderColor: theme.tabActiveBorder }]}>
-                      <ThemedText type="smallBold">My interests:</ThemedText>
                       <View style={styles.chips}>
                         {(profileModalProfile.interests ?? []).map((interest) => (
                           <View key={interest} style={[styles.chip, { borderColor: theme.tabActiveBorder }]}>
@@ -356,6 +352,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     flexDirection: 'row',
+    overflow: 'scroll'
   },
   safeArea: {
     flex: 1,
@@ -390,7 +387,7 @@ const styles = StyleSheet.create({
   },
   bioColumn: {
     flex: 1,
-    minWidth: 220,
+    minWidth: 500,
     gap: Spacing.one,
     padding: Spacing.three,
     borderWidth: 1,
@@ -399,7 +396,7 @@ const styles = StyleSheet.create({
   },
   interestsColumn: {
     flex: 1,
-    minWidth: 220,
+    minWidth: 500,
     gap: Spacing.one,
     padding: Spacing.three,
     borderWidth: 1,
@@ -444,14 +441,14 @@ const styles = StyleSheet.create({
   bio: {
     width: '100%',
     maxWidth: 420,
-    textAlign: 'center',
+    textAlign: 'left',
   },
   chips: {
     width: '100%',
     maxWidth: 420,
     flexDirection: 'row',
     flexWrap: 'wrap',
-    justifyContent: 'flex-end',
+    justifyContent: 'flex-start',
     gap: Spacing.one,
   },
   chip: {
@@ -568,8 +565,9 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   bioInterestsRow: {
-    flexDirection: 'row',
-    gap: Spacing.three,
+    paddingVertical: Spacing.three,
+    flexDirection: 'column',
+    gap: Spacing.two,
     alignItems: 'stretch',
     flexWrap: 'wrap',
   },

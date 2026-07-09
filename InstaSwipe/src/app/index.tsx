@@ -132,7 +132,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 8,
     backgroundColor: '#000000',
-    width: '100%',
+    width: Platform.OS === 'web' ? '80%' : '95%',
     maxWidth: 'auto',
   },
   composerPressed: {

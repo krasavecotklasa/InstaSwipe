@@ -223,12 +223,7 @@ export const fetchUserPostsPage = async (userId: string, page = 0, size = 20): P
     return normalizeUserPostsPage(data, page, size);
   } catch (error) {
     console.warn('[Posts] Unable to fetch user posts', error);
-    return {
-      posts: FALLBACK_POSTS,
-      page,
-      size,
-      last: true,
-    };
+    throw error;
   }
 };
 
