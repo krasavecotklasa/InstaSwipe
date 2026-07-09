@@ -170,15 +170,31 @@ export default function DiscoveryProfileModal({
             },
           ]}
         >
-          {!isWeb && (
-            <View
-              onTouchStart={handleSheetTouchStart}
-              onTouchEnd={handleSheetTouchEnd}
-              style={[styles.sheetGripArea, { borderBottomColor: theme.tabActiveBorder }]}
-            >
+          <View
+            onTouchStart={handleSheetTouchStart}
+            onTouchEnd={handleSheetTouchEnd}
+            style={[styles.surfaceHeader, { borderBottomColor: theme.tabActiveBorder }]}
+          >
+            {isWeb ? (
+              <ThemedText type="smallBold" style={styles.surfaceHeaderTitle}>
+                Profile
+              </ThemedText>
+            ) : (
               <View style={styles.sheetHandle} />
-            </View>
-          )}
+            )}
+            <Pressable
+              onPress={onClose}
+              accessibilityRole="button"
+              accessibilityLabel="Close profile"
+              style={[styles.headerCloseButton, { borderColor: theme.tabActiveBorder }]}
+            >
+              <SymbolView
+                name={{ ios: 'xmark', android: 'close', web: 'close' } as any}
+                tintColor="#8769ffbe"
+                size={20}
+              />
+            </Pressable>
+          </View>
 
           {profile && (
             <ScrollView
@@ -193,18 +209,6 @@ export default function DiscoveryProfileModal({
                   <ThemedText style={styles.panelHeaderText} type="smallBold">
                     Profile
                   </ThemedText>
-                  <Pressable
-                    onPress={onClose}
-                    accessibilityRole="button"
-                    accessibilityLabel="Close profile"
-                    style={[styles.iconButton, { borderColor: theme.tabActiveBorder }]}
-                  >
-                    <SymbolView
-                      name={{ ios: 'xmark', android: 'close', web: 'close' } as any}
-                      tintColor="#8769ffbe"
-                      size={20}
-                    />
-                  </Pressable>
                 </View>
 
                 <View style={styles.profileBlock}>
@@ -337,9 +341,25 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 18,
     borderTopRightRadius: 18,
   },
-  sheetGripArea: {
-    minHeight: 24,
+  surfaceHeader: {
+    minHeight: 56,
     borderBottomWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.two,
+  },
+  surfaceHeaderTitle: {
+    marginRight: 'auto',
+  },
+  headerCloseButton: {
+    position: 'absolute',
+    right: Spacing.three,
+    width: 40,
+    height: 40,
+    borderWidth: 1,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -372,15 +392,6 @@ const styles = StyleSheet.create({
     bottom: 1,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  iconButton: {
-    width: 44,
-    height: 44,
-    borderWidth: 1,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 0,
   },
   profileBlock: {
     gap: Spacing.three,

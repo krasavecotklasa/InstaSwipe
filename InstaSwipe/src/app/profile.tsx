@@ -31,7 +31,6 @@ import { sendTestNotificationAsync } from '@/hooks/notifications';
 import { useTheme } from '@/hooks/use-theme';
 import Header from '@/components/header';
 import { fetchUserPosts } from '@/hooks/posts';
-import DiscoveryProfileModal from '@/components/discovery-profile-modal';
 
 const DEFAULT_PREFS: DiscoveryPreferences = {
   minAge: '',
@@ -104,8 +103,10 @@ export default function ProfileScreen() {
         }
 
         const profileData: OwnProfileResponse = await profileResponse.json();
+        const profileId = profileData.id ?? profileData.userId;
         setProfile({
           ...profileData,
+          id: profileId,
           profilePictureUrl: normalizeMediaUrl(profileData.profilePictureUrl),
         });
 
@@ -155,7 +156,6 @@ export default function ProfileScreen() {
 
       try {
         const nextPosts = await fetchUserPosts(userId);
-        console.log("fetching...");
         if (isActive) {
           setPosts(nextPosts);
         }
