@@ -126,9 +126,6 @@ const createStompClient = (token: string): Client =>
     reconnectDelay: 4000,
     heartbeatIncoming: 10000,
     heartbeatOutgoing: 10000,
-    // TEMP diagnostic: log every STOMP frame so we can see the exact SUBSCRIBE
-    // destination and any ERROR frame from the broker.
-    debug: (msg) => console.log('[STOMP]', msg),
   });
 
 export interface UseChatRoom {
@@ -204,6 +201,13 @@ export function useChatRoom(matchId: string, otherUserId: string): UseChatRoom {
           return;
         }
         setConnected(true);
+        // A successful (re)connect clears any transient connection error left over
+        // from a dropped socket, so the red banner doesn't linger after we recover.
+        setError(null);
+        // The backend delivers via convertAndSendToUser(userId, "/queue/{roomId}").
+        // RabbitMQ's STOMP relay requires a single-segment /queue/ name (no extra "/"),
+        // so the room id is used directly — a "/chat/" sub-path resolves to an invalid
+        // broker destination and the SUBSCRIBE/SEND are rejected.
         subscription = client.subscribe(`/user/queue/${matchId}`, (frame: IMessage) => {
           try {
             upsert(JSON.parse(frame.body) as ChatMessage);
@@ -213,11 +217,13 @@ export function useChatRoom(matchId: string, otherUserId: string): UseChatRoom {
         });
       };
       client.onStompError = (frame) => {
-        // TEMP diagnostic: surface the full ERROR frame (headers + body) so we can
-        // see which destination the broker rejected.
-        console.log('[STOMP ERROR] headers=', JSON.stringify(frame.headers), 'body=', frame.body);
+        // Broker/relay hiccups (e.g. "Connection to broker closed" when a backgrounded
+        // tab misses heartbeats) are transient — the client auto-reconnects on
+        // reconnectDelay. Reflect it only via the header's connection status rather than
+        // a persistent red error banner.
+        console.warn('[chat] STOMP error:', frame.headers['message'] ?? frame.body);
         if (active) {
-          setError(frame.headers['message'] || 'Chat connection error');
+          setConnected(false);
         }
       };
       client.onWebSocketClose = () => {
