@@ -22,6 +22,7 @@ import { fetchUserPostsPage } from '@/hooks/posts';
 import { type DiscoveryProfile, useDiscoverySwipe } from '@/hooks/matches';
 import { useTheme } from '@/hooks/use-theme';
 import Header from '@/components/header';
+import profile from './profile';
 
 const PROFILE_POSTS_PAGE_SIZE = 10;
 const PROFILE_POSTS_LOAD_DISTANCE = 320;
@@ -283,6 +284,29 @@ export default function MatchScreen() {
                   onScroll={handleProfilePostsScroll}
                   scrollEventThrottle={200}
                 >
+                  <View style={styles.bioInterestsRow}>
+                    <View style={[styles.bioColumn, { borderColor: theme.tabActiveBorder }]}>
+                      <ThemedText type="smallBold">Bio:</ThemedText>
+                      {!!profileModalProfile.bio && (
+                        <ThemedText type="small" style={styles.bio}>
+                          {profileModalProfile.bio}
+                        </ThemedText>
+                      )}
+                    </View>
+
+                    <View style={[styles.interestsColumn, { borderColor: theme.tabActiveBorder }]}>
+                      <ThemedText type="smallBold">My interests:</ThemedText>
+                      <View style={styles.chips}>
+                        {(profileModalProfile.interests ?? []).map((interest) => (
+                          <View key={interest} style={[styles.chip, { borderColor: theme.tabActiveBorder }]}>
+                            <ThemedText type="small" style={styles.chipText}>
+                              {interest}
+                            </ThemedText>
+                          </View>
+                        ))}
+                      </View>
+                    </View>
+                  </View>
                   {loadingProfilePosts ? (
                     <View style={styles.modalState}>
                       <ActivityIndicator color={theme.text} />
@@ -364,6 +388,24 @@ const styles = StyleSheet.create({
   centerText: {
     textAlign: 'center',
   },
+  bioColumn: {
+    flex: 1,
+    minWidth: 220,
+    gap: Spacing.one,
+    padding: Spacing.three,
+    borderWidth: 1,
+    borderRadius: 8,
+    backgroundColor: 'rgba(0, 0, 0, 0.06)',
+  },
+  interestsColumn: {
+    flex: 1,
+    minWidth: 220,
+    gap: Spacing.one,
+    padding: Spacing.three,
+    borderWidth: 1,
+    borderRadius: 8,
+    backgroundColor: 'rgba(0, 0, 0, 0.06)',
+  },
   stage: {
     flex: 1,
     alignItems: 'center',
@@ -418,6 +460,10 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingHorizontal: Spacing.two,
     paddingVertical: Spacing.one,
+  },
+  chipText: {
+    fontSize: 12,
+    lineHeight: 18,
   },
   actions: {
     flexDirection: 'row',
@@ -520,5 +566,11 @@ const styles = StyleSheet.create({
   endText: {
     paddingVertical: Spacing.two,
     textAlign: 'center',
+  },
+  bioInterestsRow: {
+    flexDirection: 'row',
+    gap: Spacing.three,
+    alignItems: 'stretch',
+    flexWrap: 'wrap',
   },
 });

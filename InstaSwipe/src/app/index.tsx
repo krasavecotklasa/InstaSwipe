@@ -133,7 +133,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     backgroundColor: '#000000',
     width: '100%',
-    maxWidth: Platform.OS === 'web' ? '75%' : 'auto',
+    maxWidth: Platform.OS === 'web' ? '75%' : '100%',
   },
   composerPressed: {
     opacity: 0.85,
