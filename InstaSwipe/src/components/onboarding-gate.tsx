@@ -15,8 +15,13 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import * as ImagePicker from 'expo-image-picker';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { DateField } from '@/components/form/date-field';
+import { SelectField } from '@/components/form/select-field';
+import { InterestsSelect } from '@/components/form/interests-select';
 import { API, OwnProfileResponse } from '@/hooks/auth';
 import { Spacing } from '@/constants/theme';
+import { COUNTRIES } from '@/constants/countries';
+import { MIN_INTERESTS } from '@/constants/interests';
 import { getImageValidationError } from '@/constants/media';
 import { normalizeMediaUrl } from '@/hooks/media';
 import { useTheme } from '@/hooks/use-theme';
@@ -41,8 +46,22 @@ const GendersDisplay = ['Male', 'Female', 'Non-Binary', 'Other'];
 
 const DISPLAY_NAME_MAX_LENGTH = 50;
 const BIO_MAX_LENGTH = 150;
-const COUNTRY_MAX_LENGTH = 60;
-const INTERESTS_MAX_LENGTH = 200;
+const MIN_AGE = 18;
+
+// Whole years between an ISO date and today; NaN for an unparseable date.
+const getAge = (isoDate: string) => {
+  const birth = new Date(isoDate);
+  if (Number.isNaN(birth.getTime())) {
+    return NaN;
+  }
+  const today = new Date();
+  let age = today.getFullYear() - birth.getFullYear();
+  const monthDelta = today.getMonth() - birth.getMonth();
+  if (monthDelta < 0 || (monthDelta === 0 && today.getDate() < birth.getDate())) {
+    age -= 1;
+  }
+  return age;
+};
 
 export default function OnboardingGate({ onOnboardSuccess, mode = 'create', initialProfile }: OnboardingGateProps) {
   const [displayName, setDisplayName] = useState(initialProfile?.displayName ?? '');
@@ -50,7 +69,7 @@ export default function OnboardingGate({ onOnboardSuccess, mode = 'create', init
   const [birthDate, setBirthDate] = useState(initialProfile?.birthDate ?? '');
   const [country, setCountry] = useState(initialProfile?.country ?? '');
   const [gender, setGender] = useState(initialProfile?.gender ?? GENDERS[0]);
-  const [interests, setInterests] = useState((initialProfile?.interests ?? []).join(', '));
+  const [interests, setInterests] = useState<string[]>(initialProfile?.interests ?? []);
   // FIX: keep the full picker asset (uri + mimeType), not just the uri string.
   // We need the real mime type to build a correct native FormData part below.
   const [profileImage, setProfileImage] = useState<ImagePicker.ImagePickerAsset | null>(null);
@@ -65,7 +84,7 @@ export default function OnboardingGate({ onOnboardSuccess, mode = 'create', init
     setBirthDate(initialProfile?.birthDate ?? '');
     setCountry(initialProfile?.country ?? '');
     setGender(initialProfile?.gender ?? GENDERS[0]);
-    setInterests((initialProfile?.interests ?? []).join(', '));
+    setInterests(initialProfile?.interests ?? []);
     setProfileImage(null);
   }, [initialProfile]);
 
@@ -96,10 +115,22 @@ export default function OnboardingGate({ onOnboardSuccess, mode = 'create', init
   };
 
   const handleSubmit = async () => {
-    if (!displayName || !birthDate || !country || !bio || !interests) {
-      errorHandle('Please fill in required fields (User name, bio, birth date, country, interests).');
+    if (!displayName || !birthDate || !country || !bio) {
+      errorHandle('Please fill in your name, bio, birth date and country.');
       return;
     }
+    if (interests.length < MIN_INTERESTS) {
+      errorHandle(`Please pick at least ${MIN_INTERESTS} interests.`);
+      return;
+    }
+    if (getAge(birthDate) < MIN_AGE) {
+      errorHandle(`You must be at least ${MIN_AGE} years old.`);
+      return;
+    }
+
+    // The backend binds interests (List<String>) from a single comma-delimited
+    // multipart field, so send them joined without spaces.
+    const interestsField = interests.join(',');
 
     setLoading(true);
     try {
@@ -126,7 +157,7 @@ export default function OnboardingGate({ onOnboardSuccess, mode = 'create', init
             birthDate,
             country,
             gender,
-            interests,
+            interests: interestsField,
           },
         });
 
@@ -148,7 +179,7 @@ export default function OnboardingGate({ onOnboardSuccess, mode = 'create', init
         formData.append('birthDate', birthDate);
         formData.append('country', country);
         formData.append('gender', gender);
-        formData.append('interests', interests);
+        formData.append('interests', interestsField);
 
         if (profileImage) {
           const filename = profileImage.uri.split('/').pop() || 'profile.jpg';
@@ -241,21 +272,17 @@ export default function OnboardingGate({ onOnboardSuccess, mode = 'create', init
                 {bio.length}/{BIO_MAX_LENGTH}
               </ThemedText>
 
-              <TextInput
-                style={[styles.input, { color: theme.text, borderColor: theme.tabActiveBorder }]}
-                placeholder="Birth Date (YYYY-MM-DD)"
-                placeholderTextColor={theme.iconMuted}
-                value={birthDate}
-                onChangeText={setBirthDate}
-              />
+              <ThemedText style={styles.label}>Birth date</ThemedText>
+              <DateField value={birthDate} onChange={setBirthDate} minAge={MIN_AGE} />
 
-              <TextInput
-                style={[styles.input, { color: theme.text, borderColor: theme.tabActiveBorder }]}
-                placeholder="Country"
-                placeholderTextColor={theme.iconMuted}
-                value={country}
-                onChangeText={setCountry}
-                maxLength={COUNTRY_MAX_LENGTH}
+              <ThemedText style={styles.label}>Country</ThemedText>
+              <SelectField
+                value={country || null}
+                options={COUNTRIES}
+                onChange={setCountry}
+                placeholder="Select your country"
+                title="Country"
+                searchable
               />
 
               <ThemedText style={styles.label}>Gender</ThemedText>
@@ -277,17 +304,11 @@ export default function OnboardingGate({ onOnboardSuccess, mode = 'create', init
                 ))}
               </View>
 
-              <TextInput
-                style={[styles.input, { color: theme.text, borderColor: theme.tabActiveBorder }]}
-                placeholder="3 interests (e.g. Reading, Exercising, Cooking)"
-                placeholderTextColor={theme.iconMuted}
-                value={interests}
-                onChangeText={setInterests}
-                maxLength={INTERESTS_MAX_LENGTH}
-              />
+              <ThemedText style={styles.label}>Interests</ThemedText>
+              <InterestsSelect value={interests} onChange={setInterests} />
 
               <TouchableOpacity
-                style={[styles.buttonStyle]}
+                style={[styles.buttonStyle, styles.submitButton]}
                 onPress={handleSubmit}
                 disabled={loading}
               >
@@ -411,6 +432,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: Spacing.two,
     borderWidth: 1,
+  },
+  submitButton: {
+    marginTop: Spacing.three,
+    alignSelf: 'center',
   },
   buttonText: {
     color: '#fff',

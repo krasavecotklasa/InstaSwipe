@@ -135,6 +135,7 @@ public class ProfileService {
         }
 
         return new OwnProfileResponse(
+                user.getId(),
                 user.getEmail(),
                 profile.getName(),
                 profile.getBio(),

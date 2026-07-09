@@ -14,6 +14,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, Spacing } from '@/constants/theme';
+import { MAX_VISIBLE_MATCH_INTERESTS } from '@/constants/interests';
 import { useDiscoverySwipe } from '@/hooks/matches';
 import { useTheme } from '@/hooks/use-theme';
 import Header from '@/components/header';
@@ -173,13 +174,20 @@ export default function MatchScreen() {
                     {currentProfile.country}
                   </ThemedText>
                   <View style={styles.chips}>
-                    {currentProfile.interests?.map((interest) => (
+                    {currentProfile.interests?.slice(0, MAX_VISIBLE_MATCH_INTERESTS).map((interest) => (
                       <View key={`${currentProfile.id}-${interest}`} style={[styles.chip, { borderColor: theme.tabActiveBorder }]}>
                         <ThemedText type="small">
                           {interest}
                         </ThemedText>
                       </View>
                     ))}
+                    {(currentProfile.interests?.length ?? 0) > MAX_VISIBLE_MATCH_INTERESTS && (
+                      <View style={[styles.chip, { borderColor: theme.tabActiveBorder }]}>
+                        <ThemedText type="small">
+                          +{(currentProfile.interests?.length ?? 0) - MAX_VISIBLE_MATCH_INTERESTS}
+                        </ThemedText>
+                      </View>
+                    )}
                   </View>
                 </View>
               </Animated.View>
