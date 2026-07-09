@@ -158,9 +158,12 @@ export default function DiscoveryProfileModal({
       animationType={isWeb ? 'fade' : 'slide'}
       onRequestClose={onClose}
     >
-      <View style={[styles.backdrop, isWeb ? styles.webBackdrop : styles.mobileBackdrop]}>
-        <SafeAreaView
-          edges={isWeb ? ['left', 'right'] : ['left', 'right', 'bottom']}
+      <Pressable
+        style={[styles.backdrop, isWeb ? styles.webBackdrop : styles.mobileBackdrop]}
+        onPress={onClose}
+      >
+        <Pressable
+          onPress={(event) => event.stopPropagation()}
           style={[
             styles.surface,
             isWeb ? styles.webSurface : styles.mobileSurface,
@@ -170,33 +173,37 @@ export default function DiscoveryProfileModal({
             },
           ]}
         >
-          <View
-            onTouchStart={handleSheetTouchStart}
-            onTouchEnd={handleSheetTouchEnd}
-            style={[styles.surfaceHeader, { borderBottomColor: theme.tabActiveBorder }]}
+          <SafeAreaView
+            edges={isWeb ? ['left', 'right'] : ['left', 'right', 'bottom']}
+            style={styles.surfaceContent}
           >
-            <Pressable
-              onPress={onClose}
-              accessibilityRole="button"
-              accessibilityLabel="Close profile"
-              style={[styles.headerCloseButton, { borderColor: theme.tabActiveBorder }]}
+            <View
+              onTouchStart={handleSheetTouchStart}
+              onTouchEnd={handleSheetTouchEnd}
+              style={[styles.surfaceHeader, { borderBottomColor: theme.tabActiveBorder }]}
             >
-              <SymbolView
-                name={{ ios: 'xmark', android: 'close', web: 'close' } as any}
-                tintColor="#8769ffbe"
-                size={20}
-              />
-            </Pressable>
-          </View>
+              <Pressable
+                onPress={onClose}
+                accessibilityRole="button"
+                accessibilityLabel="Close profile"
+                style={[styles.headerCloseButton, { borderColor: theme.tabActiveBorder }]}
+              >
+                <SymbolView
+                  name={{ ios: 'xmark', android: 'close', web: 'close' } as any}
+                  tintColor="#8769ffbe"
+                  size={20}
+                />
+              </Pressable>
+            </View>
 
-          {profile && (
-            <ScrollView
-              style={styles.scroll}
-              contentContainerStyle={styles.scrollContent}
-              showsVerticalScrollIndicator
-              onScroll={handleScroll}
-              scrollEventThrottle={200}
-            >
+            {profile && (
+              <ScrollView
+                style={styles.scroll}
+                contentContainerStyle={styles.scrollContent}
+                showsVerticalScrollIndicator
+                onScroll={handleScroll}
+                scrollEventThrottle={200}
+              >
               <View style={[styles.panel, { borderColor: theme.tabActiveBorder }]}>
                 <View style={styles.panelHeader}>
                   <ThemedText style={styles.panelHeaderText} type="smallBold">
@@ -297,10 +304,11 @@ export default function DiscoveryProfileModal({
                   </ThemedText>
                 )}
               </View>
-            </ScrollView>
-          )}
-        </SafeAreaView>
-      </View>
+              </ScrollView>
+            )}
+          </SafeAreaView>
+        </Pressable>
+      </Pressable>
     </Modal>
   );
 }
@@ -322,6 +330,9 @@ const styles = StyleSheet.create({
   surface: {
     borderWidth: 1,
     overflow: 'hidden',
+  },
+  surfaceContent: {
+    flex: 1,
   },
   webSurface: {
     width: '100%',
