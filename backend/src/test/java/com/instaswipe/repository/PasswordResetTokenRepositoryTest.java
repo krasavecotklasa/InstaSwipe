@@ -38,6 +38,23 @@ class PasswordResetTokenRepositoryTest extends AbstractMongoRepositoryTest {
     }
 
     @Test
+    void findsLatestActiveTokenByEmail() {
+        passwordResetTokenRepository.save(PasswordResetToken.builder()
+                .email("otp@example.com")
+                .tokenHash("reset-xyz")
+                .expiresAt(Instant.now().plus(10, ChronoUnit.MINUTES))
+                .used(false)
+                .build());
+
+        PasswordResetToken found = passwordResetTokenRepository
+                .findTopByEmailAndUsedFalseOrderByExpiresAtDesc("otp@example.com")
+                .orElseThrow();
+
+        assertThat(found.getEmail()).isEqualTo("otp@example.com");
+        assertThat(found.getTokenHash()).isEqualTo("reset-xyz");
+    }
+
+    @Test
     void createsTtlIndexOnExpiresAt() {
         List<IndexInfo> indexes = mongoTemplate.indexOps(PasswordResetToken.class).getIndexInfo();
 
