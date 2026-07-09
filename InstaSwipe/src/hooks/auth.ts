@@ -69,6 +69,55 @@ const getRefreshToken = async () => {
   return await SecureStore.getItemAsync('refresh_token');
 };
 
+const BASE64_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+
+// Standard base64 decode with a pure-JS fallback: `atob` is not guaranteed to be
+// a global in every React Native / Hermes build, and a JWT payload is ASCII JSON,
+// so we don't need UTF-8 handling here.
+const decodeBase64 = (input: string): string => {
+  if (typeof atob === 'function') {
+    return atob(input);
+  }
+  const str = input.replace(/=+$/, '');
+  let output = '';
+  let bc = 0;
+  let bs = 0;
+  for (let i = 0; i < str.length; i++) {
+    const idx = BASE64_CHARS.indexOf(str.charAt(i));
+    if (idx === -1) {
+      continue;
+    }
+    bs = bc % 4 ? bs * 64 + idx : idx;
+    if (bc++ % 4) {
+      output += String.fromCharCode(255 & (bs >> ((-2 * bc) & 6)));
+    }
+  }
+  return output;
+};
+
+// Reads the "sub" claim (the user id) out of the access token. The backend uses
+// the same claim as the authenticated principal, so this is the id the chat
+// senderId must match. OwnProfileResponse does not expose the id, hence decoding.
+const decodeJwtSubject = (token: string): string | null => {
+  try {
+    const payload = token.split('.')[1];
+    if (!payload) {
+      return null;
+    }
+    const base64 = payload.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = base64 + '='.repeat((4 - (base64.length % 4)) % 4);
+    const claims = JSON.parse(decodeBase64(padded));
+    return typeof claims?.sub === 'string' ? claims.sub : null;
+  } catch {
+    return null;
+  }
+};
+
+const getCurrentUserId = async (): Promise<string | null> => {
+  const token = await getAccessToken();
+  return token ? decodeJwtSubject(token) : null;
+};
+
 const normalizeTokenValue = (value: unknown): string => {
   if (typeof value !== 'string' || value.length === 0) {
     throw new Error('Invalid token value');
@@ -253,6 +302,6 @@ class API {
   }
 }
 
-export { API, setTokens, clearTokens, getAccessToken, getRefreshToken, logout };
+export { API, setTokens, clearTokens, getAccessToken, getRefreshToken, getCurrentUserId, logout };
 
 export const getProfileUpdateUrl = () => `${API_BASE_URL}${PROFILE_BASE_PATH}/update`;

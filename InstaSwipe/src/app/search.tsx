@@ -24,6 +24,7 @@ import {
   getDiscovery,
   getDiscoveryPreferences,
 } from '@/hooks/matches';
+import { searchProfilesByName } from '@/hooks/search';
 import { useTheme } from '@/hooks/use-theme';
 import Header from '@/components/header';
 import DiscoveryProfileModal from '@/components/discovery-profile-modal';
@@ -61,6 +62,7 @@ const toInputValue = (value: string[] | string | number | undefined) => {
 
 export default function SearchScreen() {
   const theme = useTheme();
+  const [name, setName] = useState('');
   const [minAge, setMinAge] = useState('18');
   const [maxAge, setMaxAge] = useState('67');
   const [gender, setGender] = useState<Gender | ''>('');
@@ -80,6 +82,9 @@ export default function SearchScreen() {
   // Filters used by the current result set, snapshotted at search time so paging
   // stays consistent even if the user edits the inputs without pressing Search.
   const activeFiltersRef = useRef<DiscoveryFilters | null>(null);
+  // When set, the current result set is a name search (via /api/search/profiles)
+  // rather than the discovery browse; paging must keep using the same source.
+  const activeNameRef = useRef<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -113,6 +118,7 @@ export default function SearchScreen() {
   }, [hydrating]);
 
   async function loadDiscovery() {
+    const trimmedName = name.trim();
     const filters: DiscoveryFilters = {
       minAge: parseAge(minAge),
       maxAge: parseAge(maxAge),
@@ -122,6 +128,9 @@ export default function SearchScreen() {
       size: PAGE_SIZE,
     };
     activeFiltersRef.current = filters;
+    // A non-empty name runs a plain people-search; otherwise fall back to the
+    // discovery browse driven by the filters below.
+    activeNameRef.current = trimmedName ? trimmedName : null;
     pageRef.current = 0;
     hasMoreRef.current = false;
 
@@ -129,7 +138,9 @@ export default function SearchScreen() {
     setError(null);
 
     try {
-      const result = await getDiscovery({ ...filters, page: 0 });
+      const result = trimmedName
+        ? await searchProfilesByName({ q: trimmedName, page: 0, size: PAGE_SIZE })
+        : await getDiscovery({ ...filters, page: 0 });
 
       setProfiles(result.content);
       setTotalElements(result.totalElements);
@@ -153,7 +164,10 @@ export default function SearchScreen() {
 
     try {
       const nextPage = pageRef.current + 1;
-      const result = await getDiscovery({ ...filters, page: nextPage });
+      const activeName = activeNameRef.current;
+      const result = activeName
+        ? await searchProfilesByName({ q: activeName, page: nextPage, size: PAGE_SIZE })
+        : await getDiscovery({ ...filters, page: nextPage });
       pageRef.current = nextPage;
       hasMoreRef.current = !result.last;
       setProfiles((current) => [...current, ...result.content]);
@@ -227,6 +241,25 @@ export default function SearchScreen() {
               </ThemedText>
 
               <View style={[styles.filters, { borderColor: theme.tabActiveBorder }]}>
+                <View style={styles.field}>
+                  <ThemedText type="smallBold">Search by name</ThemedText>
+                  <TextInput
+                    value={name}
+                    onChangeText={setName}
+                    autoCapitalize="words"
+                    placeholder="Type a name…"
+                    placeholderTextColor={theme.iconMuted}
+                    returnKeyType="search"
+                    onSubmitEditing={loadDiscovery}
+                    style={[styles.input, { borderColor: theme.tabActiveBorder, color: theme.text }]}
+                  />
+                  {!!name.trim() && (
+                    <ThemedText type="small" themeColor="textSecondary">
+                      Filters below are ignored while searching by name.
+                    </ThemedText>
+                  )}
+                </View>
+
                 <View style={styles.row}>
                   <View style={styles.field}>
                     <ThemedText type="smallBold">Min age</ThemedText>

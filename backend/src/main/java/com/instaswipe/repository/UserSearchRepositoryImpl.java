@@ -12,6 +12,7 @@ import org.springframework.data.support.PageableExecutionUtils;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Pattern;
 
 @RequiredArgsConstructor
 public class UserSearchRepositoryImpl implements UserSearchRepository{
@@ -54,5 +55,33 @@ public class UserSearchRepositoryImpl implements UserSearchRepository{
         return PageableExecutionUtils.getPage(
                 users, pageable,
                 () -> mongoTemplate.count(Query.of(query).limit(-1).skip(-1), User.class));
+    }
+
+    @Override
+    public Page<User> searchByDisplayName(String query, String excludeUserId, Pageable pageable) {
+        List<Criteria> filters = new ArrayList<>();
+
+        // Only visible, fully-onboarded users are searchable (same bar the public
+        // profile endpoint enforces), so half-set-up accounts never surface.
+        filters.add(Criteria.where("enabled").is(true));
+        filters.add(Criteria.where("profile.gender").ne(null));
+        filters.add(Criteria.where("profile.birthDate").ne(null));
+        filters.add(Criteria.where("profile.profilePicture").ne(null));
+
+        // Case-insensitive substring match on display name. Pattern.quote escapes any
+        // regex metacharacters so the raw user input can't be interpreted as a regex.
+        filters.add(Criteria.where("profile.name").regex(Pattern.quote(query), "i"));
+
+        if (excludeUserId != null) {
+            filters.add(Criteria.where("_id").ne(excludeUserId));
+        }
+
+        Query mongoQuery = new Query(new Criteria().andOperator(filters.toArray(new Criteria[0])));
+        mongoQuery.with(pageable);
+
+        List<User> users = mongoTemplate.find(mongoQuery, User.class);
+        return PageableExecutionUtils.getPage(
+                users, pageable,
+                () -> mongoTemplate.count(Query.of(mongoQuery).limit(-1).skip(-1), User.class));
     }
 }

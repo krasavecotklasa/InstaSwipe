@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Modal,
   Platform,
   ScrollView,
   StyleSheet,
@@ -15,7 +16,10 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { PostCard, type Post } from '@/components/post-card';
+import { SelectField } from '@/components/form/select-field';
+import { InterestsSelect } from '@/components/form/interests-select';
 import { BottomTabInset, Colors, MaxContentWidth, Spacing } from '@/constants/theme';
+import { COUNTRIES } from '@/constants/countries';
 import { useAuthContext } from '@/hooks/auth-context';
 import { API, type OwnProfileResponse } from '@/hooks/auth';
 import {
@@ -27,7 +31,6 @@ import {
   setDiscoveryPreferences,
 } from '@/hooks/matches';
 import { normalizeMediaUrl } from '@/hooks/media';
-import { sendTestNotificationAsync } from '@/hooks/notifications';
 import { useTheme } from '@/hooks/use-theme';
 import Header from '@/components/header';
 import { fetchUserPosts } from '@/hooks/posts';
@@ -45,20 +48,22 @@ const DEFAULT_PREFS: DiscoveryPreferences = {
 const GENDER_OPTIONS: (Gender | '')[] = ['', ...DISCOVERY_GENDERS];
 const genderOptionLabel = (option: Gender | '') => (option === '' ? 'Any' : DISCOVERY_GENDER_LABELS[option]);
 
-const toInputValue = (value: string[] | string | number | undefined) => {
-  if (Array.isArray(value)) {
-    return value.join(', ');
-  }
+// Country filter is optional: the "Any country" sentinel clears the filter ('').
+const COUNTRY_ANY = 'Any country';
+const COUNTRY_OPTIONS = [COUNTRY_ANY, ...COUNTRIES];
 
+// Discovery age filter bounds. The app's minimum age is 18, so a filter below
+// that can never match anyone; cap the top end at a sane upper bound.
+const MIN_ALLOWED_AGE = 18;
+const MAX_ALLOWED_AGE = 100;
+
+const toInputValue = (value: string | number | undefined) => {
   return value == null ? '' : String(value);
 };
 
-const parseInterests = (value: string) => {
-  return value
-    .split(',')
-    .map((item) => item.trim())
-    .filter(Boolean);
-};
+// Keep age inputs numeric: strip anything that isn't a digit and cap the length
+// so free text like "9 years old" can't reach the saved preferences.
+const sanitizeAge = (text: string) => text.replace(/[^0-9]/g, '').slice(0, 3);
 
 export default function ProfileScreen() {
   const theme = useTheme();
@@ -75,13 +80,12 @@ export default function ProfileScreen() {
   const [maxAge, setMaxAge] = useState('');
   const [gender, setGender] = useState<Gender | ''>('');
   const [country, setCountry] = useState('');
-  const [interests, setInterests] = useState('');
+  const [interests, setInterests] = useState<string[]>([]);
   const [savingPrefs, setSavingPrefs] = useState(false);
   const [prefsSaved, setPrefsSaved] = useState(false);
+  const [prefsError, setPrefsError] = useState<string | null>(null);
   const [openingEditor, setOpeningEditor] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
-  const [sendingTestNotification, setSendingTestNotification] = useState(false);
-  const [notificationStatus, setNotificationStatus] = useState<string | null>(null);
 
   useEffect(() => {
     let isActive = true;
@@ -123,7 +127,7 @@ export default function ProfileScreen() {
         setMaxAge(toInputValue(mergedPreferences.maxAge));
         setGender(mergedPreferences.gender);
         setCountry(mergedPreferences.country);
-        setInterests(toInputValue(mergedPreferences.interests));
+        setInterests(mergedPreferences.interests);
       } catch (loadError) {
         if (isActive) {
           setError(loadError instanceof Error ? loadError.message : 'Could not load profile');
@@ -177,21 +181,38 @@ export default function ProfileScreen() {
   }, [profile?.id]);
 
   const savePreferences = async () => {
+    const parsedMin = minAge.trim() ? Number(minAge) : null;
+    const parsedMax = maxAge.trim() ? Number(maxAge) : null;
+
+    if (parsedMin !== null && (parsedMin < MIN_ALLOWED_AGE || parsedMin > MAX_ALLOWED_AGE)) {
+      setPrefsError(`Minimum age must be between ${MIN_ALLOWED_AGE} and ${MAX_ALLOWED_AGE}.`);
+      return;
+    }
+    if (parsedMax !== null && (parsedMax < MIN_ALLOWED_AGE || parsedMax > MAX_ALLOWED_AGE)) {
+      setPrefsError(`Maximum age must be between ${MIN_ALLOWED_AGE} and ${MAX_ALLOWED_AGE}.`);
+      return;
+    }
+    if (parsedMin !== null && parsedMax !== null && parsedMin > parsedMax) {
+      setPrefsError('Minimum age cannot be greater than maximum age.');
+      return;
+    }
+
     setSavingPrefs(true);
     setPrefsSaved(false);
+    setPrefsError(null);
     setError(null);
 
     try {
       await setDiscoveryPreferences({
-        minAge: minAge.trim() ? Number(minAge) : '',
-        maxAge: maxAge.trim() ? Number(maxAge) : '',
+        minAge: parsedMin ?? '',
+        maxAge: parsedMax ?? '',
         gender,
         country,
-        interests: parseInterests(interests),
+        interests,
       });
       setPrefsSaved(true);
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : 'Could not save preferences');
+      setPrefsError(saveError instanceof Error ? saveError.message : 'Could not save preferences');
     } finally {
       setSavingPrefs(false);
     }
@@ -204,25 +225,10 @@ export default function ProfileScreen() {
 
     setOpeningEditor(true);
     try {
+      setShowSettings(false);
       onEditProfile(profile);
     } finally {
       setOpeningEditor(false);
-    }
-  };
-
-  const sendSampleNotification = async () => {
-    setSendingTestNotification(true);
-    setNotificationStatus(null);
-
-    try {
-      await sendTestNotificationAsync();
-      setNotificationStatus('Test notification sent successfully.');
-    } catch (notificationError) {
-      setNotificationStatus(
-        notificationError instanceof Error ? notificationError.message : 'Could not send test notification'
-      );
-    } finally {
-      setSendingTestNotification(false);
     }
   };
 
@@ -264,17 +270,13 @@ export default function ProfileScreen() {
                     Your profile
                   </ThemedText>
                   <TouchableOpacity
-                    onPress={() => setShowSettings((current) => !current)}
+                    onPress={() => setShowSettings(true)}
                     style={[styles.iconButton, { borderColor: theme.tabActiveBorder }]}
                     accessibilityRole="button"
-                    accessibilityLabel={showSettings ? 'Show posts' : 'Open settings'}
+                    accessibilityLabel="Open settings"
                   >
                     <SymbolView
-                      name={
-                        (showSettings
-                          ? { ios: 'xmark', android: 'close', web: 'close' }
-                          : { ios: 'gearshape', android: 'settings', web: 'settings' }) as any
-                      }
+                      name={{ ios: 'gearshape', android: 'settings', web: 'settings' } as any}
                       tintColor='#8769ffbe'
                       size={20}
                     />
@@ -342,194 +344,221 @@ export default function ProfileScreen() {
                       </ThemedText>
                     </View>
 
-                    <View style={styles.actionsRow}>
-                      <TouchableOpacity
-                        onPress={openEditor}
-                        disabled={openingEditor}
-                        style={[styles.buttonStyle, { borderColor: '#6249cabe' }]}
-                      >
-                        <SymbolView
-                          name={{ ios: 'square.and.pencil', android: 'edit', web: 'edit' } as any}
-                          tintColor='#8769ffbe'
-                          size={20}
-                        />
-                        <ThemedText type="smallBold">
-                          Update profile
-                        </ThemedText>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        onPress={sendSampleNotification}
-                        disabled={sendingTestNotification}
-                        style={[styles.buttonStyle, { borderColor: '#6249cabe' }]}
-                      >
-                        <SymbolView
-                          name={{ ios: 'bell.badge', android: 'notifications', web: 'notifications' } as any}
-                          tintColor='#8769ffbe'
-                          size={20}
-                        />
-                        <ThemedText type="smallBold">
-                          {sendingTestNotification ? 'Sending...' : 'Send test notification'}
-                        </ThemedText>
-                      </TouchableOpacity>
-                    </View>
-                    {notificationStatus && (
-                      <ThemedText type="small" themeColor="textSecondary" style={styles.notificationStatus}>
-                        {notificationStatus}
-                      </ThemedText>
-                    )}
+                {loadingPosts ? (
+                  <View style={styles.emptyState}>
+                    <ActivityIndicator size="large" color={theme.text} />
                   </View>
+                ) : postsError ? (
+                  <View style={[styles.notice, { borderColor: '#ef4444' }]}>
+                    <ThemedText type="small" style={styles.errorText}>
+                      {postsError}
+                    </ThemedText>
+                  </View>
+                ) : posts.length > 0 ? (
+                  <View style={styles.postsList}>
+                    {posts.map((post) => (
+                      <PostCard key={post.id} post={post} />
+                    ))}
+                  </View>
+                ) : (
+                  <View style={styles.emptyState}>
+                    <ThemedText type="small" themeColor="textSecondary">
+                      No posts yet.
+                    </ThemedText>
+                  </View>
+                )}
+              </View>
+            </>
+          ) : null}
+        </ScrollView>
 
-                  <View style={[styles.panel, { borderColor: theme.tabActiveBorder }]}>
-                    <View style={styles.panelHeader}>
-                      <ThemedText style={styles.panelHeaderText} type="smallBold">
-                        Discovery preferences
-                      </ThemedText>
-                      {prefsSaved && <ThemedText type="small" themeColor="textSecondary">
-                        Saved
-                      </ThemedText>}
-                    </View>
+        <Modal
+          visible={showSettings}
+          animationType="slide"
+          onRequestClose={() => setShowSettings(false)}
+        >
+          <ThemedView style={styles.modalContainer}>
+            <SafeAreaView style={styles.modalSafeArea} edges={['top', 'left', 'right', 'bottom']}>
+              <View style={[styles.modalTopBar, { borderBottomColor: theme.tabActiveBorder }]}>
+                <TouchableOpacity
+                  onPress={() => setShowSettings(false)}
+                  style={styles.modalTopBarSide}
+                  accessibilityRole="button"
+                  accessibilityLabel="Close settings"
+                >
+                  <SymbolView
+                    name={{ ios: 'xmark', android: 'close', web: 'close' } as any}
+                    tintColor={theme.text}
+                    size={22}
+                  />
+                </TouchableOpacity>
+                <ThemedText style={styles.modalTitle}>Settings</ThemedText>
+                <View style={styles.modalTopBarSide} />
+              </View>
 
-                    <View style={styles.row}>
-                      <View style={styles.field}>
-                        <ThemedText type="smallBold">Minimum age</ThemedText>
-                        <TextInput
-                          value={minAge}
-                          onChangeText={setMinAge}
-                          keyboardType="number-pad"
-                          style={[styles.input, { borderColor: theme.tabActiveBorder, color: theme.text }]}
-                        />
-                      </View>
-                      <View style={styles.field}>
-                        <ThemedText type="smallBold">Maximum age</ThemedText>
-                        <TextInput
-                          value={maxAge}
-                          onChangeText={setMaxAge}
-                          keyboardType="number-pad"
-                          style={[styles.input, { borderColor: theme.tabActiveBorder, color: theme.text }]}
-                        />
-                      </View>
-                    </View>
-
-                    <View style={styles.field}>
-                      <ThemedText type="smallBold">Gender</ThemedText>
-                      <View style={styles.segmented}>
-                        {GENDER_OPTIONS.map((option) => {
-                          const selected = option === gender;
-
-                          return (
-                            <TouchableOpacity
-                              key={option || 'any'}
-                              onPress={() => setGender(option)}
-                              style={[
-                                styles.segment,
-                                {
-                                  borderColor: theme.tabActiveBorder,
-                                  backgroundColor: selected ? theme.backgroundElement : 'transparent',
-                                },
-                              ]}
-                            >
-                              <ThemedText type="smallBold" style={selected && styles.segmentTextSelected}>
-                                {genderOptionLabel(option)}
-                              </ThemedText>
-                            </TouchableOpacity>
-                          );
-                        })}
-                      </View>
-                    </View>
-
-                    <View style={styles.field}>
-                      <ThemedText type="smallBold">Country</ThemedText>
-                      <TextInput
-                        value={country}
-                        onChangeText={setCountry}
-                        autoCapitalize="words"
-                        style={[styles.input, { borderColor: theme.tabActiveBorder, color: theme.text }]}
-                      />
-                    </View>
-
-                    <View style={styles.field}>
-                      <ThemedText type="smallBold">Interests</ThemedText>
-                      <TextInput
-                        value={interests}
-                        onChangeText={setInterests}
-                        autoCapitalize="words"
-                        style={[styles.input, { borderColor: theme.tabActiveBorder, color: theme.text }]}
-                      />
-                    </View>
-
-                    <View style={styles.actionsRow}>
-                      <TouchableOpacity
-                        onPress={savePreferences}
-                        disabled={savingPrefs}
-                        style={[styles.buttonStyle]}
-                      >
-                        <SymbolView
-                          name={{ ios: 'save', android: 'save', web: 'save' } as any}
-                          tintColor='#8769ffbe'
-                          size={20}
-                        />
-                        <ThemedText type="smallBold">
-                          Save changes
-                        </ThemedText>
-                      </TouchableOpacity>
-                    </View>
+              <ScrollView
+                contentContainerStyle={styles.modalContent}
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator
+              >
+                <View style={[styles.panel, { borderColor: theme.tabActiveBorder }]}>
+                  <View style={styles.panelHeader}>
+                    <ThemedText style={styles.panelHeaderText} type="smallBold">
+                      Profile settings
+                    </ThemedText>
                   </View>
 
                   <View style={styles.actionsRow}>
                     <TouchableOpacity
-                      onPress={onLogout}
-                      style={[styles.buttonStyle, { borderColor: '#ef4444' }]}
+                      onPress={openEditor}
+                      disabled={openingEditor}
+                      style={[styles.buttonStyle, { borderColor: '#6249cabe' }]}
                     >
                       <SymbolView
-                        name={{ ios: 'rectangle.portrait.and.arrow.right', android: 'logout', web: 'logout' } as any}
-                        tintColor="#ef4444"
+                        name={{ ios: 'square.and.pencil', android: 'edit', web: 'edit' } as any}
+                        tintColor='#8769ffbe'
                         size={20}
                       />
                       <ThemedText type="smallBold">
-                        Logout
+                        Update profile
                       </ThemedText>
                     </TouchableOpacity>
                   </View>
-                </>
-              ) : (
-                <View style={styles.postsSection}>
-                  <View style={styles.postsHeader}>
-                    <ThemedText type="smallBold" style={styles.postsTitle}>
-                      Posts
+                </View>
+
+                <View style={[styles.panel, { borderColor: theme.tabActiveBorder }]}>
+                  <View style={styles.panelHeader}>
+                    <ThemedText style={styles.panelHeaderText} type="smallBold">
+                      Discovery preferences
                     </ThemedText>
-                    <ThemedText type="small" themeColor="textSecondary">
-                      {posts.length} {posts.length === 1 ? 'post' : 'posts'}
-                    </ThemedText>
+                    {prefsSaved && <ThemedText type="small" themeColor="textSecondary">
+                      Saved
+                    </ThemedText>}
                   </View>
 
-                  {loadingPosts ? (
-                    <View style={styles.emptyState}>
-                      <ActivityIndicator size="large" color={theme.text} />
+                  <View style={styles.row}>
+                    <View style={styles.field}>
+                      <ThemedText type="smallBold">Minimum age</ThemedText>
+                      <TextInput
+                        value={minAge}
+                        onChangeText={(text) => {
+                          setMinAge(sanitizeAge(text));
+                          setPrefsError(null);
+                        }}
+                        keyboardType="number-pad"
+                        maxLength={3}
+                        placeholder={String(MIN_ALLOWED_AGE)}
+                        placeholderTextColor={theme.iconMuted}
+                        style={[styles.input, { borderColor: theme.tabActiveBorder, color: theme.text }]}
+                      />
                     </View>
-                  ) : postsError ? (
-                    <View style={[styles.notice, { borderColor: '#ef4444' }]}>
-                      <ThemedText type="small" style={styles.errorText}>
-                        {postsError}
-                      </ThemedText>
+                    <View style={styles.field}>
+                      <ThemedText type="smallBold">Maximum age</ThemedText>
+                      <TextInput
+                        value={maxAge}
+                        onChangeText={(text) => {
+                          setMaxAge(sanitizeAge(text));
+                          setPrefsError(null);
+                        }}
+                        keyboardType="number-pad"
+                        maxLength={3}
+                        placeholder={String(MAX_ALLOWED_AGE)}
+                        placeholderTextColor={theme.iconMuted}
+                        style={[styles.input, { borderColor: theme.tabActiveBorder, color: theme.text }]}
+                      />
                     </View>
-                  ) : posts.length > 0 ? (
-                    <View style={styles.postsList}>
-                      {posts.map((post) => (
-                        <PostCard key={post.id} post={post} />
-                      ))}
+                  </View>
+
+                  <View style={styles.fieldBlock}>
+                    <ThemedText type="smallBold">Gender</ThemedText>
+                    <View style={styles.segmented}>
+                      {GENDER_OPTIONS.map((option) => {
+                        const selected = option === gender;
+
+                        return (
+                          <TouchableOpacity
+                            key={option || 'any'}
+                            onPress={() => setGender(option)}
+                            style={[
+                              styles.segment,
+                              {
+                                borderColor: theme.tabActiveBorder,
+                                backgroundColor: selected ? theme.backgroundElement : 'transparent',
+                              },
+                            ]}
+                          >
+                            <ThemedText
+                              type="smallBold"
+                              style={[styles.segmentText, selected && styles.segmentTextSelected]}
+                            >
+                              {genderOptionLabel(option)}
+                            </ThemedText>
+                          </TouchableOpacity>
+                        );
+                      })}
                     </View>
-                  ) : (
-                    <View style={styles.emptyState}>
-                      <ThemedText type="small" themeColor="textSecondary">
-                        No posts yet.
-                      </ThemedText>
-                    </View>
+                  </View>
+
+                  <View style={styles.fieldBlock}>
+                    <ThemedText type="smallBold">Country</ThemedText>
+                    <SelectField
+                      value={country || COUNTRY_ANY}
+                      options={COUNTRY_OPTIONS}
+                      onChange={(value) => setCountry(value === COUNTRY_ANY ? '' : value)}
+                      placeholder="Any country"
+                      title="Country"
+                      searchable
+                    />
+                  </View>
+
+                  <View style={styles.fieldBlock}>
+                    <ThemedText type="smallBold">Interests</ThemedText>
+                    <InterestsSelect value={interests} onChange={setInterests} requireMin={false} />
+                  </View>
+
+                  {prefsError && (
+                    <ThemedText type="small" style={styles.errorText}>
+                      {prefsError}
+                    </ThemedText>
                   )}
+
+                  <View style={styles.actionsRow}>
+                    <TouchableOpacity
+                      onPress={savePreferences}
+                      disabled={savingPrefs}
+                      style={[styles.buttonStyle]}
+                    >
+                      <SymbolView
+                        name={{ ios: 'save', android: 'save', web: 'save' } as any}
+                        tintColor='#8769ffbe'
+                        size={20}
+                      />
+                      <ThemedText type="smallBold">
+                        Save changes
+                      </ThemedText>
+                    </TouchableOpacity>
+                  </View>
                 </View>
-              )}
-            </>
-          ) : null}
-        </ScrollView>
+
+                <View style={styles.actionsRow}>
+                  <TouchableOpacity
+                    onPress={onLogout}
+                    style={[styles.buttonStyle, { borderColor: '#ef4444' }]}
+                  >
+                    <SymbolView
+                      name={{ ios: 'rectangle.portrait.and.arrow.right', android: 'logout', web: 'logout' } as any}
+                      tintColor="#ef4444"
+                      size={20}
+                    />
+                    <ThemedText type="smallBold">
+                      Logout
+                    </ThemedText>
+                  </TouchableOpacity>
+                </View>
+              </ScrollView>
+            </SafeAreaView>
+          </ThemedView>
+        </Modal>
       </SafeAreaView>
     </ThemedView>
   );
@@ -586,6 +615,12 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: Spacing.one,
   },
+  // Full-width stacked fields (gender, country, interests). Unlike `field`, these
+  // must NOT flex: inside the modal's scroll column a flex-basis:0 item collapses
+  // and lets the following buttons overlap the tall interest chip grid.
+  fieldBlock: {
+    gap: Spacing.one,
+  },
   input: {
     minHeight: 44,
     borderRadius: 8,
@@ -636,8 +671,37 @@ const styles = StyleSheet.create({
     gap: Spacing.two,
     borderWidth: 1,
   },
-  notificationStatus: {
-    fontWeight: '800',
+  modalContainer: {
+    flex: 1,
+  },
+  modalSafeArea: {
+    flex: 1,
+    maxWidth: MaxContentWidth,
+    width: '100%',
+    alignSelf: 'center',
+  },
+  modalTopBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.three,
+    borderBottomWidth: 0.5,
+  },
+  modalTopBarSide: {
+    width: 40,
+    height: 40,
+    alignItems: 'flex-start',
+    justifyContent: 'center',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  modalContent: {
+    padding: Spacing.three,
+    gap: Spacing.three,
+    paddingBottom: Spacing.six,
   },
   loadingRow: {
     flexDirection: 'row',

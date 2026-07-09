@@ -104,6 +104,49 @@ class UserSearchRepositoryTest extends AbstractMongoRepositoryTest {
     }
 
     @Test
+    void searchByDisplayNameMatchesSubstringCaseInsensitive() {
+        discoverable("alice@x.com", Gender.FEMALE, "US", 25, List.of("a"));
+        discoverable("alicia@x.com", Gender.FEMALE, "US", 25, List.of("a"));
+        discoverable("bob@x.com", Gender.MALE, "US", 25, List.of("a"));
+
+        Page<User> page = userRepository.searchByDisplayName("ALI", null, PageRequest.of(0, 10));
+
+        assertThat(page.getContent()).extracting(User::getEmail)
+                .containsExactlyInAnyOrder("alice@x.com", "alicia@x.com");
+    }
+
+    @Test
+    void searchByDisplayNameExcludesSelfDisabledAndIncomplete() {
+        User self = discoverable("sam@x.com", Gender.MALE, "US", 25, List.of("a"));
+        User disabled = discoverable("sammy@x.com", Gender.MALE, "US", 25, List.of("a"));
+        disabled.setEnabled(false);
+        userRepository.save(disabled);
+        // incomplete: missing profile picture => not searchable
+        UserProfile incomplete = UserProfile.builder()
+                .name("samuel").bio("b").gender(Gender.MALE).country("US")
+                .birthDate(LocalDate.now().minusYears(25)).interests(List.of("a"))
+                .profilePicture(null).build();
+        userRepository.save(User.builder().email("samuel@x.com").passwordHash("x")
+                .roles(new HashSet<>(Set.of(Role.USER))).enabled(true).emailVerified(true)
+                .profile(incomplete).build());
+        discoverable("samwise@x.com", Gender.MALE, "US", 25, List.of("a"));
+
+        Page<User> page = userRepository.searchByDisplayName("sam", self.getId(), PageRequest.of(0, 10));
+
+        assertThat(page.getContent()).extracting(User::getEmail).containsExactly("samwise@x.com");
+    }
+
+    @Test
+    void searchByDisplayNameTreatsQueryAsLiteralNotRegex() {
+        discoverable("neo@x.com", Gender.MALE, "US", 25, List.of("a"));
+
+        // ".*" would match every name if interpreted as a regex; as a literal it matches none.
+        Page<User> page = userRepository.searchByDisplayName(".*", null, PageRequest.of(0, 10));
+
+        assertThat(page.getContent()).isEmpty();
+    }
+
+    @Test
     void paginates() {
         for (int i = 0; i < 5; i++) {
             discoverable("u" + i + "@x.com", Gender.MALE, "US", 25, List.of("a"));
