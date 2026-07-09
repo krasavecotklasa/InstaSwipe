@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   FlatList,
   Platform,
+  Pressable,
   TouchableOpacity,
   StyleSheet,
   TextInput,
@@ -25,6 +26,7 @@ import {
 } from '@/hooks/matches';
 import { useTheme } from '@/hooks/use-theme';
 import Header from '@/components/header';
+import DiscoveryProfileModal from '@/components/discovery-profile-modal';
 
 const PAGE_SIZE = 100;
 
@@ -70,6 +72,7 @@ export default function SearchScreen() {
   const [hydrating, setHydrating] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [totalElements, setTotalElements] = useState(0);
+  const [selectedProfile, setSelectedProfile] = useState<DiscoveryProfile | null>(null);
 
   const pageRef = useRef(0);
   const hasMoreRef = useRef(false);
@@ -163,7 +166,14 @@ export default function SearchScreen() {
   }, []);
 
   const renderProfile = useCallback(({ item }: { item: DiscoveryProfile }) => (
-    <View style={[styles.profileCard, { borderColor: theme.tabActiveBorder }]}>
+    <Pressable
+      onPress={() => setSelectedProfile(item)}
+      style={({ pressed }) => [
+        styles.profileCard,
+        { borderColor: theme.tabActiveBorder },
+        pressed && styles.profileCardPressed,
+      ]}
+    >
       <Image
         source={item.profilePictureUrl ? { uri: item.profilePictureUrl } : undefined}
         style={styles.profileImage}
@@ -197,7 +207,7 @@ export default function SearchScreen() {
           ))}
         </View>
       </View>
-    </View>
+    </Pressable>
   ), [theme]);
 
   return (
@@ -333,6 +343,11 @@ export default function SearchScreen() {
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator
         />
+        <DiscoveryProfileModal
+          visible={Boolean(selectedProfile)}
+          profile={selectedProfile}
+          onClose={() => setSelectedProfile(null)}
+        />
       </SafeAreaView>
     </ThemedView>
   );
@@ -437,6 +452,9 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: Spacing.three,
     backgroundColor: 'rgba(0, 0, 0, 0.10)',
+  },
+  profileCardPressed: {
+    opacity: 0.82,
   },
   profileImage: {
     width: Platform.OS === 'web' ? 120 : 90,

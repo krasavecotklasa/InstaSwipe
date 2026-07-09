@@ -34,6 +34,7 @@ export interface Post {
 
 interface PostCardProps {
   post: Post;
+  onAuthorPress?: (userId: string) => void;
 }
 
 const DEFAULT_POST_IMAGE_ASPECT_RATIO = 3 / 2;
@@ -44,7 +45,7 @@ const clampPostImageAspectRatio = (ratio: number) => {
   return Math.min(MAX_POST_IMAGE_ASPECT_RATIO, Math.max(MIN_POST_IMAGE_ASPECT_RATIO, ratio));
 };
 
-export function PostCard({ post }: PostCardProps) {
+export function PostCard({ post, onAuthorPress }: PostCardProps) {
   const theme = useTheme();
   const [liked, setLiked] = useState(post.likedByMe);
   const [likeCount, setLikeCount] = useState(post.likes);
@@ -76,7 +77,14 @@ export function PostCard({ post }: PostCardProps) {
 
   return (
     <View style={[styles.card, { borderColor: theme.tabActiveBorder }]}>
-      <View style={styles.header}>
+      <Pressable
+        onPress={onAuthorPress ? () => onAuthorPress(post.userId) : undefined}
+        disabled={!onAuthorPress}
+        style={({ pressed }) => [
+          styles.header,
+          pressed && styles.headerPressed,
+        ]}
+      >
         <Image
           source={post.profilePictureUrl ? { uri: post.profilePictureUrl } : undefined}
           style={styles.avatar}
@@ -89,7 +97,7 @@ export function PostCard({ post }: PostCardProps) {
             {post.createdAt}
           </Text>
         </View>
-      </View>
+      </Pressable>
 
       <View style={styles.body}>
         <Text style={styles.description}>{post.caption}</Text>
@@ -170,6 +178,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: Spacing.two,
+  },
+  headerPressed: {
+    opacity: 0.78,
   },
   avatar: {
     width: 44,
