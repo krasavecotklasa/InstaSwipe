@@ -66,7 +66,7 @@ export function SelectField({
           {value || placeholder}
         </ThemedText>
         <SymbolView
-          name={{ ios: 'chevron.down', android: 'expand-more', web: 'expand-more' } as any}
+          name={{ ios: 'chevron.down', android: 'expand_more', web: 'expand_more' } as any}
           tintColor="#8769ffbe"
           size={16}
         />
