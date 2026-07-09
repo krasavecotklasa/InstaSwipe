@@ -41,6 +41,7 @@ public class SecurityConfig {
                         .requestMatchers("/ws/**").permitAll()
                         .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                        .requestMatchers("/api/emails/**").hasRole("ADMIN")
                         .anyRequest().authenticated())
                 // Return ApiError-shaped 401 (not authenticated) / 403 (authenticated but forbidden)
                 // instead of the default opaque 403 from Http403ForbiddenEntryPoint.

@@ -152,22 +152,23 @@ public class EmailService {
      * Send password reset email
      *
      * @param email the user's email address
-     * @param resetLink the password reset link
+     * @param resetCode the one-time password reset code
+     * @param expiryMinutes how long the code stays valid, in minutes
      * @return EmailResponse
      */
-    public EmailResponse sendPasswordResetEmail(String email, String resetCode) {
+    public EmailResponse sendPasswordResetEmail(String email, String resetCode, int expiryMinutes) {
         String htmlContent = String.format("""
                 <html>
                     <body style="font-family: Arial, sans-serif;">
                         <h1>Reset Your Password</h1>
-                        <p>Click the link below to reset your password:</p>
-                        <p><a href="%s" style="background-color: #28a745; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Reset Password</a></p>
-                        <p>This link expires in 1 hour.</p>
+                        <p>Use the code below to reset your password:</p>
+                        <p style="font-size: 28px; font-weight: bold; letter-spacing: 4px; margin: 16px 0;">%s</p>
+                        <p>This code expires in %d minutes.</p>
                         <br>
                         <p>If you didn't request this, please ignore this email and your password will remain unchanged.</p>
                     </body>
                 </html>
-                """, resetCode);
+                """, resetCode, expiryMinutes);
 
         EmailRequest emailRequest = new EmailRequest(
                 email,

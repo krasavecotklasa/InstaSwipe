@@ -1,6 +1,7 @@
 package com.instaswipe.controller;
 
 import com.instaswipe.dto.AuthResponse;
+import com.instaswipe.dto.ForgotPasswordRequest;
 import com.instaswipe.dto.LoginRequest;
 import com.instaswipe.dto.RegisterRequest;
 import com.instaswipe.dto.ResetPasswordRequest;
@@ -55,8 +56,8 @@ public class AuthController {
 
     @PostMapping("/password/forgot")
     @ResponseStatus(HttpStatus.OK)
-    public void sendPasswordResetToken(@Valid String email) {
-        otpService.sendOtp(email);
+    public void sendPasswordResetToken(@RequestBody @Valid ForgotPasswordRequest request) {
+        otpService.sendOtp(request.email());
     }
 
     @PostMapping("/password/verify")
