@@ -10,6 +10,8 @@ import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import Header from '@/components/header';
 import { fetchFeed } from '@/hooks/posts';
+import { type DiscoveryProfile, getPublicProfile } from '@/hooks/matches';
+import DiscoveryProfileModal from '@/components/discovery-profile-modal';
 
 function ComposerEntry({ onPress }: { onPress: () => void }) {
   const theme = useTheme();
@@ -42,6 +44,8 @@ export default function HomeScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [composerVisible, setComposerVisible] = useState(false);
+  const [selectedProfile, setSelectedProfile] = useState<DiscoveryProfile | null>(null);
+  const [profileError, setProfileError] = useState<string | null>(null);
 
   const loadPosts = useCallback(async () => {
     setIsLoading(true);
@@ -62,6 +66,17 @@ export default function HomeScreen() {
     loadPosts();
   }, [loadPosts]);
 
+  const openAuthorProfile = useCallback(async (userId: string) => {
+    setProfileError(null);
+
+    try {
+      const nextProfile = await getPublicProfile(userId);
+      setSelectedProfile(nextProfile);
+    } catch (err) {
+      setProfileError(err instanceof Error ? err.message : 'Unable to load profile');
+    }
+  }, []);
+
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
@@ -70,7 +85,9 @@ export default function HomeScreen() {
         <FlatList
           data={posts}
           keyExtractor={(item) => item.id}
-          renderItem={({ item }) => <PostCard post={item} />}
+          renderItem={({ item }) => (
+            <PostCard post={item} onAuthorPress={openAuthorProfile} />
+          )}
           ListHeaderComponent={<ComposerEntry onPress={() => setComposerVisible(true)} />}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={true}
@@ -93,10 +110,21 @@ export default function HomeScreen() {
           }
         />
 
+        {!!profileError && (
+          <View style={styles.profileErrorNotice}>
+            <Text style={styles.emptyText}>{profileError}</Text>
+          </View>
+        )}
+
         <PostComposer
           visible={composerVisible}
           onClose={() => setComposerVisible(false)}
           onPosted={loadPosts}
+        />
+        <DiscoveryProfileModal
+          visible={Boolean(selectedProfile)}
+          profile={selectedProfile}
+          onClose={() => setSelectedProfile(null)}
         />
       </SafeAreaView>
     </ThemedView>
@@ -158,5 +186,16 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 14,
     textAlign: 'center',
+  },
+  profileErrorNotice: {
+    position: 'absolute',
+    left: Spacing.three,
+    right: Spacing.three,
+    bottom: BottomTabInset + Spacing.three,
+    borderWidth: 1,
+    borderColor: '#ef4444',
+    borderRadius: 8,
+    padding: Spacing.two,
+    backgroundColor: 'rgba(239, 68, 68, 0.18)',
   },
 });

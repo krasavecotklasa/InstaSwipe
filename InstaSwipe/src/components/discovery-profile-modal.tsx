@@ -175,13 +175,6 @@ export default function DiscoveryProfileModal({
             onTouchEnd={handleSheetTouchEnd}
             style={[styles.surfaceHeader, { borderBottomColor: theme.tabActiveBorder }]}
           >
-            {isWeb ? (
-              <ThemedText type="smallBold" style={styles.surfaceHeaderTitle}>
-                Profile
-              </ThemedText>
-            ) : (
-              <View style={styles.sheetHandle} />
-            )}
             <Pressable
               onPress={onClose}
               accessibilityRole="button"
