@@ -6,6 +6,7 @@ import java.time.LocalDate;
 import java.util.List;
 
 public record OwnProfileResponse(
+        String userId,
         String email,
         String displayName,
         String bio,
