@@ -117,13 +117,13 @@ class ChatControllerTest {
 
         verify(messagingTemplate).convertAndSendToUser(
                 eq("user456"),
-                eq("/queue/chat/user123_user456"),
+                eq("/queue/user123_user456"),
                 any(Message.class)
         );
 
         verify(messagingTemplate).convertAndSendToUser(
                 eq("user123"),
-                eq("/queue/chat/user123_user456"),
+                eq("/queue/user123_user456"),
                 any(Message.class)
         );
     }

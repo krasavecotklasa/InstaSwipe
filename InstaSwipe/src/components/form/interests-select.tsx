@@ -53,7 +53,7 @@ export function InterestsSelect({ value, onChange, requireMin = true }: Interest
                 disabled && styles.chipDisabled,
               ]}
             >
-              <ThemedText type="small" style={selected ? styles.chipTextSelected : undefined}>
+              <ThemedText type="small" style={[styles.chipText, selected && styles.chipTextSelected]}>
                 {interest}
               </ThemedText>
             </TouchableOpacity>
@@ -72,17 +72,21 @@ const styles = StyleSheet.create({
   chips: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    rowGap: Spacing.three,
-    columnGap: Spacing.two,
+    rowGap: Spacing.two,
+    columnGap: Spacing.one,
   },
   chip: {
     borderWidth: 1,
-    borderRadius: 20,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two,
+    borderRadius: 16,
+    paddingHorizontal: Spacing.two + Spacing.half,
+    paddingVertical: Spacing.one + Spacing.half,
   },
   chipDisabled: {
     opacity: 0.4,
+  },
+  chipText: {
+    fontSize: 13,
+    lineHeight: 16,
   },
   chipTextSelected: {
     color: '#ffffff',

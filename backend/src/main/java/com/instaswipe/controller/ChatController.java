@@ -65,17 +65,23 @@ public class ChatController {
 
         Message savedMessage = messageRepository.save(message);
 
+        // The RabbitMQ STOMP relay parses "/queue/<name>" as a single segment, so the
+        // destination name must not contain a nested "/". Using "/queue/<roomId>" directly
+        // (no "chat/" sub-path) keeps the resolved per-user destination valid; otherwise the
+        // broker rejects it as an "Invalid destination" and the message is silently dropped.
+        String roomQueue = "/queue/" + chatMessage.chatRoomId();
+
         // 4. Deliver to recipient's private queue
         messagingTemplate.convertAndSendToUser(
                 chatMessage.recipientId(),
-                "/queue/chat/" + chatMessage.chatRoomId(),
+                roomQueue,
                 savedMessage
         );
 
         // 5. Echo back to sender (supports multiple devices/tabs)
         messagingTemplate.convertAndSendToUser(
                 senderId,
-                "/queue/chat/" + chatMessage.chatRoomId(),
+                roomQueue,
                 savedMessage
         );
 

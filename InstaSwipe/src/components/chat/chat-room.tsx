@@ -84,7 +84,7 @@ export function ChatRoom({ conversation, onBack }: ChatRoomProps) {
           accessibilityLabel="Back to conversations"
         >
           <SymbolView
-            name={{ ios: 'chevron.left', android: 'arrow-back', web: 'arrow-back' } as any}
+            name={{ ios: 'chevron.left', android: 'arrow_back', web: 'arrow_back' } as any}
             tintColor="#8769ffbe"
             size={22}
           />

@@ -120,7 +120,7 @@ class WebSocketAuthInterceptorTest {
     @Test
     void testPreSend_SubscribeToOwnMatch_Success() {
         StompHeaderAccessor sub = authenticatedFrame(StompCommand.SUBSCRIBE, "user123", Instant.now().plusSeconds(300));
-        sub.setDestination("/user/queue/chat/user123_user456");
+        sub.setDestination("/user/queue/user123_user456");
         Message<byte[]> message = toMessage(sub);
 
         Match match = new Match();
@@ -136,7 +136,7 @@ class WebSocketAuthInterceptorTest {
     @Test
     void testPreSend_SubscribeToOthersMatch_ThrowsException() {
         StompHeaderAccessor sub = authenticatedFrame(StompCommand.SUBSCRIBE, "user123", Instant.now().plusSeconds(300));
-        sub.setDestination("/user/queue/chat/user789_user999");
+        sub.setDestination("/user/queue/user789_user999");
         Message<byte[]> message = toMessage(sub);
 
         Match match = new Match();
@@ -178,7 +178,7 @@ class WebSocketAuthInterceptorTest {
     @Test
     void testPreSend_SubscribeWithExpiredToken_ThrowsBeforeMatchLookup() {
         StompHeaderAccessor sub = authenticatedFrame(StompCommand.SUBSCRIBE, "user123", Instant.now().minusSeconds(1));
-        sub.setDestination("/user/queue/chat/user123_user456");
+        sub.setDestination("/user/queue/user123_user456");
         Message<byte[]> message = toMessage(sub);
 
         AccessDeniedException exception = assertThrows(AccessDeniedException.class, () ->
