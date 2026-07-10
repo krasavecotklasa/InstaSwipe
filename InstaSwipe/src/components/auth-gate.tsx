@@ -11,6 +11,7 @@ import {
   Platform,
   ScrollView,
 } from 'react-native';
+import { router } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -18,7 +19,7 @@ import { API, setTokens } from '@/hooks/auth';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
-type Screen = 'login' | 'register';
+type Screen = 'login' | 'register' | 'forgotPassword';
 
 interface AuthGateProps {
   onAuthSuccess: () => void;
@@ -40,8 +41,13 @@ export default function AuthGate({ onAuthSuccess }: AuthGateProps) {
       <LoginView
         onAuthSuccess={onAuthSuccess}
         onGoToRegister={() => setScreen('register')}
+        onGoToForgotPassword={() => setScreen('forgotPassword')}
       />
     );
+  }
+
+  if (screen === 'forgotPassword') {
+    return <ForgotPasswordView onBackToLogin={() => setScreen('login')} />;
   }
 
   return (
@@ -57,9 +63,10 @@ export default function AuthGate({ onAuthSuccess }: AuthGateProps) {
 interface LoginViewProps {
   onAuthSuccess: () => void;
   onGoToRegister: () => void;
+  onGoToForgotPassword: () => void;
 }
 
-function LoginView({ onAuthSuccess, onGoToRegister }: LoginViewProps) {
+function LoginView({ onAuthSuccess, onGoToRegister, onGoToForgotPassword }: LoginViewProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -132,6 +139,10 @@ function LoginView({ onAuthSuccess, onGoToRegister }: LoginViewProps) {
                   secureTextEntry
                 />
 
+                <TouchableOpacity onPress={onGoToForgotPassword} style={styles.linkButton}>
+                  <ThemedText style={[styles.linkText, { color: theme.backgroundElement }]}>Forgot Password?</ThemedText>
+                </TouchableOpacity>
+
                 <TouchableOpacity
                   style={[styles.button, { backgroundColor: theme.backgroundElement }]}
                   onPress={handleLogin}
@@ -151,6 +162,228 @@ function LoginView({ onAuthSuccess, onGoToRegister }: LoginViewProps) {
                   <ThemedText style={{ color: theme.backgroundElement, fontWeight: 'bold' }}>
                     Register
                   </ThemedText>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </ScrollView>
+        </SafeAreaView>
+      </KeyboardAvoidingView>
+    </ThemedView>
+  );
+}
+
+// ─── Forgot password ────────────────────────────────────────────────────────
+
+interface ForgotPasswordViewProps {
+  onBackToLogin: () => void;
+}
+
+type ForgotPasswordStep = 'email' | 'otp' | 'reset';
+
+function ForgotPasswordView({ onBackToLogin }: ForgotPasswordViewProps) {
+  const [step, setStep] = useState<ForgotPasswordStep>('email');
+  const [email, setEmail] = useState('');
+  const [otpToken, setOtpToken] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState('');
+  const theme = useTheme();
+  const insets = useSafeAreaInsets();
+
+  const handleSendCode = async () => {
+    if (!email) {
+      errorHandle('Please enter your email');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await API.forgotPassword({ email });
+      if (response.ok) {
+        const data = await response.json().catch(() => ({}));
+        setMessage(data.message || 'If an account exists for that email, a reset code has been sent.');
+        setStep('otp');
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        errorHandle(errorData.message || 'Could not send a reset code');
+      }
+    } catch (error) {
+      errorHandle('An unexpected error occurred. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleVerifyOtp = async () => {
+    if (!otpToken) {
+      errorHandle('Please enter the reset code');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await API.verifyPasswordReset({ email, otpToken });
+      if (response.ok) {
+        setMessage('Code verified. Please choose a new password.');
+        setStep('reset');
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        errorHandle(errorData.message || 'The reset code is invalid or has expired');
+      }
+    } catch (error) {
+      errorHandle('An unexpected error occurred. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResetPassword = async () => {
+    if (!newPassword || !confirmPassword) {
+      errorHandle('Please fill in all password fields');
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      errorHandle('Passwords do not match');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await API.resetPassword({ email, otpToken, newPassword });
+      if (response.ok) {
+        const data = await response.json().catch(() => ({}));
+        setMessage(data.message || 'Password updated successfully.');
+        const redirectToLogin = () => {
+          onBackToLogin();
+          router.replace('/auth/login');
+        };
+
+        if (Platform.OS === 'web') {
+          alert('Password updated successfully. Please sign in with your new password.');
+          redirectToLogin();
+        } else {
+          Alert.alert('Success', 'Password updated successfully. Please sign in with your new password.', [
+            { text: 'OK', onPress: redirectToLogin },
+          ]);
+        }
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        errorHandle(errorData.message || 'Could not reset password');
+      }
+    } catch (error) {
+      errorHandle('An unexpected error occurred. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <ThemedView style={styles.container}>
+      <KeyboardAvoidingView
+        style={styles.keyboardAvoidingView}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={insets.top}
+      >
+        <SafeAreaView style={styles.safeArea}>
+          <ScrollView
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
+          >
+            <View style={styles.content}>
+              <ThemedText type="title" style={styles.title}>Reset Password</ThemedText>
+              <ThemedText style={styles.subtitle}>
+                {step === 'email'
+                  ? 'Enter your email address and we will send you a one-time reset code.'
+                  : step === 'otp'
+                    ? 'Enter the code sent to your email to continue.'
+                    : 'Choose a new password for your account.'}
+              </ThemedText>
+
+              {message ? <ThemedText style={styles.helperText}>{message}</ThemedText> : null}
+
+              {step === 'email' ? (
+                <View style={styles.form}>
+                  <TextInput
+                    style={[styles.input, { color: theme.text, borderColor: theme.tabActiveBorder }]}
+                    placeholder="Email"
+                    placeholderTextColor={theme.iconMuted}
+                    value={email}
+                    onChangeText={setEmail}
+                    autoCapitalize="none"
+                    keyboardType="email-address"
+                  />
+                  <TouchableOpacity
+                    style={[styles.button, { backgroundColor: theme.backgroundElement }]}
+                    onPress={handleSendCode}
+                    disabled={loading}
+                  >
+                    {loading ? <ActivityIndicator color="#fff" /> : <ThemedText style={styles.buttonText}>Send Reset Code</ThemedText>}
+                  </TouchableOpacity>
+                </View>
+              ) : null}
+
+              {step === 'otp' ? (
+                <View style={styles.form}>
+                  <TextInput
+                    style={[styles.input, { color: theme.text, borderColor: theme.tabActiveBorder }]}
+                    placeholder="Reset code"
+                    placeholderTextColor={theme.iconMuted}
+                    value={otpToken}
+                    onChangeText={setOtpToken}
+                    autoCapitalize="none"
+                    keyboardType="number-pad"
+                  />
+                  <TouchableOpacity
+                    style={[styles.button, { backgroundColor: theme.backgroundElement }]}
+                    onPress={handleVerifyOtp}
+                    disabled={loading}
+                  >
+                    {loading ? <ActivityIndicator color="#fff" /> : <ThemedText style={styles.buttonText}>Verify Code</ThemedText>}
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => setStep('email')} style={styles.linkButton}>
+                    <ThemedText style={[styles.linkText, { color: theme.backgroundElement }]}>Use a different email</ThemedText>
+                  </TouchableOpacity>
+                </View>
+              ) : null}
+
+              {step === 'reset' ? (
+                <View style={styles.form}>
+                  <TextInput
+                    style={[styles.input, { color: theme.text, borderColor: theme.tabActiveBorder }]}
+                    placeholder="New Password"
+                    placeholderTextColor={theme.iconMuted}
+                    value={newPassword}
+                    onChangeText={setNewPassword}
+                    secureTextEntry
+                  />
+                  <TextInput
+                    style={[styles.input, { color: theme.text, borderColor: theme.tabActiveBorder }]}
+                    placeholder="Confirm New Password"
+                    placeholderTextColor={theme.iconMuted}
+                    value={confirmPassword}
+                    onChangeText={setConfirmPassword}
+                    secureTextEntry
+                  />
+                  <TouchableOpacity
+                    style={[styles.button, { backgroundColor: theme.backgroundElement }]}
+                    onPress={handleResetPassword}
+                    disabled={loading}
+                  >
+                    {loading ? <ActivityIndicator color="#fff" /> : <ThemedText style={styles.buttonText}>Reset Password</ThemedText>}
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => setStep('otp')} style={styles.linkButton}>
+                    <ThemedText style={[styles.linkText, { color: theme.backgroundElement }]}>Back</ThemedText>
+                  </TouchableOpacity>
+                </View>
+              ) : null}
+
+              <View style={styles.footer}>
+                <ThemedText>Remembered your password? </ThemedText>
+                <TouchableOpacity onPress={onBackToLogin}>
+                  <ThemedText style={{ color: theme.backgroundElement, fontWeight: 'bold' }}>Login</ThemedText>
                 </TouchableOpacity>
               </View>
             </View>
@@ -369,6 +602,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     marginTop: Spacing.four,
+  },
+  linkButton: {
+    alignSelf: 'flex-end',
+  },
+  linkText: {
+    fontWeight: '600',
+  },
+  helperText: {
+    marginBottom: Spacing.two,
+    opacity: 0.8,
+    textAlign: 'center',
   },
   ageRow: {
     flexDirection: 'row',

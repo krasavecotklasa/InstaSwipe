@@ -1,15 +1,13 @@
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 
-const API_HOST = process.env.EXPO_PUBLIC_API_HOST;
-const API_PORT = process.env.EXPO_PUBLIC_API_PORT;
-const API_PREFIX_RAW = process.env.EXPO_PUBLIC_API_PREFIX || '/api';
-const API_PREFIX = API_PREFIX_RAW.startsWith('/') ? API_PREFIX_RAW : `/${API_PREFIX_RAW}`;
-const AUTH_BASE_PATH = `${API_PREFIX}/auth`;
-const PROFILE_BASE_PATH = `${API_PREFIX}/profile`;
-const API_BASE_URL = (API_PORT === '80' || API_PORT === '443')
-  ? `http://${API_HOST}`
-  : `http://${API_HOST}:${API_PORT}`;
+import { 
+  API_HOST,
+  API_PORT,
+  API_BASE_URL, 
+  AUTH_BASE_PATH,
+  PROFILE_BASE_PATH
+} from '@/hooks/api';
 
 export interface User {
   id: string;
@@ -278,6 +276,37 @@ class API {
       body: JSON.stringify({
         email: payload.email.toLowerCase(),
         password: payload.password,
+      }),
+    });
+  }
+
+  static async forgotPassword(payload: { email: string }): Promise<Response> {
+    return this.request(`${AUTH_BASE_PATH}/password/forgot`, {
+      method: 'POST',
+      body: JSON.stringify({
+        email: payload.email.toLowerCase(),
+      }),
+    });
+  }
+
+  static async verifyPasswordReset(payload: { email: string; otpToken: string }): Promise<Response> {
+    return this.request(`${AUTH_BASE_PATH}/password/verify`, {
+      method: 'POST',
+      body: JSON.stringify({
+        email: payload.email.toLowerCase(),
+        code: payload.otpToken,
+      }),
+    });
+  }
+
+  static async resetPassword(payload: { email: string; otpToken: string; newPassword: string }): Promise<Response> {
+    return this.request(`${AUTH_BASE_PATH}/password/reset`, {
+      method: 'POST',
+      body: JSON.stringify({
+        email: payload.email.toLowerCase(),
+        code: payload.otpToken,
+        newPassword: payload.newPassword,
+        password: payload.newPassword,
       }),
     });
   }
