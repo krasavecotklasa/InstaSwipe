@@ -65,8 +65,7 @@ export default function PostComposer({ visible, onClose, onPosted }: PostCompose
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
-        allowsEditing: true,
-        aspect: [1, 1],
+        allowsEditing: false,
         quality: 0.7,
       });
 
@@ -137,7 +136,14 @@ export default function PostComposer({ visible, onClose, onPosted }: PostCompose
               disabled={loading}
             >
               {image ? (
-                <Image source={{ uri: image.uri }} style={styles.imagePreview} />
+                <Image
+                  source={{ uri: image.uri }}
+                  style={[
+                    styles.imagePreview,
+                    { aspectRatio: image.width > 0 && image.height > 0 ? image.width / image.height : 1 },
+                  ]}
+                  resizeMode="contain"
+                />
               ) : (
                 <View style={[styles.imagePlaceholder, { borderColor: theme.tabActiveBorder }]}>
                   <SymbolView
@@ -228,7 +234,6 @@ const styles = StyleSheet.create({
   },
   imagePreview: {
     width: '100%',
-    aspectRatio: 1,
     borderRadius: 8,
   },
   captionColumn: {
