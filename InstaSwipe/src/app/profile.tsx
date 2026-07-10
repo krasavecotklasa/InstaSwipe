@@ -323,7 +323,7 @@ export default function ProfileScreen() {
                       <ThemedText type="smallBold">My interests:</ThemedText>
                       <View style={styles.chips}>
                         {(profile.interests ?? []).map((interest) => (
-                          <View key={interest} style={[styles.chip, { borderColor: theme.tabActiveBorder }]}>
+                          <View key={interest} style={[styles.chip, { backgroundColor: theme.backgroundSelected, borderColor: theme.tabActiveBorder }]}>
                             <ThemedText type="small" style={styles.chipText}>
                               {interest}
                             </ThemedText>
@@ -716,7 +716,6 @@ const styles = StyleSheet.create({
     gap: Spacing.two,
   },
   chip: {
-    backgroundColor: '#2f2338',
     borderWidth: 1,
     borderRadius: 8,
     paddingHorizontal: Spacing.two,

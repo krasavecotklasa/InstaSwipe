@@ -183,7 +183,7 @@ export default function DiscoveryProfileModal({
                   )}
                   <View style={styles.chips}>
                     {(profile.interests ?? []).map((interest) => (
-                      <View key={interest} style={[styles.chip, { borderColor: theme.tabActiveBorder }]}>
+                      <View key={interest} style={[styles.chip, { backgroundColor: theme.backgroundSelected, borderColor: theme.tabActiveBorder }]}>
                         <ThemedText type="small" style={styles.chipText}>
                           {interest}
                         </ThemedText>
@@ -319,7 +319,6 @@ const styles = StyleSheet.create({
     marginVertical: Spacing.one,
   },
   chip: {
-    backgroundColor: '#2f2338',
     borderWidth: 1,
     borderRadius: 8,
     paddingHorizontal: Spacing.two,

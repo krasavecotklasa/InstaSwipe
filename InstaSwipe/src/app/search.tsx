@@ -213,7 +213,7 @@ export default function SearchScreen() {
         )}
         <View style={styles.chips}>
           {item.interests?.map((interest) => (
-            <View key={`${item.id}-${interest}`} style={[styles.chip, { borderColor: theme.tabActiveBorder }]}>
+            <View key={`${item.id}-${interest}`} style={[styles.chip, { backgroundColor: theme.backgroundSelected, borderColor: theme.tabActiveBorder }]}>
               <ThemedText type="small" style={styles.chipText}>
                 {interest}
               </ThemedText>
@@ -517,7 +517,6 @@ const styles = StyleSheet.create({
     marginTop: Spacing.two,
   },
   chip: {
-    backgroundColor: '#2f2338',
     borderWidth: 1,
     borderRadius: 8,
     paddingHorizontal: Spacing.two,

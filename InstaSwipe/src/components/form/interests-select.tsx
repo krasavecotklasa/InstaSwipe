@@ -48,7 +48,7 @@ export function InterestsSelect({ value, onChange, requireMin = true }: Interest
               accessibilityState={{ checked: selected, disabled }}
               style={[
                 styles.chip,
-                { borderColor: theme.tabActiveBorder },
+                { backgroundColor: theme.backgroundSelected, borderColor: theme.tabActiveBorder },
                 selected && { backgroundColor: '#6249ca', borderColor: '#6249ca' },
                 disabled && styles.chipDisabled,
               ]}

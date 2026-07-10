@@ -21,7 +21,7 @@ function ComposerEntry({ onPress }: { onPress: () => void }) {
       onPress={onPress}
       style={({ pressed }) => [
         styles.composer,
-        { borderColor: '#6249cabe' },
+        { backgroundColor: theme.tabActiveBackground, borderColor: theme.tabActiveBorder },
         pressed && styles.composerPressed,
       ]}
     >
@@ -159,7 +159,6 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.three,
     borderWidth: 1,
     borderRadius: 8,
-    backgroundColor: '#000000',
     width: Platform.OS === 'web' ? '80%' : '95%',
     maxWidth: 'auto',
   },
