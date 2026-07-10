@@ -217,7 +217,7 @@ export default function SearchScreen() {
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-        <Header />
+        <Header title='Discover'/>
         <FlatList
           data={profiles}
           keyExtractor={(item) => item.id}
@@ -226,10 +226,11 @@ export default function SearchScreen() {
           onEndReachedThreshold={0.5}
           ListHeaderComponent={
             <View style={styles.header}>
+              {Platform.OS === 'web' ? 
               <ThemedText type="subtitle" style={styles.title}>
-                Discover
-              </ThemedText>
-
+                 Discover 
+              </ThemedText> 
+              : null}
               <View style={[styles.filters, { borderColor: theme.tabActiveBorder }]}>
                 <View style={styles.field}>
                   <ThemedText type="smallBold">Search by name</ThemedText>

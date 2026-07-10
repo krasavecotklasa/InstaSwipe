@@ -235,7 +235,7 @@ export default function ProfileScreen() {
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-        <Header />
+        <Header title='Profile'/>
         <ScrollView
           contentContainerStyle={[
             styles.content,

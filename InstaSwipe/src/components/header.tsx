@@ -1,11 +1,12 @@
-import { Platform, StyleSheet, TouchableOpacity, View } from 'react-native';
-import { SymbolView } from 'expo-symbols';
+import { Platform, StyleSheet, View } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
 
-export default function Header() {
-    const theme = useTheme();
+interface HeaderProps {
+    title?: string;
+}
+
+export default function Header({ title = 'InstaSwipe' }: HeaderProps) {
 
     if (Platform.OS !== 'ios' && Platform.OS !== 'android') {
         return null;
@@ -14,15 +15,8 @@ export default function Header() {
     return (
         <View style={styles.header}>
             <ThemedText style={styles.logoText}>
-                InstaSwipe
+                {title}
             </ThemedText>
-            <View style={styles.headerActions}>
-                <SymbolView
-                    name={{ ios: 'bell', android: 'notifications', web: 'notifications' } as any}
-                    tintColor={theme.text}
-                    size={24}
-                />
-            </View>
         </View>
     );
 }

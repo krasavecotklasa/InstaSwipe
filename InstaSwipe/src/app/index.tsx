@@ -106,7 +106,7 @@ export default function HomeScreen() {
     >
       <ThemedView style={styles.container}>
         <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-          <Header />
+          <Header title='InstaSwipe'/>
 
           <FlatList
             data={posts}

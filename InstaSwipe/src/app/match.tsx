@@ -164,7 +164,7 @@ export default function MatchScreen() {
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-        <Header />
+        <Header title='Match'/>
         <View style={[styles.content, { paddingBottom: bottomClearance }]}>
           <View style={styles.header} />
 
