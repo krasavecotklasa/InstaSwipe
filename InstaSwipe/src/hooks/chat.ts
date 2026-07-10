@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Client, type IMessage, type StompSubscription } from '@stomp/stompjs';
+import { Platform } from 'react-native';
 
 import { API_HOST, API_PORT, API_PREFIX } from '@/hooks/api';
 import { authorizedFetch, getAccessToken, getCurrentUserId } from '@/hooks/auth';
@@ -117,16 +118,33 @@ const getChatHistory = async (matchId: string): Promise<ChatMessage[]> => {
   return Array.isArray(data?.content) ? (data.content as ChatMessage[]) : [];
 };
 
-const createStompClient = (token: string): Client =>
-  new Client({
+const isNativePlatform = Platform.OS !== 'web';
+
+const createStompClient = (token: string): Client => {
+  const client = new Client({
     brokerURL: WS_URL,
     // The backend authenticates the STOMP CONNECT frame (not the HTTP handshake)
     // from this native header, and re-checks token expiry on every later frame.
     connectHeaders: { Authorization: `Bearer ${token}` },
+    connectionTimeout: 10000,
     reconnectDelay: 4000,
     heartbeatIncoming: 10000,
     heartbeatOutgoing: 10000,
   });
+
+  if (isNativePlatform) {
+    // React Native may deliver STOMP frames without the trailing NULL byte. Without
+    // this, @stomp/stompjs can wait forever for CONNECTED/MESSAGE frames to finish.
+    client.appendMissingNULLonIncoming = true;
+    // Sending STOMP text frames with a trailing NULL can also be unreliable on
+    // native. Binary frames preserve the terminator, and the protocol list keeps
+    // this custom factory aligned with the default @stomp/stompjs WebSocket path.
+    client.forceBinaryWSFrames = true;
+    client.webSocketFactory = () => new WebSocket(WS_URL, client.stompVersions.protocolVersions()) as any;
+  }
+
+  return client;
+};
 
 export interface UseChatRoom {
   messages: ChatMessage[];
@@ -192,10 +210,20 @@ export function useChatRoom(matchId: string, otherUserId: string): UseChatRoom {
 
       const token = await getAccessToken();
       if (!token || !active) {
+        if (active) {
+          setError('Could not connect to chat. Please sign in again.');
+        }
         return;
       }
 
       const client = createStompClient(token);
+      client.onWebSocketError = (event) => {
+        console.warn('[chat] WebSocket error:', event);
+        if (active) {
+          setConnected(false);
+          setError('Could not connect to chat. Check your network and try again.');
+        }
+      };
       client.onConnect = () => {
         if (!active) {
           return;
@@ -224,10 +252,12 @@ export function useChatRoom(matchId: string, otherUserId: string): UseChatRoom {
         console.warn('[chat] STOMP error:', frame.headers['message'] ?? frame.body);
         if (active) {
           setConnected(false);
+          setError(frame.headers['message'] ?? 'Chat connection failed');
         }
       };
-      client.onWebSocketClose = () => {
+      client.onWebSocketClose = (event) => {
         if (active) {
+          console.warn('[chat] WebSocket closed:', event.code, event.reason);
           setConnected(false);
         }
       };
@@ -249,7 +279,15 @@ export function useChatRoom(matchId: string, otherUserId: string): UseChatRoom {
       const text = content.trim();
       const client = clientRef.current;
       const senderId = currentUserIdRef.current;
-      if (!text || !client || !client.connected || !senderId) {
+      if (!text) {
+        return false;
+      }
+      if (!senderId) {
+        setError('Could not send yet. Please wait for your session to finish loading.');
+        return false;
+      }
+      if (!client || !client.connected) {
+        setError('Chat is still connecting. Please try again in a moment.');
         return false;
       }
       client.publish({
@@ -261,6 +299,7 @@ export function useChatRoom(matchId: string, otherUserId: string): UseChatRoom {
           content: text,
         }),
       });
+      setError(null);
       return true;
     },
     [matchId, otherUserId],
