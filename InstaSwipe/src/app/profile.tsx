@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Modal,
   Platform,
   ScrollView,
   StyleSheet,
@@ -16,6 +15,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { PostCard, type Post } from '@/components/post-card';
+import ResponsiveModalSheet, { ModalSheetPanel } from '@/components/responsive-modal-sheet';
 import { SelectField } from '@/components/form/select-field';
 import { InterestsSelect } from '@/components/form/interests-select';
 import { BottomTabInset, Colors, MaxContentWidth, Spacing } from '@/constants/theme';
@@ -373,193 +373,166 @@ export default function ProfileScreen() {
           ) : null}
         </ScrollView>
 
-        <Modal
+        <ResponsiveModalSheet
           visible={showSettings}
-          animationType="slide"
-          onRequestClose={() => setShowSettings(false)}
+          onClose={() => setShowSettings(false)}
+          title="Settings"
+          closeAccessibilityLabel="Close settings"
         >
-          <ThemedView style={styles.modalContainer}>
-            <SafeAreaView style={styles.modalSafeArea} edges={['top', 'left', 'right', 'bottom']}>
-              <View style={[styles.modalTopBar, { borderBottomColor: theme.tabActiveBorder }]}>
+          <ScrollView
+            style={styles.settingsScroll}
+            contentContainerStyle={styles.modalContent}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator
+          >
+            <ModalSheetPanel title="Profile settings">
+              <View style={styles.actionsRow}>
                 <TouchableOpacity
-                  onPress={() => setShowSettings(false)}
-                  style={styles.modalTopBarSide}
-                  accessibilityRole="button"
-                  accessibilityLabel="Close settings"
+                  onPress={openEditor}
+                  disabled={openingEditor}
+                  style={[styles.buttonStyle, { borderColor: '#6249cabe' }]}
                 >
                   <SymbolView
-                    name={{ ios: 'xmark', android: 'close', web: 'close' } as any}
-                    tintColor={theme.text}
-                    size={22}
+                    name={{ ios: 'square.and.pencil', android: 'edit', web: 'edit' } as any}
+                    tintColor='#8769ffbe'
+                    size={20}
                   />
+                  <ThemedText type="smallBold">
+                    Update profile
+                  </ThemedText>
                 </TouchableOpacity>
-                <ThemedText style={styles.modalTitle}>Settings</ThemedText>
-                <View style={styles.modalTopBarSide} />
+              </View>
+            </ModalSheetPanel>
+
+            <ModalSheetPanel
+              title="Discovery preferences"
+              trailing={prefsSaved ? (
+                <ThemedText type="small" themeColor="textSecondary">
+                  Saved
+                </ThemedText>
+              ) : undefined}
+            >
+              <View style={styles.row}>
+                <View style={styles.field}>
+                  <ThemedText type="smallBold">Minimum age</ThemedText>
+                  <TextInput
+                    value={minAge}
+                    onChangeText={(text) => {
+                      setMinAge(sanitizeAge(text));
+                      setPrefsError(null);
+                    }}
+                    keyboardType="number-pad"
+                    maxLength={3}
+                    placeholder={String(MIN_ALLOWED_AGE)}
+                    placeholderTextColor={theme.iconMuted}
+                    style={[styles.input, { borderColor: theme.tabActiveBorder, color: theme.text }]}
+                  />
+                </View>
+                <View style={styles.field}>
+                  <ThemedText type="smallBold">Maximum age</ThemedText>
+                  <TextInput
+                    value={maxAge}
+                    onChangeText={(text) => {
+                      setMaxAge(sanitizeAge(text));
+                      setPrefsError(null);
+                    }}
+                    keyboardType="number-pad"
+                    maxLength={3}
+                    placeholder={String(MAX_ALLOWED_AGE)}
+                    placeholderTextColor={theme.iconMuted}
+                    style={[styles.input, { borderColor: theme.tabActiveBorder, color: theme.text }]}
+                  />
+                </View>
               </View>
 
-              <ScrollView
-                contentContainerStyle={styles.modalContent}
-                keyboardShouldPersistTaps="handled"
-                showsVerticalScrollIndicator
+              <View style={styles.fieldBlock}>
+                <ThemedText type="smallBold">Gender</ThemedText>
+                <View style={styles.segmented}>
+                  {GENDER_OPTIONS.map((option) => {
+                    const selected = option === gender;
+
+                    return (
+                      <TouchableOpacity
+                        key={option || 'any'}
+                        onPress={() => setGender(option)}
+                        style={[
+                          styles.segment,
+                          {
+                            borderColor: theme.tabActiveBorder,
+                            backgroundColor: selected ? theme.backgroundElement : 'transparent',
+                          },
+                        ]}
+                      >
+                        <ThemedText
+                          type="smallBold"
+                          style={[styles.segmentText, selected && styles.segmentTextSelected]}
+                        >
+                          {genderOptionLabel(option)}
+                        </ThemedText>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+
+              <View style={styles.fieldBlock}>
+                <ThemedText type="smallBold">Country</ThemedText>
+                <SelectField
+                  value={country || COUNTRY_ANY}
+                  options={COUNTRY_OPTIONS}
+                  onChange={(value) => setCountry(value === COUNTRY_ANY ? '' : value)}
+                  placeholder="Any country"
+                  title="Country"
+                  searchable
+                />
+              </View>
+
+              <View style={styles.fieldBlock}>
+                <ThemedText type="smallBold">Interests</ThemedText>
+                <InterestsSelect value={interests} onChange={setInterests} requireMin={false} />
+              </View>
+
+              {prefsError && (
+                <ThemedText type="small" style={styles.errorText}>
+                  {prefsError}
+                </ThemedText>
+              )}
+
+              <View style={styles.actionsRow}>
+                <TouchableOpacity
+                  onPress={savePreferences}
+                  disabled={savingPrefs}
+                  style={[styles.buttonStyle]}
+                >
+                  <SymbolView
+                    name={{ ios: 'save', android: 'save', web: 'save' } as any}
+                    tintColor='#8769ffbe'
+                    size={20}
+                  />
+                  <ThemedText type="smallBold">
+                    Save changes
+                  </ThemedText>
+                </TouchableOpacity>
+              </View>
+            </ModalSheetPanel>
+
+            <View style={styles.actionsRow}>
+              <TouchableOpacity
+                onPress={onLogout}
+                style={[styles.buttonStyle, { borderColor: '#ef4444' }]}
               >
-                <View style={[styles.panel, { borderColor: theme.tabActiveBorder }]}>
-                  <View style={styles.panelHeader}>
-                    <ThemedText style={styles.panelHeaderText} type="smallBold">
-                      Profile settings
-                    </ThemedText>
-                  </View>
-
-                  <View style={styles.actionsRow}>
-                    <TouchableOpacity
-                      onPress={openEditor}
-                      disabled={openingEditor}
-                      style={[styles.buttonStyle, { borderColor: '#6249cabe' }]}
-                    >
-                      <SymbolView
-                        name={{ ios: 'square.and.pencil', android: 'edit', web: 'edit' } as any}
-                        tintColor='#8769ffbe'
-                        size={20}
-                      />
-                      <ThemedText type="smallBold">
-                        Update profile
-                      </ThemedText>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-
-                <View style={[styles.panel, { borderColor: theme.tabActiveBorder }]}>
-                  <View style={styles.panelHeader}>
-                    <ThemedText style={styles.panelHeaderText} type="smallBold">
-                      Discovery preferences
-                    </ThemedText>
-                    {prefsSaved && <ThemedText type="small" themeColor="textSecondary">
-                      Saved
-                    </ThemedText>}
-                  </View>
-
-                  <View style={styles.row}>
-                    <View style={styles.field}>
-                      <ThemedText type="smallBold">Minimum age</ThemedText>
-                      <TextInput
-                        value={minAge}
-                        onChangeText={(text) => {
-                          setMinAge(sanitizeAge(text));
-                          setPrefsError(null);
-                        }}
-                        keyboardType="number-pad"
-                        maxLength={3}
-                        placeholder={String(MIN_ALLOWED_AGE)}
-                        placeholderTextColor={theme.iconMuted}
-                        style={[styles.input, { borderColor: theme.tabActiveBorder, color: theme.text }]}
-                      />
-                    </View>
-                    <View style={styles.field}>
-                      <ThemedText type="smallBold">Maximum age</ThemedText>
-                      <TextInput
-                        value={maxAge}
-                        onChangeText={(text) => {
-                          setMaxAge(sanitizeAge(text));
-                          setPrefsError(null);
-                        }}
-                        keyboardType="number-pad"
-                        maxLength={3}
-                        placeholder={String(MAX_ALLOWED_AGE)}
-                        placeholderTextColor={theme.iconMuted}
-                        style={[styles.input, { borderColor: theme.tabActiveBorder, color: theme.text }]}
-                      />
-                    </View>
-                  </View>
-
-                  <View style={styles.fieldBlock}>
-                    <ThemedText type="smallBold">Gender</ThemedText>
-                    <View style={styles.segmented}>
-                      {GENDER_OPTIONS.map((option) => {
-                        const selected = option === gender;
-
-                        return (
-                          <TouchableOpacity
-                            key={option || 'any'}
-                            onPress={() => setGender(option)}
-                            style={[
-                              styles.segment,
-                              {
-                                borderColor: theme.tabActiveBorder,
-                                backgroundColor: selected ? theme.backgroundElement : 'transparent',
-                              },
-                            ]}
-                          >
-                            <ThemedText
-                              type="smallBold"
-                              style={[styles.segmentText, selected && styles.segmentTextSelected]}
-                            >
-                              {genderOptionLabel(option)}
-                            </ThemedText>
-                          </TouchableOpacity>
-                        );
-                      })}
-                    </View>
-                  </View>
-
-                  <View style={styles.fieldBlock}>
-                    <ThemedText type="smallBold">Country</ThemedText>
-                    <SelectField
-                      value={country || COUNTRY_ANY}
-                      options={COUNTRY_OPTIONS}
-                      onChange={(value) => setCountry(value === COUNTRY_ANY ? '' : value)}
-                      placeholder="Any country"
-                      title="Country"
-                      searchable
-                    />
-                  </View>
-
-                  <View style={styles.fieldBlock}>
-                    <ThemedText type="smallBold">Interests</ThemedText>
-                    <InterestsSelect value={interests} onChange={setInterests} requireMin={false} />
-                  </View>
-
-                  {prefsError && (
-                    <ThemedText type="small" style={styles.errorText}>
-                      {prefsError}
-                    </ThemedText>
-                  )}
-
-                  <View style={styles.actionsRow}>
-                    <TouchableOpacity
-                      onPress={savePreferences}
-                      disabled={savingPrefs}
-                      style={[styles.buttonStyle]}
-                    >
-                      <SymbolView
-                        name={{ ios: 'save', android: 'save', web: 'save' } as any}
-                        tintColor='#8769ffbe'
-                        size={20}
-                      />
-                      <ThemedText type="smallBold">
-                        Save changes
-                      </ThemedText>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-
-                <View style={styles.actionsRow}>
-                  <TouchableOpacity
-                    onPress={onLogout}
-                    style={[styles.buttonStyle, { borderColor: '#ef4444' }]}
-                  >
-                    <SymbolView
-                      name={{ ios: 'rectangle.portrait.and.arrow.right', android: 'logout', web: 'logout' } as any}
-                      tintColor="#ef4444"
-                      size={20}
-                    />
-                    <ThemedText type="smallBold">
-                      Logout
-                    </ThemedText>
-                  </TouchableOpacity>
-                </View>
-              </ScrollView>
-            </SafeAreaView>
-          </ThemedView>
-        </Modal>
+                <SymbolView
+                  name={{ ios: 'rectangle.portrait.and.arrow.right', android: 'logout', web: 'logout' } as any}
+                  tintColor="#ef4444"
+                  size={20}
+                />
+                <ThemedText type="smallBold">
+                  Logout
+                </ThemedText>
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
+        </ResponsiveModalSheet>
       </SafeAreaView>
     </ThemedView>
   );
@@ -666,32 +639,8 @@ const styles = StyleSheet.create({
     gap: Spacing.two,
     borderWidth: 1,
   },
-  modalContainer: {
+  settingsScroll: {
     flex: 1,
-  },
-  modalSafeArea: {
-    flex: 1,
-    maxWidth: MaxContentWidth,
-    width: '100%',
-    alignSelf: 'center',
-  },
-  modalTopBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.three,
-    borderBottomWidth: 0.5,
-  },
-  modalTopBarSide: {
-    width: 40,
-    height: 40,
-    alignItems: 'flex-start',
-    justifyContent: 'center',
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: '700',
   },
   modalContent: {
     padding: Spacing.three,

@@ -282,10 +282,9 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
-    minHeight: 40,
-    maxHeight: 120,
+    height: 40,
     borderWidth: 1,
-    borderRadius: 12,
+    borderRadius: 8,
     paddingHorizontal: Spacing.three,
     paddingTop: Spacing.two,
     fontSize: 16,
