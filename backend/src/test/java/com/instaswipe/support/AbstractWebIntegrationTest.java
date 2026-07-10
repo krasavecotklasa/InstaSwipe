@@ -9,13 +9,16 @@ import com.instaswipe.model.User;
 import com.instaswipe.model.UserProfile;
 import com.instaswipe.repository.UserRepository;
 import com.instaswipe.service.JwtService;
+import org.apache.hc.client5.http.impl.classic.HttpClientBuilder;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.context.annotation.Import;
 import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.HttpStatusCode;
+import org.springframework.http.client.HttpComponentsClientHttpRequestFactory;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.web.client.RestClient;
 
@@ -48,9 +51,21 @@ public abstract class AbstractWebIntegrationTest {
     @Autowired
     protected MongoTemplate mongoTemplate;
 
+    @Autowired
+    protected StringRedisTemplate redisTemplate;
+
     @BeforeEach
     void clearUsers() {
         userRepository.deleteAll();
+    }
+
+    @BeforeEach
+    void clearRateLimits() {
+        // Rate-limit counters live in the same Redis instance for the whole life of this
+        // (context-cached) test class, so without a reset they accumulate across unrelated
+        // tests that happen to call the same rate-limited endpoint (e.g. register/login as
+        // setup) and eventually trip limits meant for production abuse, not test traffic.
+        redisTemplate.getConnectionFactory().getConnection().serverCommands().flushAll();
     }
 
     protected RestClient client() {
@@ -58,8 +73,17 @@ public abstract class AbstractWebIntegrationTest {
     }
 
     protected RestClient client(String token) {
+        // The default auto-detected request factory (Apache HttpClient5, present on the
+        // classpath) retries 429 responses that carry a Retry-After header by sleeping for
+        // that many seconds before retrying — silently, with no exception. That turns any
+        // rate-limited call into a real-time hang instead of a response the test can assert
+        // on, so automatic retries are disabled here.
+        HttpComponentsClientHttpRequestFactory requestFactory = new HttpComponentsClientHttpRequestFactory(
+                HttpClientBuilder.create().disableAutomaticRetries().build());
+
         RestClient.Builder builder = RestClient.builder()
                 .baseUrl("http://localhost:" + port)
+                .requestFactory(requestFactory)
                 // Swallow error statuses so tests can assert on ResponseEntity#getStatusCode().
                 .defaultStatusHandler(HttpStatusCode::isError, (request, response) -> { });
         if (token != null) {

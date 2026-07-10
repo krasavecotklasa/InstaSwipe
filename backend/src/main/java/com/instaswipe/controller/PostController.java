@@ -1,5 +1,7 @@
 package com.instaswipe.controller;
 
+import com.instaswipe.ratelimit.KeyStrategy;
+import com.instaswipe.ratelimit.RateLimited;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -32,6 +34,7 @@ public class PostController {
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @ResponseStatus(HttpStatus.CREATED)
+    @RateLimited(bucket = "post-create", keyBy = KeyStrategy.USER, limit = 20, windowSeconds = 3600)
     public PostResponse createPost(
         @Valid @ModelAttribute CreatePostRequest request,
         @AuthenticationPrincipal String userId) {

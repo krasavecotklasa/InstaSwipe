@@ -3,14 +3,13 @@ package com.instaswipe.controller;
 import com.instaswipe.dto.EmailRequest;
 import com.instaswipe.dto.EmailResponse;
 import com.instaswipe.model.User;
+import com.instaswipe.ratelimit.KeyStrategy;
+import com.instaswipe.ratelimit.RateLimited;
 import com.instaswipe.repository.UserRepository;
 import com.instaswipe.service.EmailService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/emails")
@@ -20,7 +19,8 @@ public class EmailController {
     private final UserRepository userRepository;
     private final EmailService emailService;
 
-    @GetMapping("/test/{userId}")
+    @PostMapping("/test/{userId}")
+    @RateLimited(bucket = "email-test", keyBy = KeyStrategy.USER, limit = 20, windowSeconds = 3600)
     public ResponseEntity<EmailResponse> sendTestEmail(@PathVariable String userId) {
         User user = userRepository.findById(userId).orElse(null);
 

@@ -8,6 +8,9 @@ import com.instaswipe.dto.ResetPasswordRequest;
 import com.instaswipe.dto.TokenRequest;
 import com.instaswipe.dto.UserResponse;
 import com.instaswipe.dto.VerifyOtpTokenRequest;
+import com.instaswipe.ratelimit.KeyStrategy;
+import com.instaswipe.ratelimit.RateLimited;
+import com.instaswipe.ratelimit.RateLimits;
 import com.instaswipe.service.AuthService;
 import com.instaswipe.service.AuthSession;
 import com.instaswipe.service.OtpService;
@@ -32,11 +35,14 @@ public class AuthController {
 
     @PostMapping("/register")
     @ResponseStatus(HttpStatus.CREATED)
+    @RateLimited(bucket = "register", keyBy = KeyStrategy.IP, limit = 10, windowSeconds = 3600)
     public UserResponse register(@Valid @RequestBody RegisterRequest request) {
         return authService.register(request);
     }
 
     @PostMapping("/login")
+    @RateLimited(bucket = "login", keyBy = KeyStrategy.IP, limit = 20, windowSeconds = 600)
+    @RateLimited(bucket = "login", keyBy = KeyStrategy.EMAIL, limit = 5, windowSeconds = 600)
     public AuthResponse login(@Valid @RequestBody LoginRequest request) {
         AuthSession session = authService.login(request);
         return toResponse(session);
@@ -56,6 +62,8 @@ public class AuthController {
 
     @PostMapping("/password/forgot")
     @ResponseStatus(HttpStatus.OK)
+    @RateLimited(bucket = "forgot-password", keyBy = KeyStrategy.IP, limit = 10, windowSeconds = 3600)
+    @RateLimited(bucket = "forgot-password", keyBy = KeyStrategy.EMAIL, limit = 3, windowSeconds = 3600)
     public void sendPasswordResetToken(@RequestBody @Valid ForgotPasswordRequest request) {
         otpService.sendOtp(request.email());
     }
