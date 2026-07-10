@@ -28,7 +28,7 @@ class RateLimitAspectTest {
     @BeforeEach
     void setUp() {
         MockHttpServletRequest request = new MockHttpServletRequest();
-        request.setRemoteAddr("10.0.0." + (System.nanoTime() % 250));
+        request.setRemoteAddr("10.0.0.1-" + System.nanoTime());
         RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request));
     }
 
@@ -53,7 +53,7 @@ class RateLimitAspectTest {
         assertThatThrownBy(target::byIp).isInstanceOf(RateLimitExceededException.class);
 
         MockHttpServletRequest other = new MockHttpServletRequest();
-        other.setRemoteAddr("10.0.0.201");
+        other.setRemoteAddr("10.0.0.2-" + System.nanoTime());
         RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(other));
 
         assertThat(target.byIp()).isEqualTo("ok");
