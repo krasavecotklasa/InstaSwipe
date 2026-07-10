@@ -283,6 +283,7 @@ export default function OnboardingGate({ onOnboardSuccess, mode = 'create', init
                 placeholder="Select your country"
                 title="Country"
                 searchable
+                inlineOnWeb
               />
 
               <ThemedText style={styles.label}>Gender</ThemedText>

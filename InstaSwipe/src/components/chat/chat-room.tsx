@@ -264,7 +264,6 @@ const styles = StyleSheet.create({
   },
   emptyInverted: {
     textAlign: 'center',
-    paddingVertical: Spacing.five,
   },
   errorText: {
     color: '#ef4444',
@@ -286,6 +285,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingHorizontal: Spacing.three,
     paddingTop: Spacing.two,
+    marginTop: Spacing.one,
     fontSize: 16,
     backgroundColor: 'rgba(255, 255, 255, 0.06)',
   },

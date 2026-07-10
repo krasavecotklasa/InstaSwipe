@@ -1,6 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Platform,
+  Keyboard,
+  KeyboardAvoidingView,
   Pressable,
   StyleSheet,
   TextInput,
@@ -48,7 +50,23 @@ export default function PostComposer({ visible, onClose, onPosted }: PostCompose
   const [caption, setCaption] = useState('');
   const [image, setImage] = useState<ImagePicker.ImagePickerAsset | null>(null);
   const [loading, setLoading] = useState(false);
+  const scrollRef = useRef<ScrollView>(null);
+  const captionFocusedRef = useRef(false);
   const theme = useTheme();
+
+  useEffect(() => {
+    if (!visible || Platform.OS === 'web') {
+      return;
+    }
+
+    const subscription = Keyboard.addListener('keyboardDidShow', () => {
+      if (captionFocusedRef.current) {
+        scrollRef.current?.scrollToEnd({ animated: true });
+      }
+    });
+
+    return () => subscription.remove();
+  }, [visible]);
 
   const reset = () => {
     setCaption('');
@@ -114,12 +132,20 @@ export default function PostComposer({ visible, onClose, onPosted }: PostCompose
       closeAccessibilityLabel="Close new post"
       closeDisabled={loading}
     >
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={styles.scrollContent}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator
+      <KeyboardAvoidingView
+        style={styles.keyboardAvoidingView}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? Spacing.three : 0}
       >
+        <ScrollView
+          ref={scrollRef}
+          style={styles.scroll}
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+          automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
+          showsVerticalScrollIndicator
+        >
         <ModalSheetPanel
           title="Post"
           trailing={
@@ -169,6 +195,12 @@ export default function PostComposer({ visible, onClose, onPosted }: PostCompose
                 numberOfLines={4}
                 maxLength={CAPTION_MAX_LENGTH}
                 editable={!loading}
+                onFocus={() => {
+                  captionFocusedRef.current = true;
+                }}
+                onBlur={() => {
+                  captionFocusedRef.current = false;
+                }}
               />
 
               <Pressable
@@ -194,12 +226,16 @@ export default function PostComposer({ visible, onClose, onPosted }: PostCompose
             </View>
           </View>
         </ModalSheetPanel>
-      </ScrollView>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </ResponsiveModalSheet>
   );
 }
 
 const styles = StyleSheet.create({
+  keyboardAvoidingView: {
+    flex: 1,
+  },
   scroll: {
     flex: 1,
   },
