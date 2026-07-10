@@ -1,21 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  GestureResponderEvent,
-  Modal,
   NativeScrollEvent,
   NativeSyntheticEvent,
   Platform,
-  Pressable,
   ScrollView,
   StyleSheet,
   View,
 } from 'react-native';
 import { Image } from 'expo-image';
-import { SymbolView } from 'expo-symbols';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { PostCard, type Post } from '@/components/post-card';
+import ResponsiveModalSheet, { ModalSheetPanel } from '@/components/responsive-modal-sheet';
 import { ThemedText } from '@/components/themed-text';
 import { Colors, Spacing } from '@/constants/theme';
 import { type DiscoveryProfile } from '@/hooks/matches';
@@ -40,7 +36,6 @@ export default function DiscoveryProfileModal({
   const theme = useTheme();
   const isWeb = Platform.OS === 'web';
   const activeProfileIdRef = useRef<string | null>(null);
-  const sheetDragStartYRef = useRef<number | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
   const [postsPage, setPostsPage] = useState(0);
   const [postsLast, setPostsLast] = useState(true);
@@ -138,264 +133,127 @@ export default function DiscoveryProfileModal({
     }
   };
 
-  const handleSheetTouchStart = (event: GestureResponderEvent) => {
-    sheetDragStartYRef.current = event.nativeEvent.pageY;
-  };
-
-  const handleSheetTouchEnd = (event: GestureResponderEvent) => {
-    const startY = sheetDragStartYRef.current;
-    sheetDragStartYRef.current = null;
-
-    if (!isWeb && startY != null && event.nativeEvent.pageY - startY > PROFILE_CLOSE_THRESHOLD) {
-      onClose();
-    }
-  };
-
   return (
-    <Modal
+    <ResponsiveModalSheet
       visible={visible}
-      transparent
-      animationType={isWeb ? 'fade' : 'slide'}
-      onRequestClose={onClose}
+      onClose={onClose}
+      closeAccessibilityLabel="Close profile"
     >
-      <Pressable
-        style={[styles.backdrop, isWeb ? styles.webBackdrop : styles.mobileBackdrop]}
-        onPress={onClose}
-      >
-        <Pressable
-          onPress={(event) => event.stopPropagation()}
-          style={[
-            styles.surface,
-            isWeb ? styles.webSurface : styles.mobileSurface,
-            {
-              backgroundColor: theme.background,
-              borderColor: theme.tabActiveBorder,
-            },
-          ]}
+      {profile && (
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator
+          onScroll={handleScroll}
+          scrollEventThrottle={200}
         >
-          <SafeAreaView
-            edges={isWeb ? ['left', 'right'] : ['left', 'right', 'bottom']}
-            style={styles.surfaceContent}
-          >
-            <View
-              onTouchStart={handleSheetTouchStart}
-              onTouchEnd={handleSheetTouchEnd}
-              style={[styles.surfaceHeader, { borderBottomColor: theme.tabActiveBorder }]}
-            >
-              <Pressable
-                onPress={onClose}
-                accessibilityRole="button"
-                accessibilityLabel="Close profile"
-                style={[styles.headerCloseButton, { borderColor: theme.tabActiveBorder }]}
-              >
-                <SymbolView
-                  name={{ ios: 'xmark', android: 'close', web: 'close' } as any}
-                  tintColor="#8769ffbe"
-                  size={20}
+          <ModalSheetPanel title="Profile">
+            <View style={styles.profileBlock}>
+              <View style={styles.profileTopRow}>
+                <Image
+                  source={profile.profilePictureUrl ? { uri: profile.profilePictureUrl } : undefined}
+                  style={styles.avatar}
+                  contentFit="cover"
+                  transition={200}
                 />
-              </Pressable>
-            </View>
 
-            {profile && (
-              <ScrollView
-                style={styles.scroll}
-                contentContainerStyle={styles.scrollContent}
-                showsVerticalScrollIndicator
-                onScroll={handleScroll}
-                scrollEventThrottle={200}
-              >
-              <View style={[styles.panel, { borderColor: theme.tabActiveBorder }]}>
-                <View style={styles.panelHeader}>
-                  <ThemedText style={styles.panelHeaderText} type="smallBold">
-                    Profile
-                  </ThemedText>
-                </View>
-
-                <View style={styles.profileBlock}>
-                  <View style={styles.profileTopRow}>
-                    <Image
-                      source={profile.profilePictureUrl ? { uri: profile.profilePictureUrl } : undefined}
-                      style={styles.avatar}
-                      contentFit="cover"
-                      transition={200}
-                    />
-
-                    <View style={styles.profileMeta}>
-                      <ThemedText type="smallBold" style={styles.profileName}>
-                        {profile.displayName}
-                      </ThemedText>
-                      <ThemedText type="small" themeColor="textSecondary">
-                        Age: <ThemedText type="small" themeColor="textSecondary" style={styles.profileMetaDetail}>{profile.age}</ThemedText>
-                      </ThemedText>
-                      <ThemedText type="small" themeColor="textSecondary">
-                        Country: <ThemedText type="small" themeColor="textSecondary" style={styles.profileMetaDetail}>{profile.country}</ThemedText>
-                      </ThemedText>
-                      <ThemedText type="small" themeColor="textSecondary">
-                        Gender: <ThemedText type="small" themeColor="textSecondary" style={styles.profileMetaDetail}>{profile.gender}</ThemedText>
-                      </ThemedText>
-                    </View>
-                  </View>
-
-                  <View style={styles.bioInterestsRow}>
-                    <View style={[styles.bioColumn, { borderColor: theme.tabActiveBorder }]}>
-                      <ThemedText type="smallBold">About:</ThemedText>
-                      {!!profile.bio && (
-                        <ThemedText type="small" style={styles.bio}>
-                          {profile.bio}
-                        </ThemedText>
-                      )}
-                      <View style={styles.chips}>
-                        {(profile.interests ?? []).map((interest) => (
-                          <View key={interest} style={[styles.chip, { borderColor: theme.tabActiveBorder }]}>
-                            <ThemedText type="small" style={styles.chipText}>
-                              {interest}
-                            </ThemedText>
-                          </View>
-                        ))}
-                      </View>
-                    </View>
-                  </View>
-                </View>
-              </View>
-
-              <View style={styles.postsSection}>
-                <View style={styles.postsHeader}>
-                  <ThemedText type="smallBold" style={styles.postsTitle}>
-                    Posts
+                <View style={styles.profileMeta}>
+                  <ThemedText type="smallBold" style={styles.profileName}>
+                    {profile.displayName}
                   </ThemedText>
                   <ThemedText type="small" themeColor="textSecondary">
-                    {posts.length} {posts.length === 1 ? 'post' : 'posts'}
+                    Age: <ThemedText type="small" themeColor="textSecondary" style={styles.profileMetaDetail}>{profile.age}</ThemedText>
+                  </ThemedText>
+                  <ThemedText type="small" themeColor="textSecondary">
+                    Country: <ThemedText type="small" themeColor="textSecondary" style={styles.profileMetaDetail}>{profile.country}</ThemedText>
+                  </ThemedText>
+                  <ThemedText type="small" themeColor="textSecondary">
+                    Gender: <ThemedText type="small" themeColor="textSecondary" style={styles.profileMetaDetail}>{profile.gender}</ThemedText>
                   </ThemedText>
                 </View>
+              </View>
 
-                {loadingPosts ? (
-                  <View style={styles.emptyState}>
-                    <ActivityIndicator size="large" color={theme.text} />
-                  </View>
-                ) : postsError ? (
-                  <View style={[styles.notice, { borderColor: '#ef4444' }]}>
-                    <ThemedText type="small" style={styles.errorText}>
-                      {postsError}
+              <View style={styles.bioInterestsRow}>
+                <View style={[styles.bioColumn, { borderColor: theme.tabActiveBorder }]}>
+                  <ThemedText type="smallBold">About:</ThemedText>
+                  {!!profile.bio && (
+                    <ThemedText type="small" style={styles.bio}>
+                      {profile.bio}
                     </ThemedText>
-                  </View>
-                ) : posts.length > 0 ? (
-                  <View style={styles.postsList}>
-                    {posts.map((post) => (
-                      <PostCard key={post.id} post={post} />
+                  )}
+                  <View style={styles.chips}>
+                    {(profile.interests ?? []).map((interest) => (
+                      <View key={interest} style={[styles.chip, { borderColor: theme.tabActiveBorder }]}>
+                        <ThemedText type="small" style={styles.chipText}>
+                          {interest}
+                        </ThemedText>
+                      </View>
                     ))}
                   </View>
-                ) : (
-                  <View style={styles.emptyState}>
-                    <ThemedText type="small" themeColor="textSecondary">
-                      No posts yet.
-                    </ThemedText>
-                  </View>
-                )}
-
-                {loadingMorePosts && (
-                  <View style={styles.footerState}>
-                    <ActivityIndicator color={theme.text} />
-                  </View>
-                )}
-
-                {!loadingPosts && posts.length > 0 && postsLast && (
-                  <ThemedText type="small" themeColor="textSecondary" style={styles.endText}>
-                    End of posts
-                  </ThemedText>
-                )}
+                </View>
               </View>
-              </ScrollView>
+            </View>
+          </ModalSheetPanel>
+
+          <View style={styles.postsSection}>
+            <View style={styles.postsHeader}>
+              <ThemedText type="smallBold" style={styles.postsTitle}>
+                Posts
+              </ThemedText>
+              <ThemedText type="small" themeColor="textSecondary">
+                {posts.length} {posts.length === 1 ? 'post' : 'posts'}
+              </ThemedText>
+            </View>
+
+            {loadingPosts ? (
+              <View style={styles.emptyState}>
+                <ActivityIndicator size="large" color={theme.text} />
+              </View>
+            ) : postsError ? (
+              <View style={[styles.notice, { borderColor: '#ef4444' }]}>
+                <ThemedText type="small" style={styles.errorText}>
+                  {postsError}
+                </ThemedText>
+              </View>
+            ) : posts.length > 0 ? (
+              <View style={styles.postsList}>
+                {posts.map((post) => (
+                  <PostCard key={post.id} post={post} />
+                ))}
+              </View>
+            ) : (
+              <View style={styles.emptyState}>
+                <ThemedText type="small" themeColor="textSecondary">
+                  No posts yet.
+                </ThemedText>
+              </View>
             )}
-          </SafeAreaView>
-        </Pressable>
-      </Pressable>
-    </Modal>
+
+            {loadingMorePosts && (
+              <View style={styles.footerState}>
+                <ActivityIndicator color={theme.text} />
+              </View>
+            )}
+
+            {!loadingPosts && posts.length > 0 && postsLast && (
+              <ThemedText type="small" themeColor="textSecondary" style={styles.endText}>
+                End of posts
+              </ThemedText>
+            )}
+          </View>
+        </ScrollView>
+      )}
+    </ResponsiveModalSheet>
   );
 }
 
 const styles = StyleSheet.create({
-  backdrop: {
-    flex: 1,
-  },
-  webBackdrop: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: Spacing.three,
-    backgroundColor: 'rgba(0, 0, 0, 0.72)',
-  },
-  mobileBackdrop: {
-    justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0, 0, 0, 0.35)',
-  },
-  surface: {
-    borderWidth: 1,
-    overflow: 'hidden',
-  },
-  surfaceContent: {
-    flex: 1,
-  },
-  webSurface: {
-    width: '100%',
-    maxWidth: 720,
-    maxHeight: '88%',
-    borderRadius: 8,
-  },
-  mobileSurface: {
-    height: '75%',
-    borderTopLeftRadius: 18,
-    borderTopRightRadius: 18,
-  },
-  surfaceHeader: {
-    minHeight: 56,
-    borderBottomWidth: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two,
-  },
-  surfaceHeaderTitle: {
-    marginRight: 'auto',
-  },
-  headerCloseButton: {
-    position: 'absolute',
-    right: Spacing.three,
-    width: 40,
-    height: 40,
-    borderWidth: 1,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  sheetHandle: {
-    width: 44,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: 'rgba(168, 146, 191, 0.55)',
-  },
   scroll: {
     flex: 1,
   },
   scrollContent: {
     padding: Spacing.three,
     gap: Spacing.three,
-  },
-  panel: {
-    borderWidth: 1,
-    padding: Spacing.three,
-    gap: Spacing.three,
-    backgroundColor: 'rgba(0, 0, 0, 0.08)',
-  },
-  panelHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: Spacing.two,
-  },
-  panelHeaderText: {
-    bottom: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   profileBlock: {
     gap: Spacing.three,
