@@ -2,6 +2,7 @@ package com.instaswipe.service;
 
 import com.instaswipe.dto.OnboardingStatusResponse;
 import com.instaswipe.dto.OwnProfileResponse;
+import com.instaswipe.dto.PageResponse;
 import com.instaswipe.dto.ProfileUpdateRequest;
 import com.instaswipe.dto.PublicProfileResponse;
 import com.instaswipe.event.ImageTarget;
@@ -13,6 +14,8 @@ import com.instaswipe.model.UserProfile;
 import com.instaswipe.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -146,7 +149,7 @@ public class ProfileService {
         }
 
         return new OwnProfileResponse(
-                userId,
+                user.getId(),
                 user.getEmail(),
                 profile.getName(),
                 profile.getBio(),
@@ -169,14 +172,35 @@ public class ProfileService {
             throw new IllegalArgumentException("Profile not available");
         }
 
-        // Calculate age dynamically from birthdate (the raw birth date is never exposed publicly)
+        return toPublicProfileResponse(targetUser);
+    }
+
+    /**
+     * Free-text people search by display name. Does not exclude liked/passed users
+     * (that filtering belongs to discovery/matching, not a plain search).
+     */
+    public PageResponse<PublicProfileResponse> searchProfiles(String requesterId, String query, Pageable pageable) {
+        String trimmed = query == null ? "" : query.trim();
+        if (trimmed.isEmpty()) {
+            return PageResponse.from(Page.<PublicProfileResponse>empty(pageable));
+        }
+
+        Page<PublicProfileResponse> page = userRepository
+                .searchByDisplayName(trimmed, requesterId, pageable)
+                .map(this::toPublicProfileResponse);
+        return PageResponse.from(page);
+    }
+
+    private PublicProfileResponse toPublicProfileResponse(User user) {
+        UserProfile profile = user.getProfile();
+        // Age is derived from the birth date so the raw date is never exposed publicly.
         int age = 0;
         if (profile.getBirthDate() != null) {
             age = Period.between(profile.getBirthDate(), LocalDate.now()).getYears();
         }
 
         return new PublicProfileResponse(
-                targetUser.getId(),
+                user.getId(),
                 profile.getName(),
                 profile.getBio(),
                 age,

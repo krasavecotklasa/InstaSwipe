@@ -9,6 +9,7 @@ import { normalizeMediaUrl } from '@/hooks/media';
 
 const DISCOVERY_BASE_PATH = `${API_PREFIX}/discovery`;
 const MATCHES_BASE_PATH = `${API_PREFIX}/matches`;
+const PROFILE_BASE_PATH = `${API_PREFIX}/profile`;
 
 const PAGE_SIZE = 20;
 // Prefetch the next page once the in-memory stack drops to this many cards so the
@@ -213,6 +214,20 @@ export class MatchAPI {
 export const getDiscovery = MatchAPI.getDiscovery;
 export const lovePerson = MatchAPI.lovePerson;
 export const passPerson = MatchAPI.passPerson;
+
+export const getPublicProfile = async (userId: string): Promise<DiscoveryProfile> => {
+  const response = await authorizedFetch(`${PROFILE_BASE_PATH}/${userId}`, {
+    method: 'GET',
+    headers: { Accept: 'application/json' },
+  });
+
+  if (!response.ok) {
+    const message = await response.text();
+    throw new Error(message || `Profile request failed with status ${response.status}`);
+  }
+
+  return normalizeDiscoveryProfile(await response.json());
+};
 
 const toDiscoveryFilters = (preferences: DiscoveryPreferences, page: number): DiscoveryFilters => ({
   minAge: preferences.minAge === '' ? undefined : preferences.minAge,

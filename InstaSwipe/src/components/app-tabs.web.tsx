@@ -128,7 +128,7 @@ const styles = StyleSheet.create({
   tabButtonView: {
     paddingVertical: Spacing.two,
     paddingHorizontal: Spacing.four,
-    borderRadius: Spacing.four,
+    borderRadius: 8,
     borderWidth: 1,
     minWidth: 48,
     minHeight: 48,

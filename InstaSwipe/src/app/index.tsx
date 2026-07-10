@@ -10,6 +10,8 @@ import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import Header from '@/components/header';
 import { fetchFeed } from '@/hooks/posts';
+import { type DiscoveryProfile, getPublicProfile } from '@/hooks/matches';
+import DiscoveryProfileModal from '@/components/discovery-profile-modal';
 
 function ComposerEntry({ onPress }: { onPress: () => void }) {
   const theme = useTheme();
@@ -19,19 +21,19 @@ function ComposerEntry({ onPress }: { onPress: () => void }) {
       onPress={onPress}
       style={({ pressed }) => [
         styles.composer,
-        { borderColor: theme.tabActiveBorder },
+        { borderColor: '#6249cabe' },
         pressed && styles.composerPressed,
       ]}
     >
-      <View style={[styles.composerBadge, { backgroundColor: theme.backgroundElement }]}>
+      <View style={[styles.composerBadge]}>
         <SymbolView
           name={{ ios: 'plus', android: 'add', web: 'add' } as any}
-          tintColor="#ffffff"
+          tintColor="#8769ffbe"
           size={22}
         />
       </View>
       <ThemedText style={[styles.composerText, { color: theme.iconMuted }]}>
-        Share a new post
+        Create a new post
       </ThemedText>
     </Pressable>
   );
@@ -42,6 +44,8 @@ export default function HomeScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [composerVisible, setComposerVisible] = useState(false);
+  const [selectedProfile, setSelectedProfile] = useState<DiscoveryProfile | null>(null);
+  const [profileError, setProfileError] = useState<string | null>(null);
 
   const loadPosts = useCallback(async () => {
     setIsLoading(true);
@@ -62,6 +66,17 @@ export default function HomeScreen() {
     loadPosts();
   }, [loadPosts]);
 
+  const openAuthorProfile = useCallback(async (userId: string) => {
+    setProfileError(null);
+
+    try {
+      const nextProfile = await getPublicProfile(userId);
+      setSelectedProfile(nextProfile);
+    } catch (err) {
+      setProfileError(err instanceof Error ? err.message : 'Unable to load profile');
+    }
+  }, []);
+
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
@@ -70,7 +85,9 @@ export default function HomeScreen() {
         <FlatList
           data={posts}
           keyExtractor={(item) => item.id}
-          renderItem={({ item }) => <PostCard post={item} />}
+          renderItem={({ item }) => (
+            <PostCard post={item} onAuthorPress={openAuthorProfile} />
+          )}
           ListHeaderComponent={<ComposerEntry onPress={() => setComposerVisible(true)} />}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={true}
@@ -93,10 +110,21 @@ export default function HomeScreen() {
           }
         />
 
+        {!!profileError && (
+          <View style={styles.profileErrorNotice}>
+            <Text style={styles.emptyText}>{profileError}</Text>
+          </View>
+        )}
+
         <PostComposer
           visible={composerVisible}
           onClose={() => setComposerVisible(false)}
           onPosted={loadPosts}
+        />
+        <DiscoveryProfileModal
+          visible={Boolean(selectedProfile)}
+          profile={selectedProfile}
+          onClose={() => setSelectedProfile(null)}
         />
       </SafeAreaView>
     </ThemedView>
@@ -123,15 +151,17 @@ const styles = StyleSheet.create({
   composer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.two,
-    paddingVertical: Spacing.two,
-    paddingHorizontal: Spacing.three,
+    justifyContent: 'center',
+    gap: Spacing.one,
+    paddingVertical: Spacing.one,
+    marginHorizontal: 'auto',
+    paddingHorizontal: Spacing.one,
     marginBottom: Spacing.three,
     borderWidth: 1,
-    borderRadius: 999,
+    borderRadius: 8,
     backgroundColor: '#000000',
-    width: '100%',
-    maxWidth: Platform.OS === 'web' ? 500 : undefined,
+    width: Platform.OS === 'web' ? '80%' : '95%',
+    maxWidth: 'auto',
   },
   composerPressed: {
     opacity: 0.85,
@@ -139,7 +169,7 @@ const styles = StyleSheet.create({
   composerBadge: {
     width: 40,
     height: 40,
-    borderRadius: 20,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -156,5 +186,16 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 14,
     textAlign: 'center',
+  },
+  profileErrorNotice: {
+    position: 'absolute',
+    left: Spacing.three,
+    right: Spacing.three,
+    bottom: BottomTabInset + Spacing.three,
+    borderWidth: 1,
+    borderColor: '#ef4444',
+    borderRadius: 8,
+    padding: Spacing.two,
+    backgroundColor: 'rgba(239, 68, 68, 0.18)',
   },
 });
