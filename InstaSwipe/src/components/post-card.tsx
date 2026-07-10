@@ -76,7 +76,7 @@ export function PostCard({ post, onAuthorPress }: PostCardProps) {
   };
 
   return (
-    <View style={[styles.card, { borderColor: theme.tabActiveBorder }]}>
+    <View style={[styles.card, { backgroundColor: theme.tabActiveBackground, borderColor: theme.tabActiveBorder }]}>
       <Pressable
         onPress={onAuthorPress ? () => onAuthorPress(post.userId) : undefined}
         disabled={!onAuthorPress}
@@ -87,12 +87,12 @@ export function PostCard({ post, onAuthorPress }: PostCardProps) {
       >
         <Image
           source={post.profilePictureUrl ? { uri: post.profilePictureUrl } : undefined}
-          style={styles.avatar}
+          style={[styles.avatar, { backgroundColor: theme.backgroundSelected }]}
           contentFit="cover"
           transition={200}
         />
         <View style={styles.headerTextContainer}>
-          <Text style={styles.username}>{post.username}</Text>
+          <Text style={[styles.username, { color: theme.text }]}>{post.username}</Text>
           <Text style={[styles.date, { color: theme.textSecondary }]}>
             {post.createdAt}
           </Text>
@@ -100,7 +100,7 @@ export function PostCard({ post, onAuthorPress }: PostCardProps) {
       </Pressable>
 
       <View style={styles.body}>
-        <Text style={styles.description}>{post.caption}</Text>
+        <Text style={[styles.description, { color: theme.text }]}>{post.caption}</Text>
         {post.media && (
           post.media.status === 'FAILED' ? (
             <View style={[styles.postImage, styles.mediaFailed]}>
@@ -143,10 +143,10 @@ export function PostCard({ post, onAuthorPress }: PostCardProps) {
                 ? { ios: 'heart.fill', android: 'favorite', web: 'favorite' }
                 : { ios: 'heart', android: 'favorite_border', web: 'favorite_border' }) as any
             }
-            tintColor={liked ? '#ff3b30' : '#a892bf'}
+            tintColor={liked ? '#ff3b30' : theme.iconMuted}
             size={22}
           />
-          <Text style={[styles.interactionText, liked && styles.likedText]}>
+          <Text style={[styles.interactionText, { color: theme.iconMuted }, liked && styles.likedText]}>
             {likeCount}
           </Text>
         </Pressable>
@@ -155,7 +155,7 @@ export function PostCard({ post, onAuthorPress }: PostCardProps) {
         <Pressable style={[styles.interactionButton, styles.shareIconRight]}>
           <SymbolView
             name={{ ios: 'paperplane', android: 'share', web: 'share' } as any}
-            tintColor="#a892bf"
+            tintColor={theme.iconMuted}
             size={20}
           />
         </Pressable>
@@ -166,7 +166,6 @@ export function PostCard({ post, onAuthorPress }: PostCardProps) {
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#000000',
     borderWidth: 1,
     padding: Spacing.three,
     marginBottom: Spacing.three,
@@ -187,14 +186,12 @@ const styles = StyleSheet.create({
     height: 44,
     borderRadius: 22,
     marginRight: Spacing.two,
-    backgroundColor: '#1c1223',
   },
   headerTextContainer: {
     flex: 1,
     justifyContent: 'center',
   },
   username: {
-    color: '#ffffff',
     fontSize: 16,
     fontWeight: '700',
   },
@@ -210,7 +207,6 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.two,
   },
   description: {
-    color: '#f0f0f2',
     fontSize: 14,
     lineHeight: 20,
     marginBottom: Spacing.two,

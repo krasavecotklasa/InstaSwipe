@@ -1,5 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, StyleSheet, TouchableOpacity, View } from 'react-native';
+import {
+  Platform,
+  ActivityIndicator,
+  FlatList,
+  StyleSheet,
+  TouchableOpacity,
+  View
+} from 'react-native';
 import { Image } from 'expo-image';
 
 import { ThemedText } from '@/components/themed-text';
@@ -82,9 +89,13 @@ export function ConversationList({ onOpen }: ConversationListProps) {
       renderItem={renderItem}
       contentContainerStyle={styles.listContent}
       ListHeaderComponent={
+        <>
+        {Platform.OS === 'web' ? 
         <ThemedText type="subtitle" style={styles.title}>
-          Messages
+          Your chats
         </ThemedText>
+        : null}        
+        </>
       }
       ListEmptyComponent={
         <ThemedText type="small" themeColor="textSecondary" style={styles.empty}>

@@ -27,7 +27,7 @@ export const Colors = {
     icon: '#ffffff',
     textSecondary: '#9d92adc9',
     iconMuted: '#a892bf',
-    tabActiveBackground: '#312437',
+    tabActiveBackground: '#000000',
     tabActiveBorder: '#43344e',
   },
 } as const;

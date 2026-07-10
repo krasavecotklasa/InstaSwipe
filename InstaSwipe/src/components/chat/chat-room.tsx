@@ -4,6 +4,7 @@ import {
   FlatList,
   KeyboardAvoidingView,
   Platform,
+  Pressable,
   StyleSheet,
   TextInput,
   TouchableOpacity,
@@ -11,6 +12,7 @@ import {
 } from 'react-native';
 import { Image } from 'expo-image';
 import { SymbolView } from 'expo-symbols';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { BottomTabInset, Spacing } from '@/constants/theme';
@@ -32,15 +34,29 @@ const formatTime = (timestamp: string) => {
 
 export function ChatRoom({ conversation, onBack }: ChatRoomProps) {
   const theme = useTheme();
-  const { messages, currentUserId, connected, loading, error, send } = useChatRoom(
+  const insets = useSafeAreaInsets();
+  const { messages, currentUserId, loading, error, send } = useChatRoom(
     conversation.matchId,
     conversation.otherUserId,
   );
   const [draft, setDraft] = useState('');
+  const bottomClearance = BottomTabInset + insets.bottom;
+  const hasDraft = draft.trim().length > 0;
 
   const onSend = () => {
-    if (send(draft)) {
+    const message = draft.trim();
+    if (!message) {
+      return;
+    }
+    if (send(message)) {
       setDraft('');
+    }
+  };
+
+  const handleMessageKeyPress = (event: { nativeEvent: { key: string; shiftKey?: boolean }; preventDefault?: () => void }) => {
+    if (Platform.OS === 'web' && event.nativeEvent.key === 'Enter' && !event.nativeEvent.shiftKey) {
+      event.preventDefault?.();
+      onSend();
     }
   };
 
@@ -53,10 +69,11 @@ export function ChatRoom({ conversation, onBack }: ChatRoomProps) {
             styles.bubble,
             mine
               ? { backgroundColor: '#6249ca' }
-              : { backgroundColor: theme.backgroundElement, borderColor: theme.tabActiveBorder, borderWidth: 1 },
+              : { borderColor: theme.tabActiveBorder, borderWidth: 1 },
+            !mine && styles.bubbleTheirs,
           ]}
         >
-          <ThemedText type="small" style={mine ? styles.bubbleTextMine : undefined}>
+          <ThemedText type="small" style={mine ? styles.bubbleTextMine : { color: theme.textSecondary }}>
             {item.content}
           </ThemedText>
           <ThemedText
@@ -74,34 +91,30 @@ export function ChatRoom({ conversation, onBack }: ChatRoomProps) {
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={insets.top}
     >
       <View style={[styles.header, { borderBottomColor: theme.tabActiveBorder }]}>
-        <TouchableOpacity
-          onPress={onBack}
-          style={styles.backButton}
-          accessibilityRole="button"
-          accessibilityLabel="Back to conversations"
-        >
-          <SymbolView
-            name={{ ios: 'chevron.left', android: 'arrow_back', web: 'arrow_back' } as any}
-            tintColor="#8769ffbe"
-            size={22}
-          />
-        </TouchableOpacity>
         <Image
           source={conversation.otherUserPicture ? { uri: conversation.otherUserPicture } : undefined}
           style={styles.headerAvatar}
           contentFit="cover"
         />
-        <View style={styles.headerText}>
-          <ThemedText type="smallBold" numberOfLines={1}>
-            {conversation.otherUserName}
-          </ThemedText>
-          <ThemedText type="small" themeColor="textSecondary">
-            {connected ? 'Connected' : 'Connecting…'}
-          </ThemedText>
-        </View>
+        <ThemedText type="smallBold" numberOfLines={1} style={styles.headerTitle}>
+          {conversation.otherUserName}
+        </ThemedText>
+        <TouchableOpacity
+          onPress={onBack}
+          style={[styles.headerCloseButton, { borderColor: theme.tabActiveBorder }]}
+          accessibilityRole="button"
+          accessibilityLabel="Close chat"
+        >
+          <SymbolView
+            name={{ ios: 'xmark', android: 'close', web: 'close' } as any}
+            tintColor="#8769ffbe"
+            size={20}
+          />
+        </TouchableOpacity>
       </View>
 
       {loading ? (
@@ -115,6 +128,8 @@ export function ChatRoom({ conversation, onBack }: ChatRoomProps) {
           renderItem={renderMessage}
           inverted
           contentContainerStyle={styles.messagesContent}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
           ListEmptyComponent={
             <ThemedText type="small" themeColor="textSecondary" style={styles.emptyInverted}>
               {error ?? 'Say hello 👋'}
@@ -129,30 +144,49 @@ export function ChatRoom({ conversation, onBack }: ChatRoomProps) {
         </ThemedText>
       )}
 
-      <View style={[styles.inputRow, { borderTopColor: theme.tabActiveBorder }]}>
+      <View
+        style={[
+          styles.inputRow,
+          {
+            backgroundColor: theme.background,
+            borderTopColor: theme.tabActiveBorder,
+            paddingBottom: bottomClearance + Spacing.two,
+          },
+        ]}
+      >
         <TextInput
           value={draft}
-          onChangeText={setDraft}
+          onChangeText={(text) => setDraft(text)}
           placeholder="Message…"
           placeholderTextColor={theme.iconMuted}
           style={[styles.input, { color: theme.text, borderColor: theme.tabActiveBorder }]}
           multiline
           returnKeyType="send"
-          onSubmitEditing={onSend}
+          submitBehavior={Platform.OS === 'web' ? 'newline' : 'submit'}
+          onSubmitEditing={Platform.OS === 'web' ? undefined : onSend}
+          onKeyPress={handleMessageKeyPress}
         />
-        <TouchableOpacity
+        <Pressable
           onPress={onSend}
-          disabled={!draft.trim() || !connected}
-          style={[styles.sendButton, { opacity: !draft.trim() || !connected ? 0.5 : 1 }]}
+          hitSlop={8}
           accessibilityRole="button"
           accessibilityLabel="Send message"
+          accessibilityState={{ disabled: !hasDraft }}
+          style={({ pressed }) => [
+            styles.sendButton,
+            {
+              borderColor: theme.tabActiveBorder,
+              opacity: hasDraft ? (pressed ? 0.75 : 1) : 0.5,
+            },
+          ]}
         >
           <SymbolView
-            name={{ ios: 'paperplane.fill', android: 'send', web: 'send' } as any}
-            tintColor="#ffffff"
+            name={{ ios: 'paperplane', android: 'send', web: 'send' } as any}
+            tintColor="#8769ffbe"
             size={20}
+            pointerEvents="none"
           />
-        </TouchableOpacity>
+        </Pressable>
       </View>
     </KeyboardAvoidingView>
   );
@@ -170,25 +204,35 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.three,
+    justifyContent: 'center',
+    minHeight: 56,
     paddingHorizontal: Spacing.three,
-    paddingBottom: Spacing.three,
+    paddingVertical: Spacing.two,
     borderBottomWidth: 1,
   },
-  backButton: {
-    width: 36,
-    height: 36,
+  headerCloseButton: {
+    position: 'absolute',
+    right: Spacing.three,
+    width: 40,
+    height: 40,
+    borderWidth: 1,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },
   headerAvatar: {
+    position: 'absolute',
+    left: Spacing.three,
     width: 40,
     height: 40,
     borderRadius: 20,
     backgroundColor: '#24172c',
   },
-  headerText: {
-    flex: 1,
+  headerTitle: {
+    maxWidth: '70%',
+    textAlign: 'center',
+    fontSize: 16,
+    lineHeight: 22,
   },
   messagesContent: {
     padding: Spacing.three,
@@ -211,6 +255,10 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.two,
     gap: Spacing.half,
   },
+  bubbleTheirs: {
+    borderRadius: 8,
+    backgroundColor: 'transparent',
+  },
   bubbleTextMine: {
     color: '#ffffff',
   },
@@ -224,8 +272,6 @@ const styles = StyleSheet.create({
   },
   emptyInverted: {
     textAlign: 'center',
-    paddingVertical: Spacing.five,
-    transform: [{ scaleY: -1 }],
   },
   errorText: {
     color: '#ef4444',
@@ -236,27 +282,26 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-end',
     gap: Spacing.two,
-    paddingHorizontal: Spacing.three,
+    paddingHorizontal: Spacing.two,
     paddingTop: Spacing.two,
-    paddingBottom: BottomTabInset + Spacing.two,
     borderTopWidth: 1,
   },
   input: {
     flex: 1,
-    minHeight: 44,
-    maxHeight: 120,
+    height: 40,
     borderWidth: 1,
-    borderRadius: 12,
+    borderRadius: 8,
     paddingHorizontal: Spacing.three,
     paddingTop: Spacing.two,
+    marginTop: Spacing.one,
     fontSize: 16,
     backgroundColor: 'rgba(255, 255, 255, 0.06)',
   },
   sendButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#6249ca',
+    width: 40,
+    height: 40,
+    borderWidth: 1,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },

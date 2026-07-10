@@ -164,7 +164,7 @@ export default function MatchScreen() {
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-        <Header />
+        <Header title='Match'/>
         <View style={[styles.content, { paddingBottom: bottomClearance }]}>
           <View style={styles.header} />
 
@@ -202,14 +202,14 @@ export default function MatchScreen() {
                   </ThemedText>
                   <View style={styles.chips}>
                     {currentProfile.interests?.slice(0, MAX_VISIBLE_MATCH_INTERESTS).map((interest) => (
-                      <View key={`${currentProfile.id}-${interest}`} style={[styles.chip, { borderColor: theme.tabActiveBorder }]}>
+                      <View key={`${currentProfile.id}-${interest}`} style={[styles.chip, { backgroundColor: theme.backgroundSelected, borderColor: theme.tabActiveBorder }]}>
                         <ThemedText type="small">
                           {interest}
                         </ThemedText>
                       </View>
                     ))}
                     {(currentProfile.interests?.length ?? 0) > MAX_VISIBLE_MATCH_INTERESTS && (
-                      <View style={[styles.chip, { borderColor: theme.tabActiveBorder }]}>
+                      <View style={[styles.chip, { backgroundColor: theme.backgroundSelected, borderColor: theme.tabActiveBorder }]}>
                         <ThemedText type="small">
                           +{(currentProfile.interests?.length ?? 0) - MAX_VISIBLE_MATCH_INTERESTS}
                         </ThemedText>
@@ -368,7 +368,6 @@ const styles = StyleSheet.create({
     gap: Spacing.one,
   },
   chip: {
-    backgroundColor: '#2f2338',
     borderWidth: 1,
     borderRadius: 8,
     paddingHorizontal: Spacing.two,

@@ -1,6 +1,9 @@
-import React, { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Platform,
+  Keyboard,
+  KeyboardAvoidingView,
+  Pressable,
   StyleSheet,
   TextInput,
   TouchableOpacity,
@@ -9,14 +12,12 @@ import {
   ActivityIndicator,
   ScrollView,
   Image,
-  Modal,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { SymbolView } from 'expo-symbols';
+import ResponsiveModalSheet, { ModalSheetPanel } from '@/components/responsive-modal-sheet';
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Colors, Spacing } from '@/constants/theme';
+import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { createPost } from '@/hooks/posts';
 import { getImageValidationError } from '@/constants/media';
@@ -49,7 +50,23 @@ export default function PostComposer({ visible, onClose, onPosted }: PostCompose
   const [caption, setCaption] = useState('');
   const [image, setImage] = useState<ImagePicker.ImagePickerAsset | null>(null);
   const [loading, setLoading] = useState(false);
+  const scrollRef = useRef<ScrollView>(null);
+  const captionFocusedRef = useRef(false);
   const theme = useTheme();
+
+  useEffect(() => {
+    if (!visible || Platform.OS === 'web') {
+      return;
+    }
+
+    const subscription = Keyboard.addListener('keyboardDidShow', () => {
+      if (captionFocusedRef.current) {
+        scrollRef.current?.scrollToEnd({ animated: true });
+      }
+    });
+
+    return () => subscription.remove();
+  }, [visible]);
 
   const reset = () => {
     setCaption('');
@@ -66,8 +83,7 @@ export default function PostComposer({ visible, onClose, onPosted }: PostCompose
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
-        allowsEditing: true,
-        aspect: [1, 1],
+        allowsEditing: false,
         quality: 0.7,
       });
 
@@ -109,159 +125,172 @@ export default function PostComposer({ visible, onClose, onPosted }: PostCompose
   };
 
   return (
-    <Modal visible={visible} animationType="slide" onRequestClose={handleClose}>
-      <ThemedView style={styles.container}>
-        <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right', 'bottom']}>
-          <View style={[styles.topBar, { borderBottomColor: theme.tabActiveBorder }]}>
-            <TouchableOpacity onPress={handleClose} style={styles.topBarSide} disabled={loading}>
-              <SymbolView
-                name={{ ios: 'xmark', android: 'close', web: 'close' } as any}
-                tintColor={theme.text}
-                size={22}
-              />
+    <ResponsiveModalSheet
+      visible={visible}
+      onClose={handleClose}
+      title="New post"
+      closeAccessibilityLabel="Close new post"
+      closeDisabled={loading}
+    >
+      <KeyboardAvoidingView
+        style={styles.keyboardAvoidingView}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? Spacing.three : 0}
+      >
+        <ScrollView
+          ref={scrollRef}
+          style={styles.scroll}
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+          automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
+          showsVerticalScrollIndicator
+        >
+        <ModalSheetPanel
+          title="Post"
+          trailing={
+            <ThemedText type="small" themeColor="textSecondary">
+              {caption.length}/{CAPTION_MAX_LENGTH}
+            </ThemedText>
+          }
+        >
+          <View style={styles.formGrid}>
+            <TouchableOpacity
+              style={styles.imageTile}
+              onPress={handlePickImage}
+              activeOpacity={0.8}
+              disabled={loading}
+            >
+              {image ? (
+                <Image
+                  source={{ uri: image.uri }}
+                  style={[
+                    styles.imagePreview,
+                    { aspectRatio: image.width > 0 && image.height > 0 ? image.width / image.height : 1 },
+                  ]}
+                  resizeMode="contain"
+                />
+              ) : (
+                <View style={[styles.imagePlaceholder, { borderColor: theme.tabActiveBorder }]}>
+                  <SymbolView
+                    name={{ ios: 'photo.badge.plus', android: 'add_photo_alternate', web: 'add_photo_alternate' } as any}
+                    tintColor={theme.iconMuted}
+                    size={30}
+                  />
+                  <ThemedText style={[styles.imagePlaceholderText, { color: theme.iconMuted }]}>
+                    Add Photo
+                  </ThemedText>
+                </View>
+              )}
             </TouchableOpacity>
-            <ThemedText style={styles.topBarTitle}>New post</ThemedText>
-            <View style={styles.topBarSide} />
-          </View>
 
-          <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
-            <View style={styles.form}>
-              <TouchableOpacity style={styles.imageTile} onPress={handlePickImage}>
-                {image ? (
-                  <Image source={{ uri: image.uri }} style={styles.imagePreview} />
-                ) : (
-                  <View style={[styles.imagePlaceholder, { borderColor: theme.tabActiveBorder }]}>
-                    <SymbolView
-                      name={{ ios: 'photo.badge.plus', android: 'add_photo_alternate', web: 'add_photo_alternate' } as any}
-                      tintColor={theme.iconMuted}
-                      size={30}
-                    />
-                    <ThemedText style={[styles.imagePlaceholderText, { color: theme.iconMuted }]}>
-                      Add Photo
-                    </ThemedText>
-                  </View>
-                )}
-              </TouchableOpacity>
-
+            <View style={styles.captionColumn}>
               <TextInput
                 style={[styles.input, styles.textArea, { color: theme.text, borderColor: theme.tabActiveBorder }]}
-                placeholder="Write a caption…"
+                placeholder="Write a caption..."
                 placeholderTextColor={theme.iconMuted}
                 value={caption}
                 onChangeText={setCaption}
                 multiline
                 numberOfLines={4}
                 maxLength={CAPTION_MAX_LENGTH}
+                editable={!loading}
+                onFocus={() => {
+                  captionFocusedRef.current = true;
+                }}
+                onBlur={() => {
+                  captionFocusedRef.current = false;
+                }}
               />
-              <ThemedText style={[styles.charCount, { color: theme.iconMuted }]}>
-                {caption.length}/{CAPTION_MAX_LENGTH}
-              </ThemedText>
 
-              <TouchableOpacity
-                style={[styles.buttonStyle, { borderColor: '#6249cabe' }]}
+              <Pressable
+                style={({ pressed }) => [
+                  styles.submitButton,
+                  { borderColor: '#6249cabe' },
+                  (pressed || loading) && styles.submitButtonPressed,
+                ]}
                 onPress={handleSubmit}
                 disabled={loading}
               >
-
-                <SymbolView 
+                <SymbolView
                   name={{ ios: 'paperplane.fill', android: 'send', web: 'send' } as any}
                   tintColor="#8769ffbe"
-                  size={20} 
+                  size={20}
                 />
                 {loading ? (
-                  <ActivityIndicator color="#fff" />
+                  <ActivityIndicator color="#8769ffbe" />
                 ) : (
-                  <ThemedText type='smallBold'>Share post</ThemedText>
+                  <ThemedText type="smallBold">Share post</ThemedText>
                 )}
-              </TouchableOpacity>
+              </Pressable>
             </View>
-          </ScrollView>
-        </SafeAreaView>
-      </ThemedView>
-    </Modal>
+          </View>
+        </ModalSheetPanel>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </ResponsiveModalSheet>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  keyboardAvoidingView: {
     flex: 1,
   },
-  safeArea: {
+  scroll: {
     flex: 1,
-  },
-  topBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.three,
-    borderBottomWidth: 0.5,
-  },
-  topBarSide: {
-    width: 40,
-    height: 40,
-    alignItems: 'flex-start',
-    justifyContent: 'center',
-  },
-  topBarTitle: {
-    fontSize: 18,
-    fontWeight: '700',
   },
   scrollContent: {
-    paddingHorizontal: Spacing.four,
-    paddingVertical: Spacing.six,
-    flexGrow: 1,
-  },
-  form: {
+    padding: Spacing.three,
     gap: Spacing.three,
-    maxWidth: 400,
-    width: '100%',
-    alignSelf: 'center',
+  },
+  formGrid: {
+    flexDirection: Platform.OS === 'web' ? 'row' : 'column',
+    gap: Spacing.three,
+    alignItems: Platform.OS === 'web' ? 'flex-start' : 'stretch',
   },
   imageTile: {
-    alignSelf: 'center',
-    marginBottom: Spacing.two,
+    width: Platform.OS === 'web' ? 220 : '100%',
+    maxWidth: 320,
+    alignSelf: Platform.OS === 'web' ? 'flex-start' : 'center',
   },
   imagePlaceholder: {
-    width: 220,
-    height: 220,
-    borderRadius: 12,
+    width: '100%',
+    aspectRatio: 1,
+    borderRadius: 8,
     borderWidth: 1,
     borderStyle: 'dashed',
     justifyContent: 'center',
     alignItems: 'center',
     gap: Spacing.two,
+    backgroundColor: 'rgba(0, 0, 0, 0.06)',
   },
   imagePlaceholderText: {
     fontSize: 14,
     fontWeight: '600',
   },
   imagePreview: {
-    width: 220,
-    height: 220,
-    borderRadius: 12,
+    width: '100%',
+    borderRadius: 8,
+  },
+  captionColumn: {
+    flex: 1,
+    minWidth: Platform.OS === 'web' ? 260 : undefined,
+    gap: Spacing.three,
   },
   input: {
     borderWidth: 1,
     borderRadius: 8,
     paddingHorizontal: Spacing.three,
     fontSize: 16,
+    backgroundColor: 'rgba(0, 0, 0, 0.06)',
   },
   textArea: {
-    height: 120,
+    minHeight: 160,
     textAlignVertical: 'top',
     paddingTop: Spacing.three,
   },
-  charCount: {
-    fontSize: 12,
-    textAlign: 'right',
-    marginTop: -Spacing.two,
-  },
-  buttonStyle: {
-    borderColor: '#6249cabe',
+  submitButton: {
     minHeight: 44,
-    maxHeight: 50,
-    minWidth: 200,
     borderRadius: 8,
     paddingHorizontal: Spacing.three,
     alignItems: 'center',
@@ -269,11 +298,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: Spacing.two,
     borderWidth: 1,
-  },button: {
-    height: 50,
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: Spacing.four,
+    alignSelf: Platform.OS === 'web' ? 'flex-start' : 'stretch',
+    minWidth: Platform.OS === 'web' ? 180 : undefined,
+  },
+  submitButtonPressed: {
+    opacity: 0.72,
   },
 });

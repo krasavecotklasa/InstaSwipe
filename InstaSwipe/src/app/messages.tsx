@@ -24,7 +24,7 @@ export default function MessagesScreen() {
           />
         ) : (
           <>
-            <Header />
+            <Header title='Your chats'/>
             <ConversationList onOpen={setActiveConversation} />
           </>
         )}

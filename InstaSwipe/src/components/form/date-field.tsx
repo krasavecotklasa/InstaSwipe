@@ -48,6 +48,7 @@ export function DateField({ value, onChange, minAge = 18, maxAge = 100 }: DateFi
   const [year, setYear] = useState<string | null>(initial.year);
   const [month, setMonth] = useState<string | null>(initial.month);
   const [day, setDay] = useState<string | null>(initial.day);
+  const [activeField, setActiveField] = useState<'month' | 'day' | 'year' | null>(null);
 
   // Re-sync when the parent value changes externally (e.g. profile hydration in
   // update mode). Our own emits set value to the same parts, so this is idempotent;
@@ -103,6 +104,9 @@ export function DateField({ value, onChange, minAge = 18, maxAge = 100 }: DateFi
           onChange={(m) => applyChange(year, m, day)}
           placeholder="Month"
           title="Month"
+          inlineOnWeb
+          open={activeField === 'month'}
+          onOpenChange={(open) => setActiveField(open ? 'month' : null)}
         />
       </View>
       <View style={styles.dayField}>
@@ -112,6 +116,9 @@ export function DateField({ value, onChange, minAge = 18, maxAge = 100 }: DateFi
           onChange={(d) => applyChange(year, month, d)}
           placeholder="Day"
           title="Day"
+          inlineOnWeb
+          open={activeField === 'day'}
+          onOpenChange={(open) => setActiveField(open ? 'day' : null)}
         />
       </View>
       <View style={styles.yearField}>
@@ -121,7 +128,9 @@ export function DateField({ value, onChange, minAge = 18, maxAge = 100 }: DateFi
           onChange={(y) => applyChange(y, month, day)}
           placeholder="Year"
           title="Year"
-          searchable
+          inlineOnWeb
+          open={activeField === 'year'}
+          onOpenChange={(open) => setActiveField(open ? 'year' : null)}
         />
       </View>
     </View>
@@ -132,6 +141,8 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     gap: Spacing.two,
+    position: 'relative',
+    zIndex: 10,
   },
   monthField: {
     flex: 1.5,

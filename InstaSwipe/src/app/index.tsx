@@ -1,5 +1,15 @@
-import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useRef, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
+import {
+  ActivityIndicator,
+  FlatList,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+  KeyboardAvoidingView
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { SymbolView } from 'expo-symbols';
 import { ThemedText } from '@/components/themed-text';
@@ -12,6 +22,8 @@ import Header from '@/components/header';
 import { fetchFeed } from '@/hooks/posts';
 import { type DiscoveryProfile, getPublicProfile } from '@/hooks/matches';
 import DiscoveryProfileModal from '@/components/discovery-profile-modal';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 
 function ComposerEntry({ onPress }: { onPress: () => void }) {
   const theme = useTheme();
@@ -21,20 +33,18 @@ function ComposerEntry({ onPress }: { onPress: () => void }) {
       onPress={onPress}
       style={({ pressed }) => [
         styles.composer,
-        { borderColor: '#6249cabe' },
+        { backgroundColor: theme.tabActiveBackground, borderColor: theme.tabActiveBorder },
         pressed && styles.composerPressed,
       ]}
     >
-      <View style={[styles.composerBadge]}>
+      <View style={styles.composerBadge}>
         <SymbolView
           name={{ ios: 'plus', android: 'add', web: 'add' } as any}
           tintColor="#8769ffbe"
           size={22}
         />
       </View>
-      <ThemedText style={[styles.composerText, { color: theme.iconMuted }]}>
-        Create a new post
-      </ThemedText>
+      <ThemedText style={[styles.composerText, { color: theme.iconMuted }]}>Create a new post</ThemedText>
     </Pressable>
   );
 }
@@ -46,9 +56,15 @@ export default function HomeScreen() {
   const [composerVisible, setComposerVisible] = useState(false);
   const [selectedProfile, setSelectedProfile] = useState<DiscoveryProfile | null>(null);
   const [profileError, setProfileError] = useState<string | null>(null);
+  const hasLoadedPosts = useRef(false);
+  const insets = useSafeAreaInsets();
+
 
   const loadPosts = useCallback(async () => {
-    setIsLoading(true);
+
+    if (!hasLoadedPosts.current) {
+      setIsLoading(true);
+    }
     setError(null);
 
     try {
@@ -56,15 +72,20 @@ export default function HomeScreen() {
       setPosts(nextPosts);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to load posts');
-      setPosts([]);
+      if (!hasLoadedPosts.current) {
+        setPosts([]);
+      }
     } finally {
+      hasLoadedPosts.current = true;
       setIsLoading(false);
     }
   }, []);
 
-  useEffect(() => {
-    loadPosts();
-  }, [loadPosts]);
+  useFocusEffect(
+    useCallback(() => {
+      void loadPosts();
+    }, [loadPosts]),
+  );
 
   const openAuthorProfile = useCallback(async (userId: string) => {
     setProfileError(null);
@@ -78,56 +99,63 @@ export default function HomeScreen() {
   }, []);
 
   return (
-    <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-        <Header />
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={insets.top}
+    >
+      <ThemedView style={styles.container}>
+        <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+          <Header title='InstaSwipe'/>
 
-        <FlatList
-          data={posts}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <PostCard post={item} onAuthorPress={openAuthorProfile} />
+          <FlatList
+            data={posts}
+            keyExtractor={(item) => item.id}
+            renderItem={({ item }) => (
+              <PostCard post={item} onAuthorPress={openAuthorProfile} />
+            )}
+            ListHeaderComponent={<ComposerEntry onPress={() => setComposerVisible(true)} />}
+            contentContainerStyle={styles.listContent}
+            showsVerticalScrollIndicator={true}
+            scrollEnabled={true}
+            nestedScrollEnabled={Platform.OS === 'web'}
+            ListEmptyComponent={
+              isLoading ? (
+                <View style={styles.emptyState}>
+                  <ActivityIndicator size="large" color="#ffffff" />
+                </View>
+              ) : error ? (
+                <View style={styles.emptyState}>
+                  <Text style={styles.emptyText}>{error}</Text>
+                </View>
+              ) : (
+                <View style={styles.emptyState}>
+                  <Text style={styles.emptyText}>No posts yet.</Text>
+                </View>
+              )
+            }
+          />
+
+          {!!profileError && (
+            <View style={styles.profileErrorNotice}>
+              <Text style={styles.emptyText}>{profileError}</Text>
+            </View>
           )}
-          ListHeaderComponent={<ComposerEntry onPress={() => setComposerVisible(true)} />}
-          contentContainerStyle={styles.listContent}
-          showsVerticalScrollIndicator={true}
-          scrollEnabled={true}
-          nestedScrollEnabled={Platform.OS === 'web'}
-          ListEmptyComponent={
-            isLoading ? (
-              <View style={styles.emptyState}>
-                <ActivityIndicator size="large" color="#ffffff" />
-              </View>
-            ) : error ? (
-              <View style={styles.emptyState}>
-                <Text style={styles.emptyText}>{error}</Text>
-              </View>
-            ) : (
-              <View style={styles.emptyState}>
-                <Text style={styles.emptyText}>No posts yet.</Text>
-              </View>
-            )
-          }
-        />
 
-        {!!profileError && (
-          <View style={styles.profileErrorNotice}>
-            <Text style={styles.emptyText}>{profileError}</Text>
-          </View>
-        )}
+          <PostComposer
+            visible={composerVisible}
+            onClose={() => setComposerVisible(false)}
+            onPosted={loadPosts}
+          />
 
-        <PostComposer
-          visible={composerVisible}
-          onClose={() => setComposerVisible(false)}
-          onPosted={loadPosts}
-        />
-        <DiscoveryProfileModal
-          visible={Boolean(selectedProfile)}
-          profile={selectedProfile}
-          onClose={() => setSelectedProfile(null)}
-        />
-      </SafeAreaView>
-    </ThemedView>
+          <DiscoveryProfileModal
+            visible={Boolean(selectedProfile)}
+            profile={selectedProfile}
+            onClose={() => setSelectedProfile(null)}
+          />
+        </SafeAreaView>
+      </ThemedView>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -159,7 +187,6 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.three,
     borderWidth: 1,
     borderRadius: 8,
-    backgroundColor: '#000000',
     width: Platform.OS === 'web' ? '80%' : '95%',
     maxWidth: 'auto',
   },
