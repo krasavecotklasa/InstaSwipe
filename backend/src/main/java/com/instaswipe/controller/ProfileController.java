@@ -1,6 +1,7 @@
 package com.instaswipe.controller;
 
 import com.instaswipe.dto.OnboardingStatusResponse;
+import com.instaswipe.dto.PasswordChangeRequest;
 import com.instaswipe.dto.ProfilePictureResponse;
 import com.instaswipe.dto.ProfileUpdateRequest;
 import com.instaswipe.model.Media;
@@ -60,5 +61,14 @@ public class ProfileController {
             @AuthenticationPrincipal String requesterId,
             @PathVariable("id") String targetUserId) {
         return ResponseEntity.ok(profileService.getPublicProfile(requesterId, targetUserId));
+    }
+
+    @PutMapping("/password")
+    public ResponseEntity<String> changePassword(
+            @AuthenticationPrincipal String userId,
+            @Valid @RequestBody PasswordChangeRequest request) {
+
+        profileService.changePassword(userId, request.oldPassword(), request.newPassword());
+        return ResponseEntity.ok("Password changed successfully.");
     }
 }

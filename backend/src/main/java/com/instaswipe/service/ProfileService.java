@@ -5,12 +5,14 @@ import com.instaswipe.dto.OwnProfileResponse;
 import com.instaswipe.dto.ProfileUpdateRequest;
 import com.instaswipe.dto.PublicProfileResponse;
 import com.instaswipe.event.ImageTarget;
+import com.instaswipe.exception.InvalidCredentialsException;
 import com.instaswipe.model.Media;
 import com.instaswipe.model.MediaStatus;
 import com.instaswipe.model.User;
 import com.instaswipe.model.UserProfile;
 import com.instaswipe.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -24,6 +26,7 @@ public class ProfileService {
     private final UserRepository userRepository;
     private final MediaUploadService mediaUploadService;
     private final MediaStorageService mediaStorageService;
+    private final PasswordEncoder passwordEncoder;
 
     public OnboardingStatusResponse getStatus(String userId) {
         User user = getUserOrThrow(userId);
@@ -121,6 +124,17 @@ public class ProfileService {
             return null;
         }
         return mediaStorageService.extractKeyFromUrl(current.getUrl());
+    }
+
+    public void changePassword(String userId, String oldPassword, String newPassword) {
+        User user = getUserOrThrow(userId);
+
+        if (!passwordEncoder.matches(oldPassword, user.getPasswordHash())) {
+            throw new InvalidCredentialsException();
+        }
+
+        user.setPasswordHash(passwordEncoder.encode(newPassword));
+        userRepository.save(user);
     }
 
     public OwnProfileResponse getOwnProfile(String userId) {
