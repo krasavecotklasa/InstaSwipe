@@ -473,7 +473,7 @@ export default function ProfileScreen() {
                 </View>
               </View>
 
-              <View style={styles.fieldBlock}>
+              <View style={[styles.fieldBlock, styles.countryFieldBlock]}>
                 <ThemedText type="smallBold">Country</ThemedText>
                 <SelectField
                   value={country || COUNTRY_ANY}
@@ -482,6 +482,7 @@ export default function ProfileScreen() {
                   placeholder="Any country"
                   title="Country"
                   searchable
+                  inlineOnWeb
                 />
               </View>
 
@@ -586,6 +587,10 @@ const styles = StyleSheet.create({
   // and lets the following buttons overlap the tall interest chip grid.
   fieldBlock: {
     gap: Spacing.one,
+  },
+  countryFieldBlock: {
+    position: 'relative',
+    zIndex: 10,
   },
   input: {
     minHeight: 44,

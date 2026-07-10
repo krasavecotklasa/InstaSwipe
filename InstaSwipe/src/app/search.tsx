@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -16,13 +16,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import {
-  DISCOVERY_GENDER_LABELS,
-  DISCOVERY_GENDERS,
-  type DiscoveryFilters,
   DiscoveryProfile,
-  Gender,
-  getDiscovery,
-  getDiscoveryPreferences,
 } from '@/hooks/matches';
 import { searchProfilesByName } from '@/hooks/search';
 import { useTheme } from '@/hooks/use-theme';
@@ -31,47 +25,13 @@ import DiscoveryProfileModal from '@/components/discovery-profile-modal';
 
 const PAGE_SIZE = 100;
 
-// Includes an "Any" option ('') so a user can browse all genders; '' means the
-// gender filter is omitted from the discovery request.
-const GENDER_OPTIONS: (Gender | '')[] = ['', ...DISCOVERY_GENDERS];
-const genderOptionLabel = (option: Gender | '') => (option === '' ? 'Any' : DISCOVERY_GENDER_LABELS[option]);
-
-const parseAge = (value: string) => {
-  const trimmed = value.trim();
-  if (!trimmed) {
-    return undefined;
-  }
-
-  const age = Number(trimmed);
-  return Number.isFinite(age) ? age : undefined;
-};
-
-const parseInterests = (value: string) => {
-  return value
-    .split(',')
-    .map((interest) => interest.trim())
-    .filter(Boolean);
-};
-
-const toInputValue = (value: string[] | string | number | undefined) => {
-  if (Array.isArray(value)) {
-    return value.join(', ');
-  }
-  return value == null ? '' : String(value);
-};
-
 export default function SearchScreen() {
   const theme = useTheme();
   const [name, setName] = useState('');
-  const [minAge, setMinAge] = useState('');
-  const [maxAge, setMaxAge] = useState('');
-  const [gender, setGender] = useState<Gender | ''>('');
-  const [country, setCountry] = useState('');
-  const [interests, setInterests] = useState('');
   const [profiles, setProfiles] = useState<DiscoveryProfile[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [hydrating, setHydrating] = useState(true);
+  const [hasSearched, setHasSearched] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [totalElements, setTotalElements] = useState(0);
   const [selectedProfile, setSelectedProfile] = useState<DiscoveryProfile | null>(null);
@@ -79,68 +39,30 @@ export default function SearchScreen() {
   const pageRef = useRef(0);
   const hasMoreRef = useRef(false);
   const loadingMoreRef = useRef(false);
-  // Filters used by the current result set, snapshotted at search time so paging
-  // stays consistent even if the user edits the inputs without pressing Search.
-  const activeFiltersRef = useRef<DiscoveryFilters | null>(null);
-  // When set, the current result set is a name search (via /api/search/profiles)
-  // rather than the discovery browse; paging must keep using the same source.
   const activeNameRef = useRef<string | null>(null);
-
-  useEffect(() => {
-    let active = true;
-
-    (async () => {
-      const savedPreferences = await getDiscoveryPreferences();
-      if (!active) {
-        return;
-      }
-
-      setMinAge(String(savedPreferences.minAge));
-      setMaxAge(String(savedPreferences.maxAge));
-      setGender(savedPreferences.gender);
-      setCountry(savedPreferences.country);
-      setInterests(toInputValue(savedPreferences.interests));
-      setHydrating(false);
-    })();
-
-    return () => {
-      active = false;
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!hydrating) {
-      void loadDiscovery();
-    }
-    // The initial preferences hydrate should trigger one automatic search.
-    // Subsequent edits stay user-driven via the Search button.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hydrating]);
 
   async function loadDiscovery() {
     const trimmedName = name.trim();
-    const filters: DiscoveryFilters = {
-      minAge: parseAge(minAge),
-      maxAge: parseAge(maxAge),
-      gender: gender || undefined,
-      country,
-      interests: parseInterests(interests),
-      size: PAGE_SIZE,
-    };
-    activeFiltersRef.current = filters;
-    // A non-empty name runs a plain people-search; otherwise fall back to the
-    // discovery browse driven by the filters below.
-    activeNameRef.current = trimmedName ? trimmedName : null;
+
+    if (!trimmedName) {
+      activeNameRef.current = null;
+      setProfiles([]);
+      setTotalElements(0);
+      setHasSearched(false);
+      setError(null);
+      return;
+    }
+
+    activeNameRef.current = trimmedName;
     pageRef.current = 0;
     hasMoreRef.current = false;
 
+    setHasSearched(true);
     setLoading(true);
     setError(null);
 
     try {
-      const result = trimmedName
-        ? await searchProfilesByName({ q: trimmedName, page: 0, size: PAGE_SIZE })
-        : await getDiscovery({ ...filters, page: 0 });
+      const result = await searchProfilesByName({ q: trimmedName, page: 0, size: PAGE_SIZE });
 
       setProfiles(result.content);
       setTotalElements(result.totalElements);
@@ -148,15 +70,15 @@ export default function SearchScreen() {
     } catch (loadError) {
       setProfiles([]);
       setTotalElements(0);
-      setError(loadError instanceof Error ? loadError.message : 'Discovery request failed');
+      setError(loadError instanceof Error ? loadError.message : 'Search request failed');
     } finally {
       setLoading(false);
     }
   }
 
   const loadMoreResults = useCallback(async () => {
-    const filters = activeFiltersRef.current;
-    if (!filters || loadingMoreRef.current || !hasMoreRef.current) {
+    const activeName = activeNameRef.current;
+    if (!activeName || loadingMoreRef.current || !hasMoreRef.current) {
       return;
     }
     loadingMoreRef.current = true;
@@ -164,10 +86,7 @@ export default function SearchScreen() {
 
     try {
       const nextPage = pageRef.current + 1;
-      const activeName = activeNameRef.current;
-      const result = activeName
-        ? await searchProfilesByName({ q: activeName, page: nextPage, size: PAGE_SIZE })
-        : await getDiscovery({ ...filters, page: nextPage });
+      const result = await searchProfilesByName({ q: activeName, page: nextPage, size: PAGE_SIZE });
       pageRef.current = nextPage;
       hasMoreRef.current = !result.last;
       setProfiles((current) => [...current, ...result.content]);
@@ -217,7 +136,7 @@ export default function SearchScreen() {
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-        <Header title='Discover'/>
+        <Header title='Search'/>
         <FlatList
           data={profiles}
           keyExtractor={(item) => item.id}
@@ -228,93 +147,20 @@ export default function SearchScreen() {
             <View style={styles.header}>
               {Platform.OS === 'web' ? 
               <ThemedText type="subtitle" style={styles.title}>
-                 Discover 
+                 Search
               </ThemedText> 
               : null}
-              <View style={[styles.filters, { borderColor: theme.tabActiveBorder }]}>
+              <View style={[styles.searchPanel, { borderColor: theme.tabActiveBorder }]}>
                 <View style={styles.field}>
-                  <ThemedText type="smallBold">Search by name</ThemedText>
+                  <ThemedText type="smallBold">Search by username</ThemedText>
                   <TextInput
                     value={name}
                     onChangeText={setName}
                     autoCapitalize="words"
-                    placeholder="Type a name…"
+                    placeholder="Type a username…"
                     placeholderTextColor={theme.iconMuted}
                     returnKeyType="search"
                     onSubmitEditing={loadDiscovery}
-                    style={[styles.input, { borderColor: theme.tabActiveBorder, color: theme.text }]}
-                  />
-                  {!!name.trim() && (
-                    <ThemedText type="small" themeColor="textSecondary">
-                      Filters below are ignored while searching by name.
-                    </ThemedText>
-                  )}
-                </View>
-
-                <View style={styles.row}>
-                  <View style={styles.field}>
-                    <ThemedText type="smallBold">Min age</ThemedText>
-                    <TextInput
-                      value={minAge}
-                      onChangeText={setMinAge}
-                      keyboardType="number-pad"
-                      style={[styles.input, { borderColor: theme.tabActiveBorder, color: theme.text }]}
-                    />
-                  </View>
-                  <View style={styles.field}>
-                    <ThemedText type="smallBold">Max age</ThemedText>
-                    <TextInput
-                      value={maxAge}
-                      onChangeText={setMaxAge}
-                      keyboardType="number-pad"
-                      style={[styles.input, { borderColor: theme.tabActiveBorder, color: theme.text }]}
-                    />
-                  </View>
-                </View>
-
-                <View style={styles.field}>
-                  <ThemedText type="smallBold">Gender</ThemedText>
-                  <View style={styles.segmented}>
-                    {GENDER_OPTIONS.map((option) => {
-                      const selected = option === gender;
-
-                      return (
-                        <TouchableOpacity
-                          key={option || 'any'}
-                          onPress={() => setGender(option)}
-                          style={[
-                            styles.segment,
-                            {
-                              borderColor: theme.tabActiveBorder,
-                              backgroundColor: selected ? theme.backgroundElement : 'transparent',
-                            },
-                          ]}
-                        >
-                          <ThemedText type="smallBold" style={selected && styles.segmentTextSelected}>
-                            {genderOptionLabel(option)}
-                          </ThemedText>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
-                </View>
-
-                <View style={styles.field}>
-                  <ThemedText type="smallBold">Country</ThemedText>
-                  <TextInput
-                    value={country}
-                    onChangeText={setCountry}
-                    autoCapitalize="words"
-                    style={[styles.input, { borderColor: theme.tabActiveBorder, color: theme.text }]}
-                  />
-                </View>
-
-                <View style={styles.field}>
-                  <ThemedText type="smallBold">Interests</ThemedText>
-                  <TextInput
-                    value={interests}
-                    onChangeText={setInterests}
-                    autoCapitalize="words"
                     style={[styles.input, { borderColor: theme.tabActiveBorder, color: theme.text }]}
                   />
                 </View>
@@ -345,7 +191,7 @@ export default function SearchScreen() {
                 </ThemedText>
               )}
 
-              {!loading && !error && (
+              {hasSearched && !loading && !error && (
                 <ThemedText type="small" themeColor="textSecondary" style={styles.resultCount}>
                   {totalElements} results
                 </ThemedText>
@@ -355,7 +201,7 @@ export default function SearchScreen() {
           ListEmptyComponent={
             !loading ? (
               <ThemedText type="small" themeColor="textSecondary" style={styles.emptyText}>
-                No profiles loaded yet.
+                {hasSearched ? 'No matching profiles.' : 'Search for a username.'}
               </ThemedText>
             ) : null
           }
@@ -401,33 +247,11 @@ const styles = StyleSheet.create({
     fontSize: 30,
     lineHeight: 36,
   },
-  filters: {
+  searchPanel: {
     borderWidth: 1,
     padding: Spacing.three,
     gap: Spacing.three,
     backgroundColor: 'rgba(0, 0, 0, 0.08)',
-  },
-  row: {
-    flexDirection: 'row',
-    gap: Spacing.three,
-  },
-  segmented: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Spacing.two,
-  },
-  segment: {
-    flexGrow: 1,
-    minWidth: '22%',
-    minHeight: 40,
-    borderWidth: 1,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: Spacing.two,
-  },
-  segmentTextSelected: {
-    color: '#ffffff',
   },
   field: {
     flex: 1,

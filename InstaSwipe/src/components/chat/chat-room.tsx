@@ -53,6 +53,13 @@ export function ChatRoom({ conversation, onBack }: ChatRoomProps) {
     }
   };
 
+  const handleMessageKeyPress = (event: { nativeEvent: { key: string; shiftKey?: boolean }; preventDefault?: () => void }) => {
+    if (Platform.OS === 'web' && event.nativeEvent.key === 'Enter' && !event.nativeEvent.shiftKey) {
+      event.preventDefault?.();
+      onSend();
+    }
+  };
+
   const renderMessage = ({ item }: { item: ChatMessage }) => {
     const mine = item.senderId === currentUserId;
     return (
@@ -155,8 +162,9 @@ export function ChatRoom({ conversation, onBack }: ChatRoomProps) {
           style={[styles.input, { color: theme.text, borderColor: theme.tabActiveBorder }]}
           multiline
           returnKeyType="send"
-          submitBehavior="submit"
-          onSubmitEditing={onSend}
+          submitBehavior={Platform.OS === 'web' ? 'newline' : 'submit'}
+          onSubmitEditing={Platform.OS === 'web' ? undefined : onSend}
+          onKeyPress={handleMessageKeyPress}
         />
         <Pressable
           onPress={onSend}
