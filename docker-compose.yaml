@@ -19,10 +19,13 @@ services:
       # Path to the Firebase service-account JSON *inside the container*. The file is bind-mounted
       # read-only from ./secrets below. Set to empty to disable FCM push notifications.
       FIREBASE_CREDENTIALS: ${FIREBASE_CREDENTIALS:-/etc/firebase/service-account.json}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
     depends_on:
       - mongodb
       - minio
       - rabbitmq
+      - redis
     ports:
       - "8080:8080"
     volumes:
@@ -70,3 +73,12 @@ services:
       - ./rabbitmq-data:/var/lib/rabbitmq
       # Enables management + STOMP plugins at boot (STOMP relay is used by the chat WebSocket).
       - ./rabbitmq/enabled_plugins:/etc/rabbitmq/enabled_plugins:ro
+
+  redis:
+    image: redis:7.4-alpine
+    container_name: redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - ./redis-data:/data
