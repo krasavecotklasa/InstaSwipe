@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
 import { ActivityIndicator, FlatList, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { SymbolView } from 'expo-symbols';
@@ -25,16 +26,14 @@ function ComposerEntry({ onPress }: { onPress: () => void }) {
         pressed && styles.composerPressed,
       ]}
     >
-      <View style={[styles.composerBadge]}>
+      <View style={styles.composerBadge}>
         <SymbolView
           name={{ ios: 'plus', android: 'add', web: 'add' } as any}
           tintColor="#8769ffbe"
           size={22}
         />
       </View>
-      <ThemedText style={[styles.composerText, { color: theme.iconMuted }]}>
-        Create a new post
-      </ThemedText>
+      <ThemedText style={[styles.composerText, { color: theme.iconMuted }]}>Create a new post</ThemedText>
     </Pressable>
   );
 }
@@ -46,9 +45,12 @@ export default function HomeScreen() {
   const [composerVisible, setComposerVisible] = useState(false);
   const [selectedProfile, setSelectedProfile] = useState<DiscoveryProfile | null>(null);
   const [profileError, setProfileError] = useState<string | null>(null);
+  const hasLoadedPosts = useRef(false);
 
   const loadPosts = useCallback(async () => {
-    setIsLoading(true);
+    if (!hasLoadedPosts.current) {
+      setIsLoading(true);
+    }
     setError(null);
 
     try {
@@ -56,15 +58,20 @@ export default function HomeScreen() {
       setPosts(nextPosts);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to load posts');
-      setPosts([]);
+      if (!hasLoadedPosts.current) {
+        setPosts([]);
+      }
     } finally {
+      hasLoadedPosts.current = true;
       setIsLoading(false);
     }
   }, []);
 
-  useEffect(() => {
-    loadPosts();
-  }, [loadPosts]);
+  useFocusEffect(
+    useCallback(() => {
+      void loadPosts();
+    }, [loadPosts]),
+  );
 
   const openAuthorProfile = useCallback(async (userId: string) => {
     setProfileError(null);

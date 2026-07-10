@@ -63,8 +63,8 @@ const toInputValue = (value: string[] | string | number | undefined) => {
 export default function SearchScreen() {
   const theme = useTheme();
   const [name, setName] = useState('');
-  const [minAge, setMinAge] = useState('18');
-  const [maxAge, setMaxAge] = useState('67');
+  const [minAge, setMinAge] = useState('');
+  const [maxAge, setMaxAge] = useState('');
   const [gender, setGender] = useState<Gender | ''>('');
   const [country, setCountry] = useState('');
   const [interests, setInterests] = useState('');
@@ -199,27 +199,17 @@ export default function SearchScreen() {
           <ThemedText type="smallBold" style={styles.profileName}>
             {item.displayName}
           </ThemedText>
-          <ThemedText type="small" themeColor="textSecondary">
-            {item.age} · {item.gender}
-          </ThemedText>
+          
         </View>
         <ThemedText type="small" themeColor="textSecondary">
-          {item.country}
+            Age: <ThemedText type='smallBold'>{item.age}</ThemedText>
         </ThemedText>
-        {!!item.bio && (
-          <ThemedText type="small" style={styles.bio}>
-            {item.bio}
-          </ThemedText>
-        )}
-        <View style={styles.chips}>
-          {item.interests?.map((interest) => (
-            <View key={`${item.id}-${interest}`} style={[styles.chip, { backgroundColor: theme.backgroundSelected, borderColor: theme.tabActiveBorder }]}>
-              <ThemedText type="small" style={styles.chipText}>
-                {interest}
-              </ThemedText>
-            </View>
-          ))}
-        </View>
+        <ThemedText type="small" themeColor='textSecondary'>
+            Country: <ThemedText type='smallBold'>{item.country}</ThemedText>
+        </ThemedText>
+        <ThemedText type="small" themeColor="textSecondary">
+          Gender: <ThemedText type='smallBold'>{item.gender}</ThemedText>
+        </ThemedText>
       </View>
     </Pressable>
   ), [theme]);
@@ -489,9 +479,10 @@ const styles = StyleSheet.create({
   profileCardPressed: {
     opacity: 0.82,
   },
+  
   profileImage: {
-    width: Platform.OS === 'web' ? 120 : 90,
-    height: Platform.OS === 'web' ? 120 : 90,
+    width: Platform.OS === 'web' ? 100 : 90,
+    height: Platform.OS === 'web' ? 100 : 90,
     borderRadius: 64,
     backgroundColor: '#24172c',
   },
@@ -506,9 +497,7 @@ const styles = StyleSheet.create({
   },
   profileName: {
     flex: 1,
-  },
-  bio: {
-    marginTop: Spacing.one,
+    fontWeight: 800,
   },
   chips: {
     flexDirection: 'row',

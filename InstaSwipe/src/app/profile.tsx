@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
 import {
   ActivityIndicator,
   Platform,
@@ -75,6 +76,7 @@ export default function ProfileScreen() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [loadingPosts, setLoadingPosts] = useState(false);
   const [postsError, setPostsError] = useState<string | null>(null);
+  const hasLoadedPosts = useRef(false);
 
   const [minAge, setMinAge] = useState('');
   const [maxAge, setMaxAge] = useState('');
@@ -144,7 +146,7 @@ export default function ProfileScreen() {
     };
   }, []);
 
-  useEffect(() => {
+  const loadPosts = useCallback(async () => {
     const userId = profile?.id;
     if (!userId) {
       setPosts([]);
@@ -152,33 +154,29 @@ export default function ProfileScreen() {
       return;
     }
 
-    let isActive = true;
-
-    (async () => {
+    if (!hasLoadedPosts.current) {
       setLoadingPosts(true);
-      setPostsError(null);
+    }
+    setPostsError(null);
 
-      try {
-        const nextPosts = await fetchUserPosts(userId);
-        if (isActive) {
-          setPosts(nextPosts);
-        }
-      } catch (err) {
-        if (isActive) {
-          setPostsError(err instanceof Error ? err.message : 'Unable to load posts');
-          setPosts([]);
-        }
-      } finally {
-        if (isActive) {
-          setLoadingPosts(false);
-        }
+    try {
+      setPosts(await fetchUserPosts(userId));
+    } catch (err) {
+      setPostsError(err instanceof Error ? err.message : 'Unable to load posts');
+      if (!hasLoadedPosts.current) {
+        setPosts([]);
       }
-    })();
-
-    return () => {
-      isActive = false;
-    };
+    } finally {
+      hasLoadedPosts.current = true;
+      setLoadingPosts(false);
+    }
   }, [profile?.id]);
+
+  useFocusEffect(
+    useCallback(() => {
+      void loadPosts();
+    }, [loadPosts]),
+  );
 
   const savePreferences = async () => {
     const parsedMin = minAge.trim() ? Number(minAge) : null;
@@ -726,7 +724,7 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   panelHeaderText: {
-    bottom: 1,
+    bottom: 12,
     alignItems: 'center',
     justifyContent: 'center',
   },
