@@ -83,7 +83,7 @@ export function ConversationList({ onOpen }: ConversationListProps) {
       contentContainerStyle={styles.listContent}
       ListHeaderComponent={
         <ThemedText type="subtitle" style={styles.title}>
-          Messages
+          Your chats
         </ThemedText>
       }
       ListEmptyComponent={

@@ -2,8 +2,8 @@ import { type ReactNode, useRef } from 'react';
 import {
   Modal,
   Platform,
-  TouchableOpacity,
   StyleSheet,
+  TouchableOpacity,
   View,
   type GestureResponderEvent,
   type StyleProp,
@@ -91,6 +91,14 @@ export default function ResponsiveModalSheet({
     }
   };
 
+  const handleBackdropResponderStart = (event: GestureResponderEvent) => {
+    return event.target === event.currentTarget;
+  };
+
+  const handleBackdropResponderRelease = () => {
+    requestClose();
+  };
+
   return (
     <Modal
       visible={visible}
@@ -98,12 +106,12 @@ export default function ResponsiveModalSheet({
       animationType={isWeb ? 'fade' : 'slide'}
       onRequestClose={requestClose}
     >
-      <TouchableOpacity
+      <View
         style={[styles.backdrop, isWeb ? styles.webBackdrop : styles.mobileBackdrop]}
-        onPress={requestClose}
+        onStartShouldSetResponder={handleBackdropResponderStart}
+        onResponderRelease={handleBackdropResponderRelease}
       >
-        <TouchableOpacity
-          onPress={(event) => event.stopPropagation()}
+        <View
           style={[
             styles.surface,
             isWeb ? styles.webSurface : styles.mobileSurface,
@@ -151,8 +159,8 @@ export default function ResponsiveModalSheet({
 
             {children}
           </SafeAreaView>
-        </TouchableOpacity>
-      </TouchableOpacity>
+        </View>
+      </View>
     </Modal>
   );
 }
