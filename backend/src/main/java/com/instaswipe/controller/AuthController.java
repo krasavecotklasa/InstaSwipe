@@ -80,11 +80,21 @@ public class AuthController {
     }
 
     @PostMapping("/verify-email")
+    @RateLimited(bucket = "verify-email", keyBy = KeyStrategy.IP, limit = 20, windowSeconds = 600)
+    @RateLimited(bucket = "verify-email", keyBy = KeyStrategy.EMAIL, limit = 10, windowSeconds = 600)
     public ResponseEntity<Void> verifyEmail(@RequestBody @Valid VerifyOtpTokenRequest request) {
         if (emailVerificationService.verify(request.email(), request.code())) {
             return ResponseEntity.ok().build();
         }
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+    }
+
+    @PostMapping("/resend-verification")
+    @ResponseStatus(HttpStatus.OK)
+    @RateLimited(bucket = "resend-verification", keyBy = KeyStrategy.IP, limit = 10, windowSeconds = 3600)
+    @RateLimited(bucket = "resend-verification", keyBy = KeyStrategy.EMAIL, limit = 3, windowSeconds = 3600)
+    public void resendVerification(@RequestBody @Valid ForgotPasswordRequest request) {
+        emailVerificationService.resendVerification(request.email());
     }
 
     @PostMapping("/password/reset")
