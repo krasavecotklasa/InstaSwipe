@@ -311,6 +311,25 @@ class API {
     });
   }
 
+  static async verifyEmail(payload: { email: string; code: string }): Promise<Response> {
+    return this.request(`${AUTH_BASE_PATH}/verify-email`, {
+      method: 'POST',
+      body: JSON.stringify({
+        email: payload.email.toLowerCase(),
+        code: payload.code,
+      }),
+    });
+  }
+
+  static async resendVerification(payload: { email: string }): Promise<Response> {
+    return this.request(`${AUTH_BASE_PATH}/resend-verification`, {
+      method: 'POST',
+      body: JSON.stringify({
+        email: payload.email.toLowerCase(),
+      }),
+    });
+  }
+
   static async getProfileStatus(): Promise<Response> {
     return this.request(`${PROFILE_BASE_PATH}/status`, {
       method: 'GET',

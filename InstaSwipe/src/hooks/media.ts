@@ -3,6 +3,11 @@ import { API_HOST } from '@/hooks/api';
 const MEDIA_PORT = 9000;
 
 export const getMediaOrigin = () => {
+  const override = process.env.EXPO_PUBLIC_MEDIA_ORIGIN;
+  if (override) {
+    return override;
+  }
+
   if (!API_HOST) {
     return undefined;
   }

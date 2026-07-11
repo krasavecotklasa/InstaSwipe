@@ -6,6 +6,12 @@ export const AUTH_BASE_PATH = `${API_PREFIX}/auth`;
 export const PROFILE_BASE_PATH = `${API_PREFIX}/profile`;
 export const POSTS_BASE_PATH = `${API_PREFIX}/posts`;
 export const SEARCH_BASE_PATH = `${API_PREFIX}/search`;
-export const API_BASE_URL = (API_PORT === '80' || API_PORT === '443')
-  ? `http://${API_HOST}`
-  : `http://${API_HOST}:${API_PORT}`;
+export const API_BASE_URL = (() => {
+  if (API_PORT === '443') {
+    return `https://${API_HOST}`;
+  }
+  if (API_PORT === '80') {
+    return `http://${API_HOST}`;
+  }
+  return `http://${API_HOST}:${API_PORT}`;
+})();

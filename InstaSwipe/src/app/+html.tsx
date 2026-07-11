@@ -10,9 +10,11 @@ import { getMediaOrigin } from '@/hooks/media';
 const apiHost = process.env.EXPO_PUBLIC_API_HOST;
 const apiPort = process.env.EXPO_PUBLIC_API_PORT;
 const apiOrigin = apiHost
-  ? apiPort === '80' || apiPort === '443'
-    ? `http://${apiHost}`
-    : `http://${apiHost}:${apiPort}`
+  ? apiPort === '443'
+    ? `https://${apiHost}`
+    : apiPort === '80'
+      ? `http://${apiHost}`
+      : `http://${apiHost}:${apiPort}`
   : undefined;
 
 // Origin serving post media (S3/MinIO). Set EXPO_PUBLIC_MEDIA_ORIGIN to override

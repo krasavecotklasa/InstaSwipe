@@ -19,7 +19,7 @@ import { API, setTokens } from '@/hooks/auth';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
-type Screen = 'login' | 'register' | 'forgotPassword';
+type Screen = 'login' | 'register' | 'forgotPassword' | 'verifyEmail';
 
 interface AuthGateProps {
   onAuthSuccess: () => void;
@@ -35,6 +35,15 @@ function errorHandle(error: string) {
 
 export default function AuthGate({ onAuthSuccess }: AuthGateProps) {
   const [screen, setScreen] = useState<Screen>('login');
+  // Carried in memory only (never persisted) so VerifyEmailView can silently
+  // retry login once the code is accepted, instead of making the user type
+  // their password again right after they just typed it on register/login.
+  const [pendingAuth, setPendingAuth] = useState<{ email: string; password: string } | null>(null);
+
+  const onNeedsVerification = (email: string, password: string) => {
+    setPendingAuth({ email, password });
+    setScreen('verifyEmail');
+  };
 
   if (screen === 'login') {
     return (
@@ -42,6 +51,7 @@ export default function AuthGate({ onAuthSuccess }: AuthGateProps) {
         onAuthSuccess={onAuthSuccess}
         onGoToRegister={() => setScreen('register')}
         onGoToForgotPassword={() => setScreen('forgotPassword')}
+        onNeedsVerification={onNeedsVerification}
       />
     );
   }
@@ -50,10 +60,25 @@ export default function AuthGate({ onAuthSuccess }: AuthGateProps) {
     return <ForgotPasswordView onBackToLogin={() => setScreen('login')} />;
   }
 
+  if (screen === 'verifyEmail' && pendingAuth) {
+    return (
+      <VerifyEmailView
+        email={pendingAuth.email}
+        password={pendingAuth.password}
+        onAuthSuccess={onAuthSuccess}
+        onBackToLogin={() => {
+          setPendingAuth(null);
+          setScreen('login');
+        }}
+      />
+    );
+  }
+
   return (
     <RegisterView
       onAuthSuccess={onAuthSuccess}
       onGoToLogin={() => setScreen('login')}
+      onNeedsVerification={onNeedsVerification}
     />
   );
 }
@@ -64,9 +89,10 @@ interface LoginViewProps {
   onAuthSuccess: () => void;
   onGoToRegister: () => void;
   onGoToForgotPassword: () => void;
+  onNeedsVerification: (email: string, password: string) => void;
 }
 
-function LoginView({ onAuthSuccess, onGoToRegister, onGoToForgotPassword }: LoginViewProps) {
+function LoginView({ onAuthSuccess, onGoToRegister, onGoToForgotPassword, onNeedsVerification }: LoginViewProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -94,6 +120,9 @@ function LoginView({ onAuthSuccess, onGoToRegister, onGoToForgotPassword }: Logi
 
         await setTokens(accessToken, refreshToken);
         onAuthSuccess();
+      } else if (response.status === 403) {
+        // EmailNotVerifiedException: the only thing /api/auth/login returns 403 for.
+        onNeedsVerification(email, password);
       } else {
         const errorData = await response.json().catch(() => ({}));
         errorHandle(errorData.message || 'Invalid credentials');
@@ -394,14 +423,149 @@ function ForgotPasswordView({ onBackToLogin }: ForgotPasswordViewProps) {
   );
 }
 
+// ─── Verify email ───────────────────────────────────────────────────────────
+
+interface VerifyEmailViewProps {
+  email: string;
+  password: string;
+  onAuthSuccess: () => void;
+  onBackToLogin: () => void;
+}
+
+function VerifyEmailView({ email, password, onAuthSuccess, onBackToLogin }: VerifyEmailViewProps) {
+  const [code, setCode] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState('');
+  const theme = useTheme();
+  const insets = useSafeAreaInsets();
+
+  const handleVerify = async () => {
+    if (!code) {
+      errorHandle('Please enter the code we emailed you');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await API.verifyEmail({ email, code });
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        errorHandle(errorData.message || 'The code is invalid or has expired');
+        return;
+      }
+
+      // verify-email doesn't issue tokens, so log in with the credentials the
+      // user already typed on register/login instead of asking for them again.
+      const loginResponse = await API.login({ email, password });
+      if (loginResponse.ok) {
+        const data = await loginResponse.json();
+        const accessToken = data.accessToken ?? data.access_token;
+        const refreshToken = data.refreshToken ?? data.refresh_token;
+        if (accessToken && refreshToken) {
+          await setTokens(accessToken, refreshToken);
+          onAuthSuccess();
+          return;
+        }
+      }
+
+      // Fallback: verification succeeded but the auto-login retry didn't -
+      // don't strand them, send them to sign in manually.
+      const goToLogin = () => onBackToLogin();
+      if (Platform.OS === 'web') {
+        alert('Email verified. Please sign in.');
+        goToLogin();
+      } else {
+        Alert.alert('Success', 'Email verified. Please sign in.', [{ text: 'OK', onPress: goToLogin }]);
+      }
+    } catch (error) {
+      errorHandle('An unexpected error occurred. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResend = async () => {
+    setLoading(true);
+    try {
+      const response = await API.resendVerification({ email });
+      if (response.ok) {
+        setMessage('A new code has been sent.');
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        errorHandle(errorData.message || 'Could not resend the code');
+      }
+    } catch (error) {
+      errorHandle('An unexpected error occurred. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <ThemedView style={styles.container}>
+      <KeyboardAvoidingView
+        style={styles.keyboardAvoidingView}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={insets.top}
+      >
+        <SafeAreaView style={styles.safeArea}>
+          <ScrollView
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
+          >
+            <View style={styles.content}>
+              <ThemedText type="title" style={styles.title}>Verify your email</ThemedText>
+              <ThemedText style={styles.subtitle}>
+                We sent a code to {email}. Enter it below to continue.
+              </ThemedText>
+
+              {message ? <ThemedText style={styles.helperText}>{message}</ThemedText> : null}
+
+              <View style={styles.form}>
+                <TextInput
+                  style={[styles.input, { color: theme.text, borderColor: theme.tabActiveBorder }]}
+                  placeholder="Verification code"
+                  placeholderTextColor={theme.iconMuted}
+                  value={code}
+                  onChangeText={setCode}
+                  autoCapitalize="none"
+                  keyboardType="number-pad"
+                />
+                <TouchableOpacity
+                  style={[styles.button, { backgroundColor: theme.backgroundElement }]}
+                  onPress={handleVerify}
+                  disabled={loading}
+                >
+                  {loading ? <ActivityIndicator color="#fff" /> : <ThemedText style={styles.buttonText}>Verify</ThemedText>}
+                </TouchableOpacity>
+                <TouchableOpacity onPress={handleResend} style={styles.linkButton} disabled={loading}>
+                  <ThemedText style={[styles.linkText, { color: theme.backgroundElement }]}>Resend code</ThemedText>
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.footer}>
+                <TouchableOpacity onPress={onBackToLogin}>
+                  <ThemedText style={{ color: theme.backgroundElement, fontWeight: 'bold' }}>Back to login</ThemedText>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </ScrollView>
+        </SafeAreaView>
+      </KeyboardAvoidingView>
+    </ThemedView>
+  );
+}
+
 // ─── Register ─────────────────────────────────────────────────────────────────
 
 interface RegisterViewProps {
   onAuthSuccess: () => void;
   onGoToLogin: () => void;
+  onNeedsVerification: (email: string, password: string) => void;
 }
 
-function RegisterView({ onAuthSuccess, onGoToLogin }: RegisterViewProps) {
+function RegisterView({ onAuthSuccess, onGoToLogin, onNeedsVerification }: RegisterViewProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -438,14 +602,9 @@ function RegisterView({ onAuthSuccess, onGoToLogin }: RegisterViewProps) {
           await setTokens(accessToken, refreshToken);
           onAuthSuccess();
         } else {
-          if (Platform.OS === 'web') {
-            alert("Account created. Please log in!");
-            onGoToLogin();
-          } else {
-            Alert.alert('Success', 'Account created! Please log in.', [
-              { text: 'OK', onPress: onGoToLogin },
-            ]);
-          }
+          // Registration never issues tokens; a verification email was just sent
+          // (AuthService.register), so take them straight to entering the code.
+          onNeedsVerification(email, password);
         }
       } else {
         const errorData = await response.json().catch(() => ({}));
