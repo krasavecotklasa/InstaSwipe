@@ -23,7 +23,7 @@ app:
   email:
     # Set APP_EMAIL_API_KEY in every real environment using Resend API key from https://resend.com
     api-key: ${APP_EMAIL_API_KEY:}
-    from-email: ${APP_EMAIL_FROM:noreply@instaswipe.com}
+    from-email: ${APP_EMAIL_FROM:noreply@instaswipe.app}
     from-name: ${APP_EMAIL_FROM_NAME:InstaSwipe}
     enabled: ${APP_EMAIL_ENABLED:true}
 

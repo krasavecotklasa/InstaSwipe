@@ -16,6 +16,10 @@ services:
       SPRING_RABBITMQ_HOST: rabbitmq
       RABBITMQ_ROOT_USERNAME: ${RABBITMQ_ROOT_USERNAME:-guest}
       RABBITMQ_ROOT_PASSWORD: ${RABBITMQ_ROOT_PASSWORD:-guest}
+      APP_EMAIL_API_KEY: ${APP_EMAIL_API_KEY:-}
+      APP_EMAIL_FROM: ${APP_EMAIL_FROM:-noreply@instaswipe.app}
+      APP_EMAIL_FROM_NAME: ${APP_EMAIL_FROM_NAME:-InstaSwipe}
+      APP_EMAIL_ENABLED: ${APP_EMAIL_ENABLED:-true}
       # Path to the Firebase service-account JSON *inside the container*. The file is bind-mounted
       # read-only from ./secrets below. Set to empty to disable FCM push notifications.
       FIREBASE_CREDENTIALS: ${FIREBASE_CREDENTIALS:-/etc/firebase/service-account.json}
