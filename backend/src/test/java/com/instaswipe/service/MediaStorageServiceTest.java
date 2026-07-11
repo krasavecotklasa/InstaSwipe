@@ -56,4 +56,26 @@ class MediaStorageServiceTest {
     void nullUrlStaysNull() {
         assertThat(publicBucketService("http://localhost:9000").ensurePresignedUrl(null)).isNull();
     }
+
+    @Test
+    void doesNotDuplicatePathWhenHostAlsoStartsWithBucketName() {
+        // Regression: a public endpoint host of "media.instaswipe.app" also contains the
+        // bucket name "media", so a naive indexOf(bucket) matches inside the host instead
+        // of the real "/media/" path segment, corrupting the extracted key.
+        MediaStorageService service = publicBucketService("https://media.instaswipe.app");
+        String storedUrl = "https://media.instaswipe.app/media/user1/profile/abc.jpg";
+
+        String result = service.ensurePresignedUrl(storedUrl);
+
+        assertThat(result).isEqualTo(storedUrl);
+    }
+
+    @Test
+    void extractKeyFromUrlIgnoresBucketNameInsideHost() {
+        MediaStorageService service = publicBucketService("https://media.instaswipe.app");
+
+        String key = service.extractKeyFromUrl("https://media.instaswipe.app/media/user1/profile/abc.jpg");
+
+        assertThat(key).isEqualTo("user1/profile/abc.jpg");
+    }
 }

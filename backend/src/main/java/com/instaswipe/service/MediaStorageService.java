@@ -125,14 +125,18 @@ public class MediaStorageService {
      * Handles presigned URLs by stripping query parameters first.
      */
     public String extractKeyFromUrl(String publicUrl) {
-        if (publicUrl == null || !publicUrl.contains(bucket)) {
+        // Match the "/<bucket>/" path segment specifically, not a bare substring search for
+        // the bucket name - a bare search matches inside the host too (e.g. a public endpoint
+        // of media.instaswipe.app contains "media" before the real /media/ path segment).
+        String marker = "/" + bucket + "/";
+        if (publicUrl == null || !publicUrl.contains(marker)) {
             return null;
         }
         // Strip query parameters if present
         String urlWithoutParams = publicUrl.split("\\?")[0];
-        
-        int bucketIndex = urlWithoutParams.indexOf(bucket);
-        int keyStart = bucketIndex + bucket.length() + 1; // +1 for the trailing slash
+
+        int markerIndex = urlWithoutParams.indexOf(marker);
+        int keyStart = markerIndex + marker.length();
         if (keyStart < urlWithoutParams.length()) {
             return urlWithoutParams.substring(keyStart);
         }
