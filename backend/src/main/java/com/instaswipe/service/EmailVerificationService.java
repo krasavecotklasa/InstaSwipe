@@ -1,15 +1,10 @@
 package com.instaswipe.service;
 
-import java.security.GeneralSecurityException;
-import java.security.MessageDigest;
-import java.security.SecureRandom;
 import java.time.Instant;
-import java.util.Base64;
+import java.util.Locale;
 import java.util.Optional;
 
-import javax.crypto.SecretKeyFactory;
-import javax.crypto.spec.PBEKeySpec;
-
+import com.instaswipe.dto.EmailResponse;
 import com.instaswipe.model.EmailVerificationToken;
 import com.instaswipe.model.User;
 import com.instaswipe.repository.EmailVerificationTokenRepository;
@@ -17,7 +12,6 @@ import com.instaswipe.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -25,18 +19,12 @@ import org.springframework.stereotype.Service;
 @Slf4j
 public class EmailVerificationService {
 
-    private static final int PBKDF2_ITERATIONS = 120_000;
-    private static final int SALT_LENGTH_BYTES = 16;
-    private static final int KEY_LENGTH_BITS = 256;
-    private static final int DEFAULT_OTP_LENGTH = 6;
-    private static final int MAX_OTP_LENGTH = 9;
     private static final int MAX_VERIFICATION_ATTEMPTS = 5;
 
     private final EmailVerificationTokenRepository emailVerificationTokenRepository;
     private final UserRepository userRepository;
     private final EmailService emailService;
-    private final PasswordEncoder passwordEncoder;
-    private final SecureRandom secureRandom = new SecureRandom();
+    private final PbkdfOneTimeCodeHasher codeHasher;
 
     @Value("${otp.expiry-minutes:10}")
     private int expiryMinutes;
@@ -45,30 +33,43 @@ public class EmailVerificationService {
     private int otpLength;
 
     public void sendVerification(String email) {
-        emailVerificationTokenRepository.deleteAllByEmail(email);
+        String normalized = normalizeEmail(email);
+        emailVerificationTokenRepository.deleteAllByEmail(normalized);
 
-        String code = generateCode();
+        String code = codeHasher.generateCode(otpLength);
         Instant expiresAt = Instant.now().plusSeconds(expiryMinutes * 60L);
 
         EmailVerificationToken token = EmailVerificationToken.builder()
-                .email(email)
-                .tokenHash(hash(email + ":" + code))
+                .email(normalized)
+                .tokenHash(codeHasher.hash(normalized + ":" + code))
                 .expiresAt(expiresAt)
-                .code(code)
-                .used(false)
                 .build();
 
         emailVerificationTokenRepository.save(token);
-        emailService.sendVerificationEmail(email, code);
+
+        EmailResponse response = emailService.sendVerificationEmail(normalized, code);
+        if (!response.success()) {
+            log.warn("Failed to send verification email to {}: {}", normalized, response.error());
+        }
+    }
+
+    /** Re-sends a verification code for an existing, not-yet-verified account. Silently does
+     * nothing for an unknown or already-verified email so this can't be used to enumerate accounts. */
+    public void resendVerification(String email) {
+        String normalized = normalizeEmail(email);
+        userRepository.findByEmail(normalized)
+                .filter(user -> !user.isEmailVerified())
+                .ifPresent(user -> sendVerification(normalized));
     }
 
     public boolean verify(String email, String code) {
-        EmailVerificationToken token = findValidToken(email, code);
+        String normalized = normalizeEmail(email);
+        EmailVerificationToken token = findValidToken(normalized, code);
         if (token == null) {
             return false;
         }
 
-        User user = userRepository.findByEmail(email).orElse(null);
+        User user = userRepository.findByEmail(normalized).orElse(null);
         if (user == null) {
             return false;
         }
@@ -93,7 +94,7 @@ public class EmailVerificationService {
         }
 
         boolean notExpired = Instant.now().isBefore(token.getExpiresAt());
-        boolean matches = verifyHash(email + ":" + code, token.getTokenHash());
+        boolean matches = codeHasher.verify(email + ":" + code, token.getTokenHash());
 
         if (matches && notExpired) {
             return token;
@@ -107,47 +108,7 @@ public class EmailVerificationService {
         return null;
     }
 
-    private String generateCode() {
-        int length = otpLength > 0 ? Math.min(otpLength, MAX_OTP_LENGTH) : DEFAULT_OTP_LENGTH;
-        int bound = (int) Math.pow(10, length);
-        return String.format("%0" + length + "d", secureRandom.nextInt(bound));
-    }
-
-    private String hash(String value) {
-        byte[] salt = new byte[SALT_LENGTH_BYTES];
-        secureRandom.nextBytes(salt);
-
-        try {
-            PBEKeySpec spec = new PBEKeySpec(value.toCharArray(), salt, PBKDF2_ITERATIONS, KEY_LENGTH_BITS);
-            SecretKeyFactory factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256");
-            byte[] hashed = factory.generateSecret(spec).getEncoded();
-            return PBKDF2_ITERATIONS + ":"
-                    + Base64.getEncoder().encodeToString(salt) + ":"
-                    + Base64.getEncoder().encodeToString(hashed);
-        } catch (GeneralSecurityException e) {
-            throw new IllegalStateException("PBKDF2WithHmacSHA256 not available", e);
-        }
-    }
-
-    private boolean verifyHash(String rawValue, String stored) {
-        try {
-            String[] parts = stored.split(":");
-            if (parts.length != 3) {
-                return false;
-            }
-
-            int iterations = Integer.parseInt(parts[0]);
-            byte[] salt = Base64.getDecoder().decode(parts[1]);
-            byte[] expected = Base64.getDecoder().decode(parts[2]);
-
-            PBEKeySpec spec = new PBEKeySpec(rawValue.toCharArray(), salt, iterations, expected.length * 8);
-            SecretKeyFactory factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256");
-            byte[] actual = factory.generateSecret(spec).getEncoded();
-
-            return MessageDigest.isEqual(actual, expected);
-        } catch (IllegalArgumentException | GeneralSecurityException e) {
-            log.warn("Unable to verify email token hash", e);
-            return false;
-        }
+    private String normalizeEmail(String email) {
+        return email.trim().toLowerCase(Locale.ROOT);
     }
 }

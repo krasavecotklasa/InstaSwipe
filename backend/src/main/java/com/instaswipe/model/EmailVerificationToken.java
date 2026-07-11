@@ -30,8 +30,6 @@ public class EmailVerificationToken {
     @Indexed(expireAfter = "0s")
     private Instant expiresAt;
 
-    private String code;
-
     @Builder.Default
     private boolean used = false;
 
