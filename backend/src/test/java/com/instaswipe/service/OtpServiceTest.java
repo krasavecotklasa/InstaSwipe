@@ -10,11 +10,11 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.util.ReflectionTestUtils;
 
-import java.lang.reflect.Method;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.Optional;
@@ -40,6 +40,9 @@ class OtpServiceTest {
 
     @Mock
     private PasswordEncoder passwordEncoder;
+
+    @Spy
+    private PbkdfOneTimeCodeHasher codeHasher = new PbkdfOneTimeCodeHasher();
 
     @InjectMocks
     private OtpService otpService;
@@ -74,16 +77,14 @@ class OtpServiceTest {
     }
 
     @Test
-    void resetPasswordUpdatesStoredPasswordWhenOtpIsValid() throws Exception {
+    void resetPasswordUpdatesStoredPasswordWhenOtpIsValid() {
         String email = "user@example.com";
         String code = "123456";
         String newPassword = "newPassword123";
         String encodedPassword = "$2a$10$encoded";
         User user = User.builder().email(email).passwordHash("oldHash").build();
 
-        Method hashMethod = OtpService.class.getDeclaredMethod("hash", String.class);
-        hashMethod.setAccessible(true);
-        String tokenHash = (String) hashMethod.invoke(otpService, email + ":" + code);
+        String tokenHash = codeHasher.hash(email + ":" + code);
 
         when(passwordResetTokenRepository.findTopByEmailAndUsedFalseOrderByExpiresAtDesc(email))
                 .thenReturn(Optional.of(PasswordResetToken.builder()

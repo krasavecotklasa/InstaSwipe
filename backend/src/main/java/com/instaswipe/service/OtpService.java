@@ -1,14 +1,7 @@
 package com.instaswipe.service;
 
-import java.security.GeneralSecurityException;
-import java.security.SecureRandom;
 import java.time.Instant;
-import java.util.Base64;
 import java.util.Optional;
-import java.security.MessageDigest;
-
-import javax.crypto.SecretKeyFactory;
-import javax.crypto.spec.PBEKeySpec;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -27,18 +20,13 @@ import org.springframework.beans.factory.annotation.Value;
 @Slf4j
 public class OtpService {
 
-    private static final int PBKDF2_ITERATIONS = 120_000;
-    private static final int SALT_LENGTH_BYTES = 16;
-    private static final int KEY_LENGTH_BITS = 256;
-    private static final int DEFAULT_OTP_LENGTH = 6;
-    private static final int MAX_OTP_LENGTH = 9;
     private static final int MAX_VERIFICATION_ATTEMPTS = 5;
 
     private final PasswordResetTokenRepository passwordResetTokenRepository;
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final EmailService emailService;
-    private final SecureRandom secureRandom = new SecureRandom();
+    private final PbkdfOneTimeCodeHasher codeHasher;
 
     @Value("${otp.expiry-minutes:10}")
     private int expiryMinutes;
@@ -49,12 +37,12 @@ public class OtpService {
     public void sendOtp(String email) {
         passwordResetTokenRepository.deleteAllByEmail(email);
 
-        String code = generateCode();
+        String code = codeHasher.generateCode(otpLength);
         Instant expiresAt = Instant.now().plusSeconds(expiryMinutes * 60L);
 
         PasswordResetToken token = PasswordResetToken.builder()
                 .email(email)
-                .tokenHash(hash(email + ":" + code))
+                .tokenHash(codeHasher.hash(email + ":" + code))
                 .expiresAt(expiresAt)
                 .used(false)
                 .build();
@@ -78,7 +66,7 @@ public class OtpService {
         }
 
         boolean notExpired = Instant.now().isBefore(token.getExpiresAt());
-        boolean matches = verify(email + ":" + code, token.getTokenHash());
+        boolean matches = codeHasher.verify(email + ":" + code, token.getTokenHash());
 
         if (matches && notExpired) {
             return token;
@@ -114,49 +102,4 @@ public class OtpService {
         passwordResetTokenRepository.save(token);
     }
 
-    private String generateCode() {
-        // Guard against an unset/misconfigured length (0 would build the invalid
-        // pattern "%00d") and cap it so 10^length stays within int range.
-        int length = otpLength > 0 ? Math.min(otpLength, MAX_OTP_LENGTH) : DEFAULT_OTP_LENGTH;
-        int bound = (int) Math.pow(10, length);
-        return String.format("%0" + length + "d", secureRandom.nextInt(bound));
-    }
-
-    private String hash(String value) {
-        byte[] salt = new byte[SALT_LENGTH_BYTES];
-        secureRandom.nextBytes(salt);
-
-        try {
-            PBEKeySpec spec = new PBEKeySpec(value.toCharArray(), salt, PBKDF2_ITERATIONS, KEY_LENGTH_BITS);
-            SecretKeyFactory factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256");
-            byte[] hashed = factory.generateSecret(spec).getEncoded();
-            return PBKDF2_ITERATIONS + ":"
-                    + Base64.getEncoder().encodeToString(salt) + ":"
-                    + Base64.getEncoder().encodeToString(hashed);
-        } catch (GeneralSecurityException e) {
-            throw new IllegalStateException("PBKDF2WithHmacSHA256 not available", e);
-        }
-    }
-
-    private boolean verify(String rawValue, String stored) {
-        try {
-            String[] parts = stored.split(":");
-            if (parts.length != 3) {
-                return false;
-            }
-
-            int iterations = Integer.parseInt(parts[0]);
-            byte[] salt = Base64.getDecoder().decode(parts[1]);
-            byte[] expected = Base64.getDecoder().decode(parts[2]);
-
-            PBEKeySpec spec = new PBEKeySpec(rawValue.toCharArray(), salt, iterations, expected.length * 8);
-            SecretKeyFactory factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256");
-            byte[] actual = factory.generateSecret(spec).getEncoded();
-
-            return MessageDigest.isEqual(actual, expected); // constant-time comparison
-        } catch (IllegalArgumentException | GeneralSecurityException e) {
-            log.warn("Unable to verify OTP hash", e);
-            return false;
-        }
-    }
 }
