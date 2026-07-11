@@ -1,0 +1,7 @@
+api.instaswipe.app {
+	reverse_proxy 127.0.0.1:8080
+}
+
+media.instaswipe.app {
+	reverse_proxy 127.0.0.1:9000
+}

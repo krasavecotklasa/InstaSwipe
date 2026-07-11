@@ -27,7 +27,7 @@ services:
       - rabbitmq
       - redis
     ports:
-      - "8080:8080"
+      - "127.0.0.1:8080:8080"
     volumes:
       # Firebase credential (gitignored). Drop the service-account JSON at ./secrets/service-account.json.
       - ./secrets:/etc/firebase:ro
@@ -43,8 +43,8 @@ services:
     volumes:
       - ./minio-data:/data
     ports:
-      - "9000:9000" # S3 API
-      - "9001:9001" # Web console
+      - "127.0.0.1:9000:9000" # S3 API (public via Caddy reverse proxy)
+      - "127.0.0.1:9001:9001" # Web console (SSH tunnel only, never public)
 
   mongodb:
     image: mongo:8.3.4-noble
@@ -56,16 +56,16 @@ services:
     volumes:
       - ./mongo-data:/data/db
     ports:
-      - "27017:27017" # API
+      - "127.0.0.1:27017:27017" # API
 
   rabbitmq:
     image: rabbitmq:4.0-management
     container_name: rabbitmq
     restart: unless-stopped
     ports:
-      - "5672:5672" # AMQP
-      - "15672:15672" # Management UI
-      - "61613:61613" # STOMP
+      - "127.0.0.1:5672:5672" # AMQP
+      - "127.0.0.1:15672:15672" # Management UI
+      - "127.0.0.1:61613:61613" # STOMP
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_ROOT_USERNAME:-guest}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_ROOT_PASSWORD:-guest}
@@ -79,6 +79,6 @@ services:
     container_name: redis
     restart: unless-stopped
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     volumes:
       - ./redis-data:/data
