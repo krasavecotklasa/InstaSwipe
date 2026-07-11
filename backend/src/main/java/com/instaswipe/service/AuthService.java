@@ -6,6 +6,7 @@ import com.instaswipe.dto.LoginRequest;
 import com.instaswipe.dto.RegisterRequest;
 import com.instaswipe.dto.UserResponse;
 import com.instaswipe.exception.EmailAlreadyUsedException;
+import com.instaswipe.exception.EmailNotVerifiedException;
 import com.instaswipe.exception.InvalidCredentialsException;
 import com.instaswipe.model.User;
 import com.instaswipe.model.UserProfile;
@@ -22,6 +23,7 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final RefreshTokenService refreshTokenService;
+    private final EmailVerificationService emailVerificationService;
 
     // A valid BCrypt hash compared against on login misses so response time does not reveal
     // whether an account exists (mitigates user enumeration via a timing side channel).
@@ -38,8 +40,10 @@ public class AuthService {
                 .email(email)
                 .passwordHash(passwordEncoder.encode(request.password()))
                 .profile(UserProfile.builder().build())
+                .emailVerified(false)
                 .build();
         User saved = userRepository.save(user);
+        emailVerificationService.sendVerification(email);
         return new UserResponse(saved.getId(), saved.getEmail());
     }
 
@@ -54,6 +58,9 @@ public class AuthService {
         }
         if (!passwordEncoder.matches(request.password(), user.getPasswordHash()) || !user.isEnabled()) {
             throw new InvalidCredentialsException();
+        }
+        if (!user.isEmailVerified()) {
+            throw new EmailNotVerifiedException();
         }
         String accessToken = jwtService.generateAccessToken(user);
         String refreshToken = refreshTokenService.issue(user.getId());

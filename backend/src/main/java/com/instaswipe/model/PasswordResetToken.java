@@ -24,6 +24,9 @@ public class PasswordResetToken {
     @Indexed
     private String userId;
 
+    @Indexed
+    private String email;
+
     @Indexed(unique = true)
     private String tokenHash;
 
@@ -32,6 +35,9 @@ public class PasswordResetToken {
 
     @Builder.Default
     private boolean used = false;
+
+    @Builder.Default
+    private int attempts = 0;
 
     @CreatedDate
     private Instant createdAt;

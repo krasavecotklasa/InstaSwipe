@@ -6,28 +6,41 @@ import java.util.List;
 
 import com.instaswipe.TestcontainersConfiguration;
 import com.instaswipe.dto.AuthResponse;
+import com.instaswipe.dto.EmailResponse;
+import com.instaswipe.dto.ForgotPasswordRequest;
 import com.instaswipe.dto.LoginRequest;
 import com.instaswipe.dto.RegisterRequest;
 import com.instaswipe.dto.TokenRequest;
 import com.instaswipe.dto.UserResponse;
+import com.instaswipe.dto.VerifyOtpTokenRequest;
 import com.instaswipe.model.RefreshToken;
 import com.instaswipe.model.Role;
 import com.instaswipe.model.User;
 import com.instaswipe.repository.RefreshTokenRepository;
 import com.instaswipe.repository.UserRepository;
+import com.instaswipe.service.EmailService;
 import com.instaswipe.service.JwtService;
 import com.instaswipe.service.RefreshTokenService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
+import org.springframework.http.HttpHeaders;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.TestPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.web.client.RestClient;
+
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @Import(TestcontainersConfiguration.class)
@@ -49,6 +62,9 @@ class AuthEndpointTest {
     @Autowired
     private JwtService jwtService;
 
+    @MockitoBean
+    private EmailService emailService;
+
     private RestClient client;
 
     @BeforeEach
@@ -56,6 +72,8 @@ class AuthEndpointTest {
         client = RestClient.create("http://localhost:" + port);
         userRepository.deleteAll();
         refreshTokenRepository.deleteAll();
+        when(emailService.sendVerificationEmail(anyString(), anyString()))
+                .thenReturn(new EmailResponse("test-message-id", "SENT", null, null, true));
     }
 
     private record HttpResult<T>(HttpStatusCode status, T body) {
@@ -75,6 +93,30 @@ class AuthEndpointTest {
                                 : null));
     }
 
+    private void markEmailVerified(String email) {
+        User user = userRepository.findByEmail(email).orElseThrow();
+        user.setEmailVerified(true);
+        userRepository.save(user);
+    }
+
+    private HttpStatusCode getProfileStatus(String accessToken) {
+        return client.get().uri("/api/profile/status")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                .exchange((request, response) -> response.getStatusCode());
+    }
+
+    @Test
+    void registerPreflightRequestIsAllowed() {
+        var response = client.options()
+                .uri("/api/auth/register")
+                .header(HttpHeaders.ORIGIN, "http://localhost:3000")
+                .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, "POST")
+                .header(HttpHeaders.ACCESS_CONTROL_REQUEST_HEADERS, "content-type")
+                .exchange((request, httpResponse) -> httpResponse.getStatusCode());
+
+        assertThat(response.value()).isIn(200, 204);
+    }
+
     @Test
     void registerCreatesUserWithHashedPassword() {
         HttpResult<UserResponse> result = post("/api/auth/register",
@@ -89,6 +131,89 @@ class AuthEndpointTest {
         assertThat(saved.getPasswordHash()).isNotEqualTo("Password123!");
         assertThat(passwordEncoder.matches("Password123!", saved.getPasswordHash())).isTrue();
         assertThat(saved.getRoles()).containsExactly(Role.USER);
+    }
+
+    @Test
+    void registerCreatesUnverifiedUserAndCanVerifyIt() {
+        HttpResult<UserResponse> result = post("/api/auth/register",
+                new RegisterRequest("verify@example.com", "Password123!"), UserResponse.class);
+
+        assertThat(result.status().value()).isEqualTo(201);
+
+        User saved = userRepository.findByEmail("verify@example.com").orElseThrow();
+        assertThat(saved.isEmailVerified()).isFalse();
+
+        ArgumentCaptor<String> codeCaptor = ArgumentCaptor.forClass(String.class);
+        verify(emailService).sendVerificationEmail(eq("verify@example.com"), codeCaptor.capture());
+
+        HttpResult<Void> verification = post("/api/auth/verify-email",
+                new VerifyOtpTokenRequest("verify@example.com", codeCaptor.getValue()), Void.class);
+
+        assertThat(verification.status().value()).isEqualTo(200);
+
+        User verified = userRepository.findByEmail("verify@example.com").orElseThrow();
+        assertThat(verified.isEmailVerified()).isTrue();
+    }
+
+    /** Seeds an unverified user directly, bypassing /register so these tests don't eat into
+     * register's per-IP rate-limit budget shared with every other test in this class. */
+    private void seedUnverifiedUser(String email) {
+        userRepository.save(User.builder()
+                .email(email)
+                .passwordHash(passwordEncoder.encode("Password123!"))
+                .emailVerified(false)
+                .build());
+    }
+
+    @Test
+    void verifyEmailAcceptsMixedCaseEmail() {
+        seedUnverifiedUser("mixedcase@example.com");
+
+        HttpResult<Void> resend = post("/api/auth/resend-verification",
+                new ForgotPasswordRequest("mixedcase@example.com"), Void.class);
+        assertThat(resend.status().value()).isEqualTo(200);
+
+        ArgumentCaptor<String> codeCaptor = ArgumentCaptor.forClass(String.class);
+        verify(emailService).sendVerificationEmail(eq("mixedcase@example.com"), codeCaptor.capture());
+
+        HttpResult<Void> verification = post("/api/auth/verify-email",
+                new VerifyOtpTokenRequest("MixedCase@Example.com", codeCaptor.getValue()), Void.class);
+
+        assertThat(verification.status().value()).isEqualTo(200);
+        assertThat(userRepository.findByEmail("mixedcase@example.com").orElseThrow().isEmailVerified()).isTrue();
+    }
+
+    @Test
+    void resendVerificationIssuesAUsableCode() {
+        seedUnverifiedUser("resend@example.com");
+
+        HttpResult<Void> resend = post("/api/auth/resend-verification",
+                new ForgotPasswordRequest("resend@example.com"), Void.class);
+        assertThat(resend.status().value()).isEqualTo(200);
+
+        ArgumentCaptor<String> codeCaptor = ArgumentCaptor.forClass(String.class);
+        verify(emailService).sendVerificationEmail(eq("resend@example.com"), codeCaptor.capture());
+
+        HttpResult<Void> verification = post("/api/auth/verify-email",
+                new VerifyOtpTokenRequest("resend@example.com", codeCaptor.getValue()), Void.class);
+
+        assertThat(verification.status().value()).isEqualTo(200);
+    }
+
+    @Test
+    void resendVerificationIsANoOpForAlreadyVerifiedEmail() {
+        userRepository.save(User.builder()
+                .email("already-verified@example.com")
+                .passwordHash(passwordEncoder.encode("Password123!"))
+                .emailVerified(true)
+                .build());
+
+        HttpResult<Void> resend = post("/api/auth/resend-verification",
+                new ForgotPasswordRequest("already-verified@example.com"), Void.class);
+
+        assertThat(resend.status().value()).isEqualTo(200);
+        verify(emailService, never())
+                .sendVerificationEmail(eq("already-verified@example.com"), anyString());
     }
 
     @Test
@@ -113,6 +238,7 @@ class AuthEndpointTest {
     void loginReturnsAccessAndRefreshTokens() {
         post("/api/auth/register",
                 new RegisterRequest("ada@example.com", "Password123!"), UserResponse.class);
+        markEmailVerified("ada@example.com");
 
         HttpResult<AuthResponse> result = post("/api/auth/login",
                 new LoginRequest("ada@example.com", "Password123!"), AuthResponse.class);
@@ -137,6 +263,7 @@ class AuthEndpointTest {
     void refreshRotatesRefreshTokenAndReturnsNewTokens() {
         post("/api/auth/register",
                 new RegisterRequest("refresh@example.com", "Password123!"), UserResponse.class);
+        markEmailVerified("refresh@example.com");
         HttpResult<AuthResponse> login = post("/api/auth/login",
                 new LoginRequest("refresh@example.com", "Password123!"), AuthResponse.class);
         String oldRefreshToken = login.body().refreshToken();
@@ -166,6 +293,7 @@ class AuthEndpointTest {
     void logoutRevokesRefreshToken() {
         post("/api/auth/register",
                 new RegisterRequest("logout@example.com", "Password123!"), UserResponse.class);
+        markEmailVerified("logout@example.com");
         HttpResult<AuthResponse> login = post("/api/auth/login",
                 new LoginRequest("logout@example.com", "Password123!"), AuthResponse.class);
         String refreshToken = login.body().refreshToken();
@@ -182,11 +310,34 @@ class AuthEndpointTest {
     void loginRejectsWrongPassword() {
         post("/api/auth/register",
                 new RegisterRequest("bob@example.com", "Password123!"), UserResponse.class);
+        markEmailVerified("bob@example.com");
 
         HttpResult<AuthResponse> result = post("/api/auth/login",
                 new LoginRequest("bob@example.com", "wrongpass1"), AuthResponse.class);
 
         assertThat(result.status().value()).isEqualTo(401);
+    }
+
+    @Test
+    void loginRejectsUnverifiedEmail() {
+        post("/api/auth/register",
+                new RegisterRequest("unverified@example.com", "Password123!"), UserResponse.class);
+
+        HttpResult<AuthResponse> result = post("/api/auth/login",
+                new LoginRequest("unverified@example.com", "Password123!"), AuthResponse.class);
+
+        assertThat(result.status().value()).isEqualTo(403);
+    }
+
+    @Test
+    void protectedEndpointsRejectUnverifiedUserToken() {
+        post("/api/auth/register",
+                new RegisterRequest("stale-token@example.com", "Password123!"), UserResponse.class);
+        User user = userRepository.findByEmail("stale-token@example.com").orElseThrow();
+
+        HttpStatusCode result = getProfileStatus(jwtService.generateAccessToken(user));
+
+        assertThat(result.value()).isEqualTo(403);
     }
 
     @Test

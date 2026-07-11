@@ -1,5 +1,6 @@
 package com.instaswipe.dto;
 
+import com.instaswipe.ratelimit.EmailKeyed;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
@@ -14,5 +15,5 @@ public record RegisterRequest(
         @Pattern(regexp = "^(?=.*[0-9])(?=.*[a-z])(?=.*[A-Z])(?=.*[@#$%^&+=!]).*$",
                 message = "Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character")
         String password
-) {
+) implements EmailKeyed {
 }

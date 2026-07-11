@@ -1,9 +1,12 @@
 package com.instaswipe.controller;
 
 import com.instaswipe.dto.OnboardingStatusResponse;
+import com.instaswipe.dto.PasswordChangeRequest;
 import com.instaswipe.dto.ProfilePictureResponse;
 import com.instaswipe.dto.ProfileUpdateRequest;
 import com.instaswipe.model.Media;
+import com.instaswipe.ratelimit.KeyStrategy;
+import com.instaswipe.ratelimit.RateLimited;
 import com.instaswipe.repository.UserRepository;
 import com.instaswipe.service.ProfileService;
 import jakarta.validation.Valid;
@@ -39,6 +42,7 @@ public class ProfileController {
     }
 
     @PostMapping(value = "/picture", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @RateLimited(bucket = "profile-picture", keyBy = KeyStrategy.USER, limit = 10, windowSeconds = 3600)
     public ResponseEntity<ProfilePictureResponse> uploadProfilePicture(
             @AuthenticationPrincipal String userId,
             @RequestParam("file") MultipartFile file) {
@@ -60,5 +64,14 @@ public class ProfileController {
             @AuthenticationPrincipal String requesterId,
             @PathVariable("id") String targetUserId) {
         return ResponseEntity.ok(profileService.getPublicProfile(requesterId, targetUserId));
+    }
+
+    @PutMapping("/password")
+    public ResponseEntity<String> changePassword(
+            @AuthenticationPrincipal String userId,
+            @Valid @RequestBody PasswordChangeRequest request) {
+
+        profileService.changePassword(userId, request.oldPassword(), request.newPassword());
+        return ResponseEntity.ok("Password changed successfully.");
     }
 }

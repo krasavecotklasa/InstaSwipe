@@ -1,6 +1,7 @@
 package com.instaswipe.controller;
 
 import com.instaswipe.config.RabbitMQConfig;
+import com.instaswipe.dto.PasswordChangeRequest;
 import com.instaswipe.dto.ProfilePictureResponse;
 import com.instaswipe.event.ImageProcessingEvent;
 import com.instaswipe.event.ImageTarget;
@@ -21,6 +22,7 @@ import org.springframework.core.io.Resource;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.client.MultipartBodyBuilder;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.nio.charset.StandardCharsets;
@@ -152,6 +154,39 @@ class ProfileUpdateAndPictureTest extends AbstractWebIntegrationTest {
                 .retrieve().toBodilessEntity();
 
         assertThat(response.getStatusCode().value()).isIn(401, 403);
+    }
+
+    @Test
+    void changePasswordUpdatesHashWhenCurrentPasswordMatches() {
+        User user = bareUser("pass@x.com");
+        user.setPasswordHash(new BCryptPasswordEncoder().encode("password123!"));
+        userRepository.save(user);
+
+        ResponseEntity<String> response = client(tokenFor(user)).put()
+                .uri("/api/profile/password")
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(new PasswordChangeRequest("password123!", "NewPass123!"))
+                .retrieve().toEntity(String.class);
+
+        assertThat(response.getStatusCode().value()).isEqualTo(200);
+        User stored = userRepository.findById(user.getId()).orElseThrow();
+        assertThat(stored.getPasswordHash()).isNotEqualTo(user.getPasswordHash());
+        assertThat(stored.getPasswordHash()).isNotEqualTo("password123!");
+    }
+
+    @Test
+    void changePasswordRejectsWrongCurrentPassword() {
+        User user = bareUser("wrongpass@x.com");
+        user.setPasswordHash(new BCryptPasswordEncoder().encode("password123!"));
+        userRepository.save(user);
+
+        ResponseEntity<Void> response = client(tokenFor(user)).put()
+                .uri("/api/profile/password")
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(new PasswordChangeRequest("wrongPassword!", "NewPass123!"))
+                .retrieve().toBodilessEntity();
+
+        assertThat(response.getStatusCode().value()).isEqualTo(401);
     }
 
     @Test

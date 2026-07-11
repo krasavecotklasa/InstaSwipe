@@ -1,6 +1,7 @@
 package com.instaswipe.security;
 
 import com.instaswipe.config.JwtProperties;
+import com.instaswipe.repository.UserRepository;
 import com.instaswipe.service.JwtService;
 import java.util.List;
 import org.springframework.beans.factory.ObjectProvider;
@@ -28,6 +29,7 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http, JwtService jwtService,
+            UserRepository userRepository,
             ObjectProvider<ObjectMapper> objectMapperProvider) throws Exception {
         RestAuthenticationEntryPoint authenticationEntryPoint = new RestAuthenticationEntryPoint(objectMapperProvider);
         RestAccessDeniedHandler accessDeniedHandler = new RestAccessDeniedHandler(objectMapperProvider);
@@ -41,6 +43,7 @@ public class SecurityConfig {
                         .requestMatchers("/ws/**").permitAll()
                         .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                        .requestMatchers("/api/emails/**").hasRole("ADMIN")
                         .anyRequest().authenticated())
                 // Return ApiError-shaped 401 (not authenticated) / 403 (authenticated but forbidden)
                 // instead of the default opaque 403 from Http403ForbiddenEntryPoint.
@@ -50,7 +53,9 @@ public class SecurityConfig {
                 .httpBasic(AbstractHttpConfigurer::disable)
                 .formLogin(AbstractHttpConfigurer::disable)
                 .addFilterBefore(new JwtBearerAuthenticationFilter(jwtService),
-                        UsernamePasswordAuthenticationFilter.class);
+                        UsernamePasswordAuthenticationFilter.class)
+                .addFilterAfter(new EmailVerifiedAuthenticationFilter(userRepository),
+                        JwtBearerAuthenticationFilter.class);
         return http.build();
     }
 

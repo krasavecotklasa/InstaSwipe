@@ -2,6 +2,7 @@ package com.instaswipe.security;
 
 import com.instaswipe.model.Match;
 import com.instaswipe.repository.MatchRepository;
+import com.instaswipe.repository.UserRepository;
 import com.instaswipe.service.JwtService;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
@@ -36,6 +37,9 @@ class WebSocketAuthInterceptorTest {
 
     @Mock
     private MatchRepository matchRepository;
+
+    @Mock
+    private UserRepository userRepository;
 
     @InjectMocks
     private WebSocketAuthInterceptor interceptor;
@@ -105,6 +109,7 @@ class WebSocketAuthInterceptorTest {
         Instant expiry = Instant.now().plusSeconds(300);
         Claims claims = claimsWith("user123", expiry);
         when(jwtService.parseClaims("valid-token")).thenReturn(claims);
+        when(userRepository.existsByIdAndEmailVerifiedTrue("user123")).thenReturn(true);
 
         Message<?> result = interceptor.preSend(message, null);
 
@@ -113,6 +118,22 @@ class WebSocketAuthInterceptorTest {
         assertNotNull(resultAccessor.getUser());
         assertEquals("user123", resultAccessor.getUser().getName());
         assertEquals(Date.from(expiry).toInstant(), sessionAttrs.get(WebSocketAuthInterceptor.SESSION_TOKEN_EXPIRY));
+    }
+
+    @Test
+    void testPreSend_ConnectWithUnverifiedUser_ThrowsException() {
+        accessor.setNativeHeader("Authorization", "Bearer valid-token");
+        Message<byte[]> message = toMessage(accessor);
+
+        Claims claims = mock(Claims.class);
+        when(claims.getSubject()).thenReturn("user123");
+        when(jwtService.parseClaims("valid-token")).thenReturn(claims);
+        when(userRepository.existsByIdAndEmailVerifiedTrue("user123")).thenReturn(false);
+
+        AccessDeniedException exception = assertThrows(AccessDeniedException.class, () ->
+                interceptor.preSend(message, null));
+
+        assertEquals("Please verify your email before using the app", exception.getMessage());
     }
 
     // --- SUBSCRIBE authorization (principal bound at CONNECT) ---

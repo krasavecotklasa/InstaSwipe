@@ -3,11 +3,14 @@ package com.instaswipe.exception;
 import java.util.stream.Collectors;
 
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
+
+import com.instaswipe.ratelimit.RateLimitExceededException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -22,6 +25,12 @@ public class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.UNAUTHORIZED)
     public ApiError handleInvalidCredentials(InvalidCredentialsException ex) {
         return ApiError.of(HttpStatus.UNAUTHORIZED.value(), ex.getMessage());
+    }
+
+    @ExceptionHandler(EmailNotVerifiedException.class)
+    @ResponseStatus(HttpStatus.FORBIDDEN)
+    public ApiError handleEmailNotVerified(EmailNotVerifiedException ex) {
+        return ApiError.of(HttpStatus.FORBIDDEN.value(), ex.getMessage());
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -52,5 +61,12 @@ public class GlobalExceptionHandler {
     public ApiError handleMaxUploadSize(MaxUploadSizeExceededException ex) {
         return ApiError.of(HttpStatus.CONTENT_TOO_LARGE.value(),
                 "Uploaded file exceeds the maximum allowed size");
+    }
+
+    @ExceptionHandler(RateLimitExceededException.class)
+    public ResponseEntity<ApiError> handleRateLimit(RateLimitExceededException ex) {
+        return ResponseEntity.status(429)
+                .header("Retry-After", String.valueOf(ex.getRetryAfterSeconds()))
+                .body(ApiError.of(429, ex.getMessage()));
     }
 }

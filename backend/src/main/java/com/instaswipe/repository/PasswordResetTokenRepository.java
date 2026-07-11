@@ -8,4 +8,8 @@ import org.springframework.data.mongodb.repository.MongoRepository;
 public interface PasswordResetTokenRepository extends MongoRepository<PasswordResetToken, String> {
 
     Optional<PasswordResetToken> findByTokenHash(String tokenHash);
+
+    Optional<PasswordResetToken> findTopByEmailAndUsedFalseOrderByExpiresAtDesc(String email);
+
+    void deleteAllByEmail(String email);
 }

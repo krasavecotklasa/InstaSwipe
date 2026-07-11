@@ -1,5 +1,6 @@
 package com.instaswipe.dto;
 
+import com.instaswipe.ratelimit.EmailKeyed;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 
@@ -9,5 +10,5 @@ public record LoginRequest(
         String email,
         @NotBlank(message = "Password is required")
         String password
-) {
+) implements EmailKeyed {
 }

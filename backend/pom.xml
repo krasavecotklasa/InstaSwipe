@@ -31,6 +31,14 @@
 	</properties>
 	<dependencies>
 		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-data-redis</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-aspectj</artifactId>
+		</dependency>
+		<dependency>
 			<groupId>io.jsonwebtoken</groupId>
 			<artifactId>jjwt-api</artifactId>
 			<version>0.12.5</version>
@@ -105,6 +113,17 @@
 		  <artifactId>thumbnailator</artifactId>
 		  <version>0.4.20</version>
 		</dependency>
+		<!-- Source: https://mvnrepository.com/artifact/com.resend/resend-java -->
+		<dependency>
+		    <groupId>com.resend</groupId>
+		    <artifactId>resend-java</artifactId>
+		    <version>v4.16.0</version>
+		</dependency>
+        <dependency>
+            <groupId>com.squareup.okhttp3</groupId>
+            <artifactId>okhttp</artifactId>
+            <version>4.12.0</version>
+        </dependency>
 		<dependency>
 			<groupId>org.projectlombok</groupId>
 			<artifactId>lombok</artifactId>
