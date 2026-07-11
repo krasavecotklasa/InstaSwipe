@@ -2,6 +2,7 @@ package com.instaswipe.security;
 
 import com.instaswipe.model.Match;
 import com.instaswipe.repository.MatchRepository;
+import com.instaswipe.repository.UserRepository;
 import com.instaswipe.service.JwtService;
 import io.jsonwebtoken.Claims;
 import lombok.RequiredArgsConstructor;
@@ -30,6 +31,7 @@ public class WebSocketAuthInterceptor implements ChannelInterceptor {
 
     private final JwtService jwtService;
     private final MatchRepository matchRepository;
+    private final UserRepository userRepository;
 
     @Override
     public Message<?> preSend(Message<?> message, MessageChannel channel) {
@@ -72,6 +74,12 @@ public class WebSocketAuthInterceptor implements ChannelInterceptor {
         String userId = claims.getSubject();
         if (userId == null) {
             throw new AccessDeniedException("Invalid JWT Token");
+        }
+        boolean verified = userRepository.findById(userId)
+                .map(user -> user.isEmailVerified())
+                .orElse(false);
+        if (!verified) {
+            throw new AccessDeniedException("Please verify your email before using the app");
         }
 
         accessor.setUser(new UsernamePasswordAuthenticationToken(userId, null, List.of()));

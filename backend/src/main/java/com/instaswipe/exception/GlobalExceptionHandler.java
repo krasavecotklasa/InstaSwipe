@@ -27,6 +27,12 @@ public class GlobalExceptionHandler {
         return ApiError.of(HttpStatus.UNAUTHORIZED.value(), ex.getMessage());
     }
 
+    @ExceptionHandler(EmailNotVerifiedException.class)
+    @ResponseStatus(HttpStatus.FORBIDDEN)
+    public ApiError handleEmailNotVerified(EmailNotVerifiedException ex) {
+        return ApiError.of(HttpStatus.FORBIDDEN.value(), ex.getMessage());
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public ApiError handleValidation(MethodArgumentNotValidException ex) {

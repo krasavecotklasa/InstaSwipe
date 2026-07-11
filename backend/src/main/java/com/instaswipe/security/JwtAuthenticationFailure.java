@@ -9,7 +9,8 @@ public enum JwtAuthenticationFailure {
 
     MISSING("Authentication is required to access this resource"),
     EXPIRED("The access token has expired"),
-    INVALID("The access token is invalid");
+    INVALID("The access token is invalid"),
+    EMAIL_NOT_VERIFIED("Please verify your email before using the app");
 
     /** Request attribute key under which the active reason is stored. */
     public static final String ATTRIBUTE = JwtAuthenticationFailure.class.getName();

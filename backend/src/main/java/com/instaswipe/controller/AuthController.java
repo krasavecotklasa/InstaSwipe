@@ -13,6 +13,7 @@ import com.instaswipe.ratelimit.RateLimited;
 import com.instaswipe.ratelimit.RateLimits;
 import com.instaswipe.service.AuthService;
 import com.instaswipe.service.AuthSession;
+import com.instaswipe.service.EmailVerificationService;
 import com.instaswipe.service.OtpService;
 
 import jakarta.validation.Valid;
@@ -32,6 +33,7 @@ public class AuthController {
 
     private final AuthService authService;
     private final OtpService otpService;
+    private final EmailVerificationService emailVerificationService;
 
     @PostMapping("/register")
     @ResponseStatus(HttpStatus.CREATED)
@@ -70,11 +72,19 @@ public class AuthController {
 
     @PostMapping("/password/verify")
     public ResponseEntity<Void> verifyOtp(@RequestBody @Valid VerifyOtpTokenRequest request) {
-        if(otpService.verifyOtp(request.email(), request.code())) {
+        if (otpService.verifyOtp(request.email(), request.code())) {
             return ResponseEntity.ok().build();
         } else {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
+    }
+
+    @PostMapping("/verify-email")
+    public ResponseEntity<Void> verifyEmail(@RequestBody @Valid VerifyOtpTokenRequest request) {
+        if (emailVerificationService.verify(request.email(), request.code())) {
+            return ResponseEntity.ok().build();
+        }
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
     }
 
     @PostMapping("/password/reset")
