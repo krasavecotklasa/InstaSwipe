@@ -72,9 +72,6 @@ public class AuthService {
             String userId = refreshTokenService.userIdForValidToken(refreshToken);
             User user = userRepository.findById(userId)
                     .orElseThrow(InvalidCredentialsException::new);
-            if (!user.isEmailVerified()) {
-                throw new EmailNotVerifiedException();
-            }
             RefreshTokenService.TokenRotation rotation = refreshTokenService.rotate(refreshToken);
             String accessToken = jwtService.generateAccessToken(user);
             return new AuthSession(accessToken, rotation.refreshToken(),

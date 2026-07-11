@@ -75,11 +75,8 @@ public class WebSocketAuthInterceptor implements ChannelInterceptor {
         if (userId == null) {
             throw new AccessDeniedException("Invalid JWT Token");
         }
-        boolean verified = userRepository.findById(userId)
-                .map(user -> user.isEmailVerified())
-                .orElse(false);
-        if (!verified) {
-            throw new AccessDeniedException("Please verify your email before using the app");
+        if (!userRepository.existsByIdAndEmailVerifiedTrue(userId)) {
+            throw new AccessDeniedException(JwtAuthenticationFailure.EMAIL_NOT_VERIFIED.message());
         }
 
         accessor.setUser(new UsernamePasswordAuthenticationToken(userId, null, List.of()));
