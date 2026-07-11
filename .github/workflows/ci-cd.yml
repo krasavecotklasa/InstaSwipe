@@ -1,0 +1,97 @@
+name: CI/CD
+on:
+  pull_request:
+    branches: [ main ]
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-cd-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    name: Build & Test (Java + TypeScript)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      ###### Java ######
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Maven build & test
+        working-directory: ./backend
+        run: mvn -B -ntp clean verify
+
+      ###### TypeScript ######
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: InstaSwipe/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ./InstaSwipe
+        run: npm ci
+
+      - name: Lint
+        working-directory: ./InstaSwipe
+        run: npm run lint --if-present
+
+      - name: Type check
+        working-directory: ./InstaSwipe
+        run: npm run typecheck --if-present
+
+      - name: Frontend tests
+        working-directory: ./InstaSwipe
+        run: npm test --if-present
+
+      - name: Build frontend
+        working-directory: ./InstaSwipe
+        run: npm run build --if-present
+
+  deploy_staging:
+    name: Deploy Staging
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: ci
+    runs-on: ubuntu-latest
+    environment:
+      name: staging
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Deploy to Staging
+        env:
+          STAGING_API_KEY: ${{ secrets.STAGING_API_KEY }}
+        run: |
+          echo "Add staging deploy command here"
+          # ./scripts/deploy-staging.sh
+
+  deploy_production:
+    name: Deploy Production
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: ci
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+    steps:
+      - name: Deploy to Production
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: root
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          script: |
+            cd /opt/instaswipe
+            git pull
+            docker compose up -d --build
