@@ -77,6 +77,9 @@ class ProfileVisibilityTest {
     private String registerAndLogin(String email) {
         send(client.post().uri("/api/auth/register"), null,
                 new RegisterRequest(email, "Password123!"), UserResponse.class);
+        User user = userRepository.findByEmail(email).orElseThrow();
+        user.setEmailVerified(true);
+        userRepository.save(user);
         return send(client.post().uri("/api/auth/login"), null,
                 new LoginRequest(email, "Password123!"), AuthResponse.class).body().accessToken();
     }

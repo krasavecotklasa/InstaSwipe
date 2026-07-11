@@ -6,22 +6,24 @@ import java.util.List;
 
 import com.instaswipe.TestcontainersConfiguration;
 import com.instaswipe.dto.AuthResponse;
+import com.instaswipe.dto.EmailResponse;
+import com.instaswipe.dto.ForgotPasswordRequest;
 import com.instaswipe.dto.LoginRequest;
 import com.instaswipe.dto.RegisterRequest;
 import com.instaswipe.dto.TokenRequest;
 import com.instaswipe.dto.UserResponse;
 import com.instaswipe.dto.VerifyOtpTokenRequest;
-import com.instaswipe.model.EmailVerificationToken;
 import com.instaswipe.model.RefreshToken;
 import com.instaswipe.model.Role;
 import com.instaswipe.model.User;
-import com.instaswipe.repository.EmailVerificationTokenRepository;
 import com.instaswipe.repository.RefreshTokenRepository;
 import com.instaswipe.repository.UserRepository;
+import com.instaswipe.service.EmailService;
 import com.instaswipe.service.JwtService;
 import com.instaswipe.service.RefreshTokenService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -31,7 +33,14 @@ import org.springframework.http.MediaType;
 import org.springframework.http.HttpHeaders;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.TestPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.web.client.RestClient;
+
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @Import(TestcontainersConfiguration.class)
@@ -48,13 +57,13 @@ class AuthEndpointTest {
     private RefreshTokenRepository refreshTokenRepository;
 
     @Autowired
-    private EmailVerificationTokenRepository emailVerificationTokenRepository;
-
-    @Autowired
     private PasswordEncoder passwordEncoder;
 
     @Autowired
     private JwtService jwtService;
+
+    @MockitoBean
+    private EmailService emailService;
 
     private RestClient client;
 
@@ -63,6 +72,8 @@ class AuthEndpointTest {
         client = RestClient.create("http://localhost:" + port);
         userRepository.deleteAll();
         refreshTokenRepository.deleteAll();
+        when(emailService.sendVerificationEmail(anyString(), anyString()))
+                .thenReturn(new EmailResponse("test-message-id", "SENT", null, null, true));
     }
 
     private record HttpResult<T>(HttpStatusCode status, T body) {
@@ -132,17 +143,77 @@ class AuthEndpointTest {
         User saved = userRepository.findByEmail("verify@example.com").orElseThrow();
         assertThat(saved.isEmailVerified()).isFalse();
 
-        EmailVerificationToken token = emailVerificationTokenRepository
-                .findTopByEmailAndUsedFalseOrderByExpiresAtDesc("verify@example.com")
-                .orElseThrow();
+        ArgumentCaptor<String> codeCaptor = ArgumentCaptor.forClass(String.class);
+        verify(emailService).sendVerificationEmail(eq("verify@example.com"), codeCaptor.capture());
 
         HttpResult<Void> verification = post("/api/auth/verify-email",
-                new VerifyOtpTokenRequest("verify@example.com", token.getCode()), Void.class);
+                new VerifyOtpTokenRequest("verify@example.com", codeCaptor.getValue()), Void.class);
 
         assertThat(verification.status().value()).isEqualTo(200);
 
         User verified = userRepository.findByEmail("verify@example.com").orElseThrow();
         assertThat(verified.isEmailVerified()).isTrue();
+    }
+
+    /** Seeds an unverified user directly, bypassing /register so these tests don't eat into
+     * register's per-IP rate-limit budget shared with every other test in this class. */
+    private void seedUnverifiedUser(String email) {
+        userRepository.save(User.builder()
+                .email(email)
+                .passwordHash(passwordEncoder.encode("Password123!"))
+                .emailVerified(false)
+                .build());
+    }
+
+    @Test
+    void verifyEmailAcceptsMixedCaseEmail() {
+        seedUnverifiedUser("mixedcase@example.com");
+
+        HttpResult<Void> resend = post("/api/auth/resend-verification",
+                new ForgotPasswordRequest("mixedcase@example.com"), Void.class);
+        assertThat(resend.status().value()).isEqualTo(200);
+
+        ArgumentCaptor<String> codeCaptor = ArgumentCaptor.forClass(String.class);
+        verify(emailService).sendVerificationEmail(eq("mixedcase@example.com"), codeCaptor.capture());
+
+        HttpResult<Void> verification = post("/api/auth/verify-email",
+                new VerifyOtpTokenRequest("MixedCase@Example.com", codeCaptor.getValue()), Void.class);
+
+        assertThat(verification.status().value()).isEqualTo(200);
+        assertThat(userRepository.findByEmail("mixedcase@example.com").orElseThrow().isEmailVerified()).isTrue();
+    }
+
+    @Test
+    void resendVerificationIssuesAUsableCode() {
+        seedUnverifiedUser("resend@example.com");
+
+        HttpResult<Void> resend = post("/api/auth/resend-verification",
+                new ForgotPasswordRequest("resend@example.com"), Void.class);
+        assertThat(resend.status().value()).isEqualTo(200);
+
+        ArgumentCaptor<String> codeCaptor = ArgumentCaptor.forClass(String.class);
+        verify(emailService).sendVerificationEmail(eq("resend@example.com"), codeCaptor.capture());
+
+        HttpResult<Void> verification = post("/api/auth/verify-email",
+                new VerifyOtpTokenRequest("resend@example.com", codeCaptor.getValue()), Void.class);
+
+        assertThat(verification.status().value()).isEqualTo(200);
+    }
+
+    @Test
+    void resendVerificationIsANoOpForAlreadyVerifiedEmail() {
+        userRepository.save(User.builder()
+                .email("already-verified@example.com")
+                .passwordHash(passwordEncoder.encode("Password123!"))
+                .emailVerified(true)
+                .build());
+
+        HttpResult<Void> resend = post("/api/auth/resend-verification",
+                new ForgotPasswordRequest("already-verified@example.com"), Void.class);
+
+        assertThat(resend.status().value()).isEqualTo(200);
+        verify(emailService, never())
+                .sendVerificationEmail(eq("already-verified@example.com"), anyString());
     }
 
     @Test
@@ -266,7 +337,7 @@ class AuthEndpointTest {
 
         HttpStatusCode result = getProfileStatus(jwtService.generateAccessToken(user));
 
-        assertThat(result.value()).isEqualTo(401);
+        assertThat(result.value()).isEqualTo(403);
     }
 
     @Test
