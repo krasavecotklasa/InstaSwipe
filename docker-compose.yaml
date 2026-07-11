@@ -36,6 +36,15 @@ services:
       # Firebase credential (gitignored). Drop the service-account JSON at ./secrets/service-account.json.
       - ./secrets:/etc/firebase:ro
 
+  frontend:
+    build:
+      context: ./InstaSwipe
+      dockerfile: Dockerfile
+    container_name: frontend
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8082:80"
+
   minio:
     image: minio/minio:RELEASE.2025-09-07T16-13-09Z-cpuv1
     container_name: minio
