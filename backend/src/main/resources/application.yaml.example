@@ -37,6 +37,8 @@ s3:
   secret-key: ${S3_PASSWORD:supersecretpassword}
   bucket: media
   region: eu-central-2
+  public-endpoint: ${S3_PUBLIC_ENDPOINT:${s3.endpoint}}
+  public-bucket: ${S3_PUBLIC_BUCKET:false}
 
 # Image uploads (images only for now: JPEG/PNG in, re-encoded to compressed JPEG).
 # max-image-size is also enforced at the multipart layer (see MediaConfig), so these
