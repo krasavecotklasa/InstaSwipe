@@ -49,9 +49,18 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
         config.setUserDestinationPrefix("/user");
     }
 
+    // Mirrors SecurityConfig's CORS allowed-origin patterns so the WebSocket endpoint
+    // isn't reachable from arbitrary origins.
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
-        registry.addEndpoint("/ws").setAllowedOriginPatterns("*");
+        registry.addEndpoint("/ws").setAllowedOriginPatterns(
+                "http://localhost:*",
+                "http://127.0.0.1:*",
+                "http://[::1]:*",
+                "https://*.expo.dev",
+                "https://*.exponent.dev",
+                "https://instaswipe.app"
+        );
     }
 
     @Override
