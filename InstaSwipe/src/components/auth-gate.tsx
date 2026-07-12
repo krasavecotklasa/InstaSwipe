@@ -186,7 +186,7 @@ function LoginView({ onAuthSuccess, onGoToRegister, onGoToForgotPassword, onNeed
               </View>
 
               <View style={styles.footer}>
-                <ThemedText>Don't have an account? </ThemedText>
+                <ThemedText>Don&apos;t have an account? </ThemedText>
                 <TouchableOpacity onPress={onGoToRegister}>
                   <ThemedText style={{ color: theme.backgroundElement, fontWeight: 'bold' }}>
                     Register

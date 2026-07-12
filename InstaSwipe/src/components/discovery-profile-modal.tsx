@@ -42,6 +42,7 @@ export default function DiscoveryProfileModal({
   const [loadingPosts, setLoadingPosts] = useState(false);
   const [loadingMorePosts, setLoadingMorePosts] = useState(false);
   const [postsError, setPostsError] = useState<string | null>(null);
+  const [loadedProfileId, setLoadedProfileId] = useState<string | null>(null);
 
   const resetPosts = useCallback(() => {
     setPosts([]);
@@ -99,17 +100,25 @@ export default function DiscoveryProfileModal({
     }
   }, []);
 
-  useEffect(() => {
-    if (!visible || !profile) {
-      activeProfileIdRef.current = null;
-      resetPosts();
-      return;
-    }
-
-    activeProfileIdRef.current = profile.id;
+  // Reset synchronously during render when the target profile changes (React's documented
+  // alternative to an Effect for this: https://react.dev/learn/you-might-not-need-an-effect).
+  // The ref write and the actual fetch are real side effects and stay in the Effect below.
+  const targetProfileId = visible && profile ? profile.id : null;
+  if (targetProfileId !== loadedProfileId) {
+    setLoadedProfileId(targetProfileId);
     resetPosts();
-    void loadProfilePosts(profile.id, 0);
-  }, [loadProfilePosts, profile, resetPosts, visible]);
+  }
+
+  useEffect(() => {
+    activeProfileIdRef.current = targetProfileId;
+    if (targetProfileId) {
+      // loadProfilePosts sets its loading state synchronously before its first await (so the
+      // spinner shows immediately) - standard fetch-on-mount UX, not the derived-state pattern
+      // this rule targets.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      void loadProfilePosts(targetProfileId, 0);
+    }
+  }, [targetProfileId, loadProfilePosts]);
 
   const loadMorePosts = () => {
     if (!profile || loadingPosts || loadingMorePosts || postsLast) {

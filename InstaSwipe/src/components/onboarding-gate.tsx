@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -74,11 +74,18 @@ export default function OnboardingGate({ onOnboardSuccess, mode = 'create', init
   // We need the real mime type to build a correct native FormData part below.
   const [profileImage, setProfileImage] = useState<ImagePicker.ImagePickerAsset | null>(null);
   const [loading, setLoading] = useState(false);
+  const [syncedProfile, setSyncedProfile] = useState(initialProfile);
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const currentProfilePictureUrl = normalizeMediaUrl(initialProfile?.profilePictureUrl);
 
-  useEffect(() => {
+  // Re-sync the form when the parent hands us a different profile to edit (identity is
+  // stable across re-renders - it only changes via the parent's onEditProfile setter - so
+  // reference equality is safe here). Done during render rather than in an Effect, since
+  // there's no external system involved, just local state (React's documented pattern:
+  // https://react.dev/learn/you-might-not-need-an-effect).
+  if (initialProfile !== syncedProfile) {
+    setSyncedProfile(initialProfile);
     setDisplayName(initialProfile?.displayName ?? '');
     setBio(initialProfile?.bio ?? '');
     setBirthDate(initialProfile?.birthDate ?? '');
@@ -86,7 +93,7 @@ export default function OnboardingGate({ onOnboardSuccess, mode = 'create', init
     setGender(initialProfile?.gender ?? GENDERS[0]);
     setInterests(initialProfile?.interests ?? []);
     setProfileImage(null);
-  }, [initialProfile]);
+  }
 
   const handlePickImage = async () => {
     try {

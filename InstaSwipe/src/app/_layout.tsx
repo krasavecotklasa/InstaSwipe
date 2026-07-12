@@ -26,10 +26,11 @@ export default function RootLayout() {
     checkAuth();
   }, []);
 
-  // Once authenticated, check whether onboarding is required
+  // Once authenticated, check whether onboarding is required. Transitions back to
+  // unauthenticated reset needsOnboarding at their source (onLogout, the 401 handler
+  // below) rather than reactively here, so this effect only needs to act when signed in.
   useEffect(() => {
     if (!isAuthenticated) {
-      setNeedsOnboarding(null);
       return;
     }
     async function checkOnboarding() {

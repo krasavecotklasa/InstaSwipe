@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { SelectField } from '@/components/form/select-field';
@@ -49,16 +49,20 @@ export function DateField({ value, onChange, minAge = 18, maxAge = 100 }: DateFi
   const [month, setMonth] = useState<string | null>(initial.month);
   const [day, setDay] = useState<string | null>(initial.day);
   const [activeField, setActiveField] = useState<'month' | 'day' | 'year' | null>(null);
+  const [syncedValue, setSyncedValue] = useState(value);
 
   // Re-sync when the parent value changes externally (e.g. profile hydration in
   // update mode). Our own emits set value to the same parts, so this is idempotent;
-  // partial selections don't change value, so they are never clobbered.
-  useEffect(() => {
+  // partial selections don't change value, so they are never clobbered. Done during
+  // render (React's documented alternative to an Effect for this) rather than in an
+  // Effect, since there's no external system involved - just local state.
+  if (value !== syncedValue) {
+    setSyncedValue(value);
     const parts = parseDate(value);
     setYear(parts.year);
     setMonth(parts.month);
     setDay(parts.day);
-  }, [value]);
+  }
 
   const currentYear = new Date().getFullYear();
   const years = useMemo(() => {

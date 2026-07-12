@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { View, StyleSheet, Pressable, Text, Platform, ActivityIndicator } from 'react-native';
 import { Image, type ImageLoadEventData } from 'expo-image';
 import { SymbolView } from 'expo-symbols';
@@ -50,10 +50,15 @@ export function PostCard({ post, onAuthorPress }: PostCardProps) {
   const [liked, setLiked] = useState(post.likedByMe);
   const [likeCount, setLikeCount] = useState(post.likes);
   const [postImageAspectRatio, setPostImageAspectRatio] = useState(DEFAULT_POST_IMAGE_ASPECT_RATIO);
+  const [syncedMediaUrl, setSyncedMediaUrl] = useState(post.media?.url);
 
-  useEffect(() => {
+  // Reset to the default aspect ratio whenever the image itself changes, until the real
+  // one arrives via handlePostImageLoad. Done during render, not in an Effect - no
+  // external system involved (React's documented pattern for this).
+  if (post.media?.url !== syncedMediaUrl) {
+    setSyncedMediaUrl(post.media?.url);
     setPostImageAspectRatio(DEFAULT_POST_IMAGE_ASPECT_RATIO);
-  }, [post.media?.url]);
+  }
 
   const handleLike = () => {
     if (liked) {

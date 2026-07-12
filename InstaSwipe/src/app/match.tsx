@@ -24,6 +24,16 @@ const SWIPE_THRESHOLD = 120;
 const SWIPE_OUT_DISTANCE = 700;
 const PROFILE_OPEN_THRESHOLD = 90;
 
+/* eslint-disable react-hooks/refs -- This screen uses React Native's legacy Animated API
+ * (Animated.ValueXY via useRef), the standard native-driven pattern for gesture-based
+ * animation in React Native: the ref's identity is stable across renders, and its value is
+ * mutated imperatively outside React's render cycle via the native driver, bypassing normal
+ * re-renders for performance. That predates and is unrelated to the mutable-ref-as-state
+ * pattern this rule targets. The modern Compiler-friendly replacement is
+ * react-native-reanimated's useSharedValue (already a dependency), but migrating this
+ * screen's gesture+animation logic to it is a larger rewrite warranting its own dedicated
+ * pass and testing on this core swipe screen, not a lint-sweep side effect. */
+
 export default function MatchScreen() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
