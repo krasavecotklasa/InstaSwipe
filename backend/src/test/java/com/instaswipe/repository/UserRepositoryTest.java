@@ -44,7 +44,9 @@ class UserRepositoryTest extends AbstractMongoRepositoryTest {
         assertThat(found.getEmail()).isEqualTo("ada@example.com");
         assertThat(found.getRoles()).containsExactly(Role.USER);
         assertThat(found.isEnabled()).isTrue();
-        assertThat(found.isEmailVerified()).isTrue();
+        // New users start unverified (AuthService.register sets this explicitly); this test
+        // builds a User directly, bypassing that, so it gets the model's own default.
+        assertThat(found.isEmailVerified()).isFalse();
         assertThat(found.getProfile().getName()).isEqualTo("Ada");
         assertThat(found.getProfile().getGender()).isEqualTo(Gender.FEMALE);
         assertThat(found.getProfile().getProfilePicture().getUrl()).isEqualTo("ada.jpg");

@@ -62,6 +62,7 @@ class SecurityErrorResponseTest extends AbstractWebIntegrationTest {
         User user = userRepository.save(User.builder()
                 .email("user@example.com")
                 .passwordHash("x")
+                .emailVerified(true)
                 .build());
 
         ResponseEntity<String> response = getAdminUsers(tokenFor(user));
