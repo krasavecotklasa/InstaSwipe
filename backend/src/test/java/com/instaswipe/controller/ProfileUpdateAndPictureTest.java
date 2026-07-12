@@ -1,6 +1,7 @@
 package com.instaswipe.controller;
 
 import com.instaswipe.config.RabbitMQConfig;
+import com.instaswipe.dto.OwnProfileResponse;
 import com.instaswipe.dto.PasswordChangeRequest;
 import com.instaswipe.dto.ProfilePictureResponse;
 import com.instaswipe.event.ImageProcessingEvent;
@@ -58,6 +59,7 @@ class ProfileUpdateAndPictureTest extends AbstractWebIntegrationTest {
     void stubStorage() {
         when(mediaStorageService.upload(any(), any(), any(), any(), any())).thenReturn(RAW_KEY);
         when(mediaStorageService.publicUrl(any())).thenReturn(PREVIEW_URL);
+        when(mediaStorageService.ensurePresignedUrl(any())).thenAnswer(invocation -> invocation.getArgument(0));
     }
 
     private User bareUser(String email) {
@@ -303,5 +305,43 @@ class ProfileUpdateAndPictureTest extends AbstractWebIntegrationTest {
         verify(rabbitTemplate).convertAndSend(
                 eq(RabbitMQConfig.IMAGE_EXCHANGE), eq(RabbitMQConfig.IMAGE_ROUTING), (Object) event.capture());
         assertThat(event.getValue().previousKey()).isEqualTo("u/profile/old.jpg");
+    }
+
+    @Test
+    void getOwnProfileExposesProcessingPictureStatus() {
+        User user = bareUser("meprocessing@x.com");
+        MultipartBodyBuilder body = new MultipartBodyBuilder();
+        body.part("file", jpegPart()).contentType(MediaType.IMAGE_JPEG);
+        client(tokenFor(user)).post().uri("/api/profile/picture")
+                .contentType(MediaType.MULTIPART_FORM_DATA)
+                .body(body.build())
+                .retrieve().toBodilessEntity();
+
+        ResponseEntity<OwnProfileResponse> response = client(tokenFor(user)).get()
+                .uri("/api/profile/me")
+                .retrieve().toEntity(OwnProfileResponse.class);
+
+        assertThat(response.getStatusCode().value()).isEqualTo(200);
+        assertThat(response.getBody().profilePictureStatus()).isEqualTo(MediaStatus.PROCESSING);
+        assertThat(response.getBody().profilePictureUrl()).isEqualTo(PREVIEW_URL);
+    }
+
+    @Test
+    void getOwnProfileExposesNullStatusForLegacyPicture() {
+        User user = bareUser("melegacy@x.com");
+        user.setProfile(UserProfile.builder()
+                .name("Legacy")
+                .profilePicture(Media.builder()
+                        .url("https://cdn.test/media/u/profile/legacy.jpg")
+                        .build())
+                .build());
+        userRepository.save(user);
+
+        ResponseEntity<OwnProfileResponse> response = client(tokenFor(user)).get()
+                .uri("/api/profile/me")
+                .retrieve().toEntity(OwnProfileResponse.class);
+
+        assertThat(response.getStatusCode().value()).isEqualTo(200);
+        assertThat(response.getBody().profilePictureStatus()).isNull();
     }
 }
