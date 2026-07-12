@@ -9,6 +9,7 @@ import AuthGate from '@/components/auth-gate';
 import OnboardingGate from '@/components/onboarding-gate';
 import { getAccessToken, logout, API, OwnProfileResponse } from '@/hooks/auth';
 import { AuthContext } from '@/hooks/auth-context';
+import { registerForPushNotificationsAsync, registerNotificationTokenAsync } from '@/hooks/notifications';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -52,6 +53,21 @@ export default function RootLayout() {
     }
     checkOnboarding();
   }, [isAuthenticated]);
+
+  // Register for push notifications once the user reaches the main app (fully
+  // authenticated and onboarded). This is what triggers the OS permission prompt.
+  useEffect(() => {
+    if (!isAuthenticated || needsOnboarding !== false) {
+      return;
+    }
+    async function registerPush() {
+      const token = await registerForPushNotificationsAsync();
+      if (token) {
+        await registerNotificationTokenAsync(token);
+      }
+    }
+    registerPush();
+  }, [isAuthenticated, needsOnboarding]);
 
   const authContextValue = useMemo(
     () => ({

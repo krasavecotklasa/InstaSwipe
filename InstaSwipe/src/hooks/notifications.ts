@@ -73,7 +73,7 @@ export async function registerForPushNotificationsAsync() {
 
 export async function registerNotificationTokenAsync(fcmToken: string): Promise<Response> {
   return authorizedFetch(`${API_PREFIX}/notifications/token`, {
-    method: "POST",
+    method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ fcmToken }),
   });
