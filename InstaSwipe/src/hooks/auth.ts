@@ -1,10 +1,11 @@
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 
-import { 
+import type { MediaStatus } from '@/components/post-card';
+import {
   API_HOST,
   API_PORT,
-  API_BASE_URL, 
+  API_BASE_URL,
   AUTH_BASE_PATH,
   PROFILE_BASE_PATH
 } from '@/hooks/api';
@@ -49,6 +50,7 @@ export interface OwnProfileResponse {
   gender: string;
   interests: string[];
   profilePictureUrl: string | null;
+  profilePictureStatus: MediaStatus | null;
 }
 
 const isWebPlatform = () => Platform.OS === 'web';
@@ -353,3 +355,68 @@ class API {
 export { API, setTokens, clearTokens, getAccessToken, getRefreshToken, getCurrentUserId, logout };
 
 export const getProfileUpdateUrl = () => `${API_BASE_URL}${PROFILE_BASE_PATH}/update`;
+
+export interface ProfilePictureUploadResult {
+  url: string;
+  status: MediaStatus;
+}
+
+export const uploadProfilePicture = async (
+  image: { uri: string; mimeType?: string },
+): Promise<ProfilePictureUploadResult> => {
+  const url = `${API_BASE_URL}${PROFILE_BASE_PATH}/picture`;
+  const filename = image.uri.split('/').pop() || 'profile.jpg';
+  const inferredType =
+    image.mimeType || (filename.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg');
+
+  if (Platform.OS !== 'web') {
+    const FileSystem = await import('expo-file-system/legacy');
+    const token = await getAccessToken();
+    const uploadResult = await FileSystem.uploadAsync(url, image.uri, {
+      httpMethod: 'POST',
+      uploadType: FileSystem.FileSystemUploadType.MULTIPART,
+      fieldName: 'file',
+      mimeType: inferredType,
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    });
+
+    if (uploadResult.status === 429) {
+      throw new Error('Too many picture changes. Please try again later.');
+    }
+    if (uploadResult.status < 200 || uploadResult.status >= 300) {
+      let message = 'Could not upload your picture';
+      try {
+        message = JSON.parse(uploadResult.body).message || message;
+      } catch {
+        // Leave the default message.
+      }
+      throw new Error(message);
+    }
+    return JSON.parse(uploadResult.body);
+  }
+
+  const accessToken = await getAccessToken();
+  const res = await fetch(image.uri);
+  const blob = await res.blob();
+  const formData = new FormData();
+  formData.append('file', blob, filename);
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+    },
+    body: formData,
+  });
+
+  if (response.status === 429) {
+    throw new Error('Too many picture changes. Please try again later.');
+  }
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Could not upload your picture');
+  }
+
+  return response.json();
+};
