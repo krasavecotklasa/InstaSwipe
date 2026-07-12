@@ -12,6 +12,6 @@ export const INTEREST_OPTIONS: string[] = [
   'Art', 'Dancing', 'Hiking', 'Camping', 'Yoga', 'Running', 'Cycling', 'Swimming',
   'Football', 'Basketball', 'Tennis', 'Coffee', 'Wine', 'Foodie', 'Fashion', 'Technology',
   'Science', 'History', 'Nature', 'Animals', 'Volunteering', 'Meditation', 'Writing',
-  'Podcasts', 'Board Games', 'Gardening', 'Astronomy', 'Fishing', 'Politics', 'Pornography',
-  'Programming', 'Exploration', 'Online Moderation', 'Drinking', 'Driving'
+  'Podcasts', 'Board Games', 'Gardening', 'Astronomy', 'Fishing', 'Politics',
+  'Programming', 'Exploration'
 ];
