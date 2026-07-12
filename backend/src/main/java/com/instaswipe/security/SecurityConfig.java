@@ -67,7 +67,8 @@ public class SecurityConfig {
                 "http://127.0.0.1:*",
                 "http://[::1]:*",
                 "https://*.expo.dev",
-                "https://*.exponent.dev"
+                "https://*.exponent.dev",
+                "https://instaswipe.app"
         ));
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
