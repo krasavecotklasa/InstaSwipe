@@ -10,6 +10,7 @@ import {
   View,
 } from 'react-native';
 import { Image } from 'expo-image';
+import * as ImagePicker from 'expo-image-picker';
 import { SymbolView } from 'expo-symbols';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -21,8 +22,10 @@ import { SelectField } from '@/components/form/select-field';
 import { InterestsSelect } from '@/components/form/interests-select';
 import { BottomTabInset, Colors, MaxContentWidth, Spacing } from '@/constants/theme';
 import { COUNTRIES } from '@/constants/countries';
+import { getImageValidationError } from '@/constants/media';
 import { useAuthContext } from '@/hooks/auth-context';
-import { API, type OwnProfileResponse } from '@/hooks/auth';
+import { API, type OwnProfileResponse, uploadProfilePicture } from '@/hooks/auth';
+import { useMediaStatusPolling } from '@/hooks/use-media-status-polling';
 import {
   DISCOVERY_GENDER_LABELS,
   DISCOVERY_GENDERS,
@@ -73,6 +76,7 @@ export default function ProfileScreen() {
   const [profile, setProfile] = useState<OwnProfileResponse | null>(null);
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [avatarUploading, setAvatarUploading] = useState(false);
   const [posts, setPosts] = useState<Post[]>([]);
   const [loadingPosts, setLoadingPosts] = useState(false);
   const [postsError, setPostsError] = useState<string | null>(null);
@@ -89,32 +93,34 @@ export default function ProfileScreen() {
   const [openingEditor, setOpeningEditor] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
 
+  const loadProfile = useCallback(async () => {
+    const profileResponse = await API.getOwnProfile();
+    if (!profileResponse.ok) {
+      const errorData = await profileResponse.json().catch(() => ({}));
+      throw new Error(errorData.message || 'Could not load your profile');
+    }
+    const profileData: OwnProfileResponse = await profileResponse.json();
+    const profileId = profileData.id ?? profileData.userId;
+    setProfile({
+      ...profileData,
+      id: profileId,
+      profilePictureUrl: normalizeMediaUrl(profileData.profilePictureUrl),
+    });
+  }, []);
+
   useEffect(() => {
     let isActive = true;
 
     (async () => {
       try {
-        const [profileResponse, savedPreferences] = await Promise.all([
-          API.getOwnProfile(),
+        const [, savedPreferences] = await Promise.all([
+          loadProfile(),
           getDiscoveryPreferences(),
         ]);
 
         if (!isActive) {
           return;
         }
-
-        if (!profileResponse.ok) {
-          const errorData = await profileResponse.json().catch(() => ({}));
-          throw new Error(errorData.message || 'Could not load your profile');
-        }
-
-        const profileData: OwnProfileResponse = await profileResponse.json();
-        const profileId = profileData.id ?? profileData.userId;
-        setProfile({
-          ...profileData,
-          id: profileId,
-          profilePictureUrl: normalizeMediaUrl(profileData.profilePictureUrl),
-        });
 
         const mergedPreferences = {
           ...DEFAULT_PREFS,
@@ -144,7 +150,47 @@ export default function ProfileScreen() {
     return () => {
       isActive = false;
     };
-  }, []);
+  }, [loadProfile]);
+
+  const { timedOut: avatarTimedOut } = useMediaStatusPolling(
+    profile?.profilePictureStatus,
+    () => { loadProfile().catch(() => {}); },
+  );
+
+  const handlePickAvatar = async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.7,
+      });
+
+      if (result.canceled || !result.assets || result.assets.length === 0) {
+        return;
+      }
+
+      const asset = result.assets[0];
+      const validationError = getImageValidationError(asset);
+      if (validationError) {
+        setError(validationError);
+        return;
+      }
+
+      setAvatarUploading(true);
+      setError(null);
+      const uploadResult = await uploadProfilePicture(asset);
+      setProfile((current) => current && ({
+        ...current,
+        profilePictureUrl: normalizeMediaUrl(uploadResult.url),
+        profilePictureStatus: uploadResult.status,
+      }));
+    } catch (uploadError) {
+      setError(uploadError instanceof Error ? uploadError.message : 'Could not upload your picture');
+    } finally {
+      setAvatarUploading(false);
+    }
+  };
 
   const loadPosts = useCallback(async () => {
     const userId = profile?.id;
@@ -283,11 +329,33 @@ export default function ProfileScreen() {
 
                 <View style={styles.profileBlock}>
                   <View style={styles.profileTopRow}>
-                    <Image
-                      source={profilePicture ? { uri: profilePicture } : undefined}
-                      style={styles.avatar}
-                      contentFit="cover"
-                    />
+                    <TouchableOpacity
+                      onPress={handlePickAvatar}
+                      disabled={avatarUploading}
+                      accessibilityRole="button"
+                      accessibilityLabel="Change profile picture"
+                    >
+                      <Image
+                        source={profilePicture ? { uri: profilePicture } : undefined}
+                        style={styles.avatar}
+                        contentFit="cover"
+                      />
+                      {(avatarUploading || profile.profilePictureStatus === 'PROCESSING') && (
+                        <View style={styles.avatarOverlay}>
+                          <ActivityIndicator color="#ffffff" />
+                          <ThemedText type="small" style={styles.avatarOverlayText}>
+                            {avatarTimedOut ? 'Still…' : 'Processing…'}
+                          </ThemedText>
+                        </View>
+                      )}
+                      {!avatarUploading && profile.profilePictureStatus === 'FAILED' && (
+                        <View style={styles.avatarOverlay}>
+                          <ThemedText type="small" style={styles.avatarOverlayText}>
+                            Failed — tap to retry
+                          </ThemedText>
+                        </View>
+                      )}
+                    </TouchableOpacity>
 
                     <View style={styles.profileMeta}>
                       <ThemedText type="smallBold" style={styles.profileName}>
@@ -694,6 +762,23 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#6249cabe',
     backgroundColor: Colors.dark.backgroundSelected,
+  },
+  avatarOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: 100,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.half,
+    backgroundColor: 'rgba(0, 0, 0, 0.45)',
+  },
+  avatarOverlayText: {
+    color: '#ffffff',
+    textAlign: 'center',
+    paddingHorizontal: Spacing.one,
   },
   profileMeta: {
     flex: 1,
