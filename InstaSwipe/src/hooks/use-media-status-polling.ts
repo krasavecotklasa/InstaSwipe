@@ -17,13 +17,25 @@ export function useMediaStatusPolling(
 ): { timedOut: boolean } {
   const { intervalMs = 2000, maxAttempts = 15 } = options;
   const [timedOut, setTimedOut] = useState(false);
+
+  // Reset `timedOut` when `status` changes, done in the render body by
+  // comparing against the previous status tracked in state. This is React's
+  // sanctioned "adjust state when a prop changes" pattern and avoids doing the
+  // reset inside an effect.
+  const [prevStatus, setPrevStatus] = useState(status);
+  if (status !== prevStatus) {
+    setPrevStatus(status);
+    setTimedOut(false);
+  }
+
   // Ref so a fresh `onPoll` identity each render doesn't restart the interval.
   const onPollRef = useRef(onPoll);
-  onPollRef.current = onPoll;
+  useEffect(() => {
+    onPollRef.current = onPoll;
+  });
 
   useEffect(() => {
     if (status !== 'PROCESSING') {
-      setTimedOut(false);
       return;
     }
 
