@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { MediaStatus } from '@/components/post-card';
 
 interface UseMediaStatusPollingOptions {
@@ -19,11 +19,13 @@ export function useMediaStatusPolling(
   const [timedOut, setTimedOut] = useState(false);
   // Ref so a fresh `onPoll` identity each render doesn't restart the interval.
   const onPollRef = useRef(onPoll);
-  onPollRef.current = onPoll;
+  // Sync the ref after paint, outside of render, to satisfy react-hooks/refs.
+  useLayoutEffect(() => {
+    onPollRef.current = onPoll;
+  });
 
   useEffect(() => {
     if (status !== 'PROCESSING') {
-      setTimedOut(false);
       return;
     }
 
@@ -38,7 +40,12 @@ export function useMediaStatusPolling(
       onPollRef.current();
     }, intervalMs);
 
-    return () => clearInterval(interval);
+    // When status leaves 'PROCESSING' the effect re-runs and this cleanup
+    // fires, resetting timedOut without a synchronous setState in the body.
+    return () => {
+      clearInterval(interval);
+      setTimedOut(false);
+    };
   }, [status, intervalMs, maxAttempts]);
 
   return { timedOut };

@@ -31,8 +31,8 @@ type SettingsView = 'closed' | 'hub' | 'profile' | 'discovery';
 export default function ProfileScreen() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
-  const {isMobileWeb, isDesktopWeb} = useResponsiveLayout();
-  const {onLogout} = useAuthContext();
+  const { isMobileWeb, isDesktopWeb } = useResponsiveLayout();
+  const { onLogout } = useAuthContext();
   const [profile, setProfile] = useState<OwnProfileResponse | null>(null);
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -114,9 +114,9 @@ export default function ProfileScreen() {
   }, [profile?.id]);
 
   useFocusEffect(
-      useCallback(() => {
-        void loadPosts();
-      }, [loadPosts]),
+    useCallback(() => {
+      void loadPosts();
+    }, [loadPosts]),
   );
 
   const handleProfileUpdated = async () => {
@@ -149,190 +149,190 @@ export default function ProfileScreen() {
   const profilePicture = profile?.profilePictureUrl;
 
   return (
-      <ThemedView style={styles.container}>
-        <SafeAreaView style={[styles.safeArea, {marginLeft: isDesktopWeb ? 100 : 0}]} edges={['top', 'left', 'right']}>
-          <Header title='Profile'/>
-          <ScrollView
-              contentContainerStyle={[
-                styles.content,
-                {paddingBottom: (isMobileWeb ? 64 : BottomTabInset) + insets.bottom + Spacing.five},
-              ]}
-              showsVerticalScrollIndicator
-          >
-            {error && (
-                <View style={[styles.notice, {borderColor: '#ef4444'}]}>
-                  <ThemedText type="small" style={styles.errorText}>
-                    {error}
+    <ThemedView style={styles.container}>
+      <SafeAreaView style={[styles.safeArea, { marginLeft: isDesktopWeb ? 100 : 0 }]} edges={['top', 'left', 'right']}>
+        <Header title='Profile' />
+        <ScrollView
+          contentContainerStyle={[
+            styles.content,
+            { paddingBottom: (isMobileWeb ? 64 : BottomTabInset) + insets.bottom + Spacing.five },
+          ]}
+          showsVerticalScrollIndicator
+        >
+          {error && (
+            <View style={[styles.notice, { borderColor: '#ef4444' }]}>
+              <ThemedText type="small" style={styles.errorText}>
+                {error}
+              </ThemedText>
+            </View>
+          )}
+
+          {loadingProfile ? (
+            <View style={[styles.panel, { borderColor: theme.tabActiveBorder }]}>
+              <View style={styles.loadingRow}>
+                <ActivityIndicator color={theme.text} />
+                <ThemedText type="small" themeColor="textSecondary">
+                  Loading profile...
+                </ThemedText>
+              </View>
+            </View>
+          ) : profile ? (
+            <>
+              <View style={[styles.panel, isMobileWeb && styles.mobilePanel, { borderColor: theme.tabActiveBorder }]}>
+                <View style={styles.panelHeader}>
+                  <ThemedText style={styles.panelHeaderText} type="smallBold">
+                    Your profile
                   </ThemedText>
+                  <TouchableOpacity
+                    onPress={() => setSettingsView('hub')}
+                    style={[styles.iconButton, { borderColor: theme.tabActiveBorder }]}
+                    accessibilityRole="button"
+                    accessibilityLabel="Open settings"
+                  >
+                    <SymbolView
+                      name={{ ios: 'gearshape', android: 'settings', web: 'settings' } as any}
+                      tintColor='#8769ffbe'
+                      size={20}
+                    />
+                  </TouchableOpacity>
                 </View>
-            )}
 
-            {loadingProfile ? (
-                <View style={[styles.panel, {borderColor: theme.tabActiveBorder}]}>
-                  <View style={styles.loadingRow}>
-                    <ActivityIndicator color={theme.text}/>
-                    <ThemedText type="small" themeColor="textSecondary">
-                      Loading profile...
-                    </ThemedText>
-                  </View>
-                </View>
-            ) : profile ? (
-                <>
-                  <View style={[styles.panel, isMobileWeb && styles.mobilePanel, {borderColor: theme.tabActiveBorder}]}>
-                    <View style={styles.panelHeader}>
-                      <ThemedText style={styles.panelHeaderText} type="smallBold">
-                        Your profile
+                <View style={styles.profileBlock}>
+                  <View style={[styles.profileTopRow, isMobileWeb && styles.mobileProfileTopRow]}>
+                    <Image
+                      source={profilePicture ? { uri: profilePicture } : undefined}
+                      style={[styles.avatar, isMobileWeb && styles.mobileAvatar]}
+                      contentFit="cover"
+                    />
+
+                    <View style={styles.profileMeta}>
+                      <ThemedText type="smallBold" style={styles.profileName}>
+                        {profile.displayName}
                       </ThemedText>
-                      <TouchableOpacity
-                          onPress={() => setSettingsView('hub')}
-                          style={[styles.iconButton, {borderColor: theme.tabActiveBorder}]}
-                          accessibilityRole="button"
-                          accessibilityLabel="Open settings"
-                      >
-                        <SymbolView
-                            name={{ios: 'gearshape', android: 'settings', web: 'settings'} as any}
-                            tintColor='#8769ffbe'
-                            size={20}
-                        />
-                      </TouchableOpacity>
-                    </View>
-
-                    <View style={styles.profileBlock}>
-                      <View style={[styles.profileTopRow, isMobileWeb && styles.mobileProfileTopRow]}>
-                        <Image
-                            source={profilePicture ? {uri: profilePicture} : undefined}
-                            style={[styles.avatar, isMobileWeb && styles.mobileAvatar]}
-                            contentFit="cover"
-                        />
-
-                        <View style={styles.profileMeta}>
-                          <ThemedText type="smallBold" style={styles.profileName}>
-                            {profile.displayName}
-                          </ThemedText>
-                          <ThemedText type="small" themeColor="textSecondary" numberOfLines={2}>
-                            {profile.email}
-                          </ThemedText>
-                          <ThemedText type="small" themeColor="textSecondary">
-                            Birthday: <ThemedText type="small" themeColor="textSecondary"
-                                                  style={styles.profileMetaDetail}>{profile.birthDate}</ThemedText>
-                          </ThemedText>
-                          <ThemedText type="small" themeColor="textSecondary">
-                            Country: <ThemedText type="small" themeColor="textSecondary"
-                                                 style={styles.profileMetaDetail}>{profile.country}</ThemedText>
-                          </ThemedText>
-                          <ThemedText type="small" themeColor="textSecondary">
-                            Gender: <ThemedText type="small" themeColor="textSecondary"
-                                                style={styles.profileMetaDetail}>{profile.gender}</ThemedText>
-                          </ThemedText>
-                        </View>
-                      </View>
-
-                      <View style={[styles.bioInterestsRow, isMobileWeb && styles.mobileBioInterestsRow]}>
-                        <View
-                            style={[styles.bioColumn, isMobileWeb && styles.mobileProfileColumn, {borderColor: theme.tabActiveBorder}]}>
-                          <ThemedText type="smallBold">Bio:</ThemedText>
-                          {!!profile.bio && (
-                              <ThemedText type="small" style={styles.bio}>
-                                {profile.bio}
-                              </ThemedText>
-                          )}
-                        </View>
-
-                        <View
-                            style={[styles.interestsColumn, isMobileWeb && styles.mobileProfileColumn, {borderColor: theme.tabActiveBorder}]}>
-                          <ThemedText type="smallBold">My interests:</ThemedText>
-                          <View style={styles.chips}>
-                            {(profile.interests ?? []).map((interest) => (
-                                <View key={interest} style={[styles.chip, {
-                                  backgroundColor: theme.backgroundSelected,
-                                  borderColor: theme.tabActiveBorder
-                                }]}>
-                                  <ThemedText type="small" style={styles.chipText}>
-                                    {interest}
-                                  </ThemedText>
-                                </View>
-                            ))}
-                          </View>
-                        </View>
-                      </View>
-                    </View>
-                  </View>
-
-                  <View style={styles.postsSection}>
-                    <View style={styles.postsHeader}>
-                      <ThemedText type="smallBold" style={styles.postsTitle}>
-                        Posts
+                      <ThemedText type="small" themeColor="textSecondary" numberOfLines={2}>
+                        {profile.email}
                       </ThemedText>
                       <ThemedText type="small" themeColor="textSecondary">
-                        {posts.length} {posts.length === 1 ? 'post' : 'posts'}
+                        Birthday: <ThemedText type="small" themeColor="textSecondary"
+                          style={styles.profileMetaDetail}>{profile.birthDate}</ThemedText>
+                      </ThemedText>
+                      <ThemedText type="small" themeColor="textSecondary">
+                        Country: <ThemedText type="small" themeColor="textSecondary"
+                          style={styles.profileMetaDetail}>{profile.country}</ThemedText>
+                      </ThemedText>
+                      <ThemedText type="small" themeColor="textSecondary">
+                        Gender: <ThemedText type="small" themeColor="textSecondary"
+                          style={styles.profileMetaDetail}>{profile.gender}</ThemedText>
                       </ThemedText>
                     </View>
-
-                    {loadingPosts ? (
-                        <View style={styles.emptyState}>
-                          <ActivityIndicator size="large" color={theme.text}/>
-                        </View>
-                    ) : postsError ? (
-                        <View style={[styles.notice, {borderColor: '#ef4444'}]}>
-                          <ThemedText type="small" style={styles.errorText}>
-                            {postsError}
-                          </ThemedText>
-                        </View>
-                    ) : posts.length > 0 ? (
-                        <View style={styles.postsList}>
-                          {posts.map((post) => (
-                              <PostCard key={post.id} post={post}/>
-                          ))}
-                        </View>
-                    ) : (
-                        <View style={styles.emptyState}>
-                          <ThemedText type="small" themeColor="textSecondary">
-                            No posts yet.
-                          </ThemedText>
-                        </View>
-                    )}
                   </View>
-                </>
-            ) : null}
-          </ScrollView>
 
-          <ResponsiveModalSheet
-              visible={settingsView !== 'closed'}
-              onClose={() => setSettingsView('closed')}
-              title={settingsView === 'profile'
-                ? 'Profile settings'
-                : settingsView === 'discovery'
-                  ? 'Discovery preferences'
-                  : 'Settings'}
-              closeAccessibilityLabel="Close settings"
-          >
-            {settingsView === 'profile' && profile ? (
-              <View style={styles.profileEditor}>
-                <TouchableOpacity
-                    onPress={() => setSettingsView('hub')}
-                    style={[styles.backButton, styles.profileEditorBackButton]}
-                >
-                  <SymbolView
-                      name={{ios: 'chevron.left', android: 'arrow_back', web: 'arrow_back'} as any}
-                      tintColor='#8769ffbe'
-                      size={18}
-                  />
-                  <ThemedText type="smallBold">Back to settings</ThemedText>
-                </TouchableOpacity>
-                <OnboardingGate
-                    mode="update"
-                    embedded
-                    initialProfile={profile}
-                    onOnboardSuccess={() => void handleProfileUpdated()}
-                />
+                  <View style={[styles.bioInterestsRow, isMobileWeb && styles.mobileBioInterestsRow]}>
+                    <View
+                      style={[styles.bioColumn, isMobileWeb && styles.mobileProfileColumn, { borderColor: theme.tabActiveBorder }]}>
+                      <ThemedText type="smallBold">Bio:</ThemedText>
+                      {!!profile.bio && (
+                        <ThemedText type="small" style={styles.bio}>
+                          {profile.bio}
+                        </ThemedText>
+                      )}
+                    </View>
+
+                    <View
+                      style={[styles.interestsColumn, isMobileWeb && styles.mobileProfileColumn, { borderColor: theme.tabActiveBorder }]}>
+                      <ThemedText type="smallBold">My interests:</ThemedText>
+                      <View style={styles.chips}>
+                        {(profile.interests ?? []).map((interest) => (
+                          <View key={interest} style={[styles.chip, {
+                            backgroundColor: theme.backgroundSelected,
+                            borderColor: theme.tabActiveBorder
+                          }]}>
+                            <ThemedText type="small" style={styles.chipText}>
+                              {interest}
+                            </ThemedText>
+                          </View>
+                        ))}
+                      </View>
+                    </View>
+                  </View>
+                </View>
               </View>
-            ) : (
-              <ScrollView
-                style={styles.settingsScroll}
-                contentContainerStyle={styles.modalContent}
-                keyboardShouldPersistTaps="handled"
-                showsVerticalScrollIndicator
+
+              <View style={styles.postsSection}>
+                <View style={styles.postsHeader}>
+                  <ThemedText type="smallBold" style={styles.postsTitle}>
+                    Posts
+                  </ThemedText>
+                  <ThemedText type="small" themeColor="textSecondary">
+                    {posts.length} {posts.length === 1 ? 'post' : 'posts'}
+                  </ThemedText>
+                </View>
+
+                {loadingPosts ? (
+                  <View style={styles.emptyState}>
+                    <ActivityIndicator size="large" color={theme.text} />
+                  </View>
+                ) : postsError ? (
+                  <View style={[styles.notice, { borderColor: '#ef4444' }]}>
+                    <ThemedText type="small" style={styles.errorText}>
+                      {postsError}
+                    </ThemedText>
+                  </View>
+                ) : posts.length > 0 ? (
+                  <View style={styles.postsList}>
+                    {posts.map((post) => (
+                      <PostCard key={post.id} post={post} onMediaProcessing={loadPosts} />
+                    ))}
+                  </View>
+                ) : (
+                  <View style={styles.emptyState}>
+                    <ThemedText type="small" themeColor="textSecondary">
+                      No posts yet.
+                    </ThemedText>
+                  </View>
+                )}
+              </View>
+            </>
+          ) : null}
+        </ScrollView>
+
+        <ResponsiveModalSheet
+          visible={settingsView !== 'closed'}
+          onClose={() => setSettingsView('closed')}
+          title={settingsView === 'profile'
+            ? 'Profile settings'
+            : settingsView === 'discovery'
+              ? 'Discovery preferences'
+              : 'Settings'}
+          closeAccessibilityLabel="Close settings"
+        >
+          {settingsView === 'profile' && profile ? (
+            <View style={styles.profileEditor}>
+              <TouchableOpacity
+                onPress={() => setSettingsView('hub')}
+                style={[styles.backButton, styles.profileEditorBackButton]}
               >
+                <SymbolView
+                  name={{ ios: 'chevron.left', android: 'arrow_back', web: 'arrow_back' } as any}
+                  tintColor='#8769ffbe'
+                  size={18}
+                />
+                <ThemedText type="smallBold">Back to settings</ThemedText>
+              </TouchableOpacity>
+              <OnboardingGate
+                mode="update"
+                embedded
+                initialProfile={profile}
+                onOnboardSuccess={() => void handleProfileUpdated()}
+              />
+            </View>
+          ) : (
+            <ScrollView
+              style={styles.settingsScroll}
+              contentContainerStyle={styles.modalContent}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator
+            >
               {settingsView === 'hub' ? (
                 <>
                   <ModalSheetPanel title="Profile settings">
@@ -340,51 +340,51 @@ export default function ProfileScreen() {
                       Update your public profile, photo, bio, and personal details.
                     </ThemedText>
                     <TouchableOpacity
-                        onPress={() => setSettingsView('profile')}
-                        style={[styles.buttonStyle, {borderColor: '#6249cabe'}]}
+                      onPress={() => setSettingsView('profile')}
+                      style={[styles.buttonStyle, { borderColor: '#6249cabe' }]}
                     >
                       <SymbolView
-                          name={{ios: 'square.and.pencil', android: 'edit', web: 'edit'} as any}
-                          tintColor='#8769ffbe'
-                          size={20}
+                        name={{ ios: 'square.and.pencil', android: 'edit', web: 'edit' } as any}
+                        tintColor='#8769ffbe'
+                        size={20}
                       />
                       <ThemedText type="smallBold">Edit profile</ThemedText>
                     </TouchableOpacity>
                   </ModalSheetPanel>
 
                   <ModalSheetPanel
-                      title="Discovery preferences"
-                      trailing={prefsSaved ? (
-                        <ThemedText type="small" themeColor="textSecondary">Saved</ThemedText>
-                      ) : undefined}
+                    title="Discovery preferences"
+                    trailing={prefsSaved ? (
+                      <ThemedText type="small" themeColor="textSecondary">Saved</ThemedText>
+                    ) : undefined}
                   >
                     <ThemedText type="small" themeColor="textSecondary">
                       Control the age range, genders, countries, and interests you discover.
                     </ThemedText>
                     <TouchableOpacity
-                        onPress={() => {
-                          setPrefsSaved(false);
-                          setSettingsView('discovery');
-                        }}
-                        style={[styles.buttonStyle, {borderColor: '#6249cabe'}]}
+                      onPress={() => {
+                        setPrefsSaved(false);
+                        setSettingsView('discovery');
+                      }}
+                      style={[styles.buttonStyle, { borderColor: '#6249cabe' }]}
                     >
                       <SymbolView
-                          name={{ios: 'slider.horizontal.3', android: 'tune', web: 'tune'} as any}
-                          tintColor='#8769ffbe'
-                          size={20}
+                        name={{ ios: 'slider.horizontal.3', android: 'tune', web: 'tune' } as any}
+                        tintColor='#8769ffbe'
+                        size={20}
                       />
                       <ThemedText type="smallBold">Edit discovery preferences</ThemedText>
                     </TouchableOpacity>
                   </ModalSheetPanel>
 
                   <TouchableOpacity
-                      onPress={onLogout}
-                      style={[styles.buttonStyle, {borderColor: '#ef4444'}]}
+                    onPress={onLogout}
+                    style={[styles.buttonStyle, { borderColor: '#ef4444' }]}
                   >
                     <SymbolView
-                        name={{ios: 'rectangle.portrait.and.arrow.right', android: 'logout', web: 'logout'} as any}
-                        tintColor="#ef4444"
-                        size={20}
+                      name={{ ios: 'rectangle.portrait.and.arrow.right', android: 'logout', web: 'logout' } as any}
+                      tintColor="#ef4444"
+                      size={20}
                     />
                     <ThemedText type="smallBold">Logout</ThemedText>
                   </TouchableOpacity>
@@ -392,13 +392,13 @@ export default function ProfileScreen() {
               ) : settingsView === 'discovery' ? (
                 <>
                   <TouchableOpacity
-                      onPress={() => setSettingsView('hub')}
-                      style={styles.backButton}
+                    onPress={() => setSettingsView('hub')}
+                    style={styles.backButton}
                   >
                     <SymbolView
-                        name={{ios: 'chevron.left', android: 'arrow_back', web: 'arrow_back'} as any}
-                        tintColor='#8769ffbe'
-                        size={18}
+                      name={{ ios: 'chevron.left', android: 'arrow_back', web: 'arrow_back' } as any}
+                      tintColor='#8769ffbe'
+                      size={18}
                     />
                     <ThemedText type="smallBold">Back to settings</ThemedText>
                   </TouchableOpacity>
@@ -412,11 +412,11 @@ export default function ProfileScreen() {
                   </ModalSheetPanel>
                 </>
               ) : null}
-              </ScrollView>
-            )}
-          </ResponsiveModalSheet>
-        </SafeAreaView>
-      </ThemedView>
+            </ScrollView>
+          )}
+        </ResponsiveModalSheet>
+      </SafeAreaView>
+    </ThemedView>
   );
 }
 
