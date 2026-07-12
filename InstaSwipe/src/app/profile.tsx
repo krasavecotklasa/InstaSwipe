@@ -356,7 +356,7 @@ export default function ProfileScreen() {
                 ) : posts.length > 0 ? (
                   <View style={styles.postsList}>
                     {posts.map((post) => (
-                      <PostCard key={post.id} post={post} />
+                      <PostCard key={post.id} post={post} onMediaProcessing={loadPosts} />
                     ))}
                   </View>
                 ) : (

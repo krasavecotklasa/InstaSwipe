@@ -5,6 +5,7 @@ import { SymbolView } from 'expo-symbols';
 import { useTheme } from '@/hooks/use-theme';
 import { Spacing } from '@/constants/theme';
 import { likePost, unlikePost } from '@/hooks/posts';
+import { useMediaStatusPolling } from '@/hooks/use-media-status-polling';
 
 
 // Mirrors the backend Media: images are uploaded async, so `status` tracks where
@@ -35,6 +36,7 @@ export interface Post {
 interface PostCardProps {
   post: Post;
   onAuthorPress?: (userId: string) => void;
+  onMediaProcessing?: () => void;
 }
 
 const DEFAULT_POST_IMAGE_ASPECT_RATIO = 3 / 2;
@@ -45,12 +47,13 @@ const clampPostImageAspectRatio = (ratio: number) => {
   return Math.min(MAX_POST_IMAGE_ASPECT_RATIO, Math.max(MIN_POST_IMAGE_ASPECT_RATIO, ratio));
 };
 
-export function PostCard({ post, onAuthorPress }: PostCardProps) {
+export function PostCard({ post, onAuthorPress, onMediaProcessing }: PostCardProps) {
   const theme = useTheme();
   const [liked, setLiked] = useState(post.likedByMe);
   const [likeCount, setLikeCount] = useState(post.likes);
   const [postImageAspectRatio, setPostImageAspectRatio] = useState(DEFAULT_POST_IMAGE_ASPECT_RATIO);
   const [syncedMediaUrl, setSyncedMediaUrl] = useState(post.media?.url);
+  const { timedOut } = useMediaStatusPolling(post.media?.status, onMediaProcessing ?? (() => {}));
 
   // Reset to the default aspect ratio whenever the image itself changes, until the real
   // one arrives via handlePostImageLoad. Done during render, not in an Effect - no
@@ -132,7 +135,9 @@ export function PostCard({ post, onAuthorPress }: PostCardProps) {
               {post.media.status === 'PROCESSING' && (
                 <View style={styles.mediaOverlay}>
                   <ActivityIndicator color="#ffffff" />
-                  <Text style={styles.mediaOverlayText}>Processing…</Text>
+                  <Text style={styles.mediaOverlayText}>
+                    {timedOut ? 'Still processing…' : 'Processing…'}
+                  </Text>
                 </View>
               )}
             </View>
