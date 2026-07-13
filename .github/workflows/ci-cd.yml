@@ -73,7 +73,10 @@ jobs:
           host: ${{ secrets.DEPLOY_HOST }}
           username: root
           key: ${{ secrets.DEPLOY_SSH_KEY }}
+          command_timeout: 20m
           script: |
             cd /opt/instaswipe
             git pull
-            docker compose up -d --build
+            docker compose build backend
+            docker compose build frontend
+            docker compose up -d
