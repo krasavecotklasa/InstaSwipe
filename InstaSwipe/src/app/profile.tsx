@@ -4,6 +4,7 @@ import {
   ActivityIndicator,
   ScrollView,
   StyleSheet,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -30,6 +31,10 @@ import { useResponsiveLayout } from '@/hooks/use-responsive-layout';
 
 type SettingsView = 'closed' | 'hub' | 'profile' | 'discovery';
 
+// Mirrors PasswordChangeRequest's @Pattern rule on the backend so a bad password
+// is caught before the round-trip instead of surfacing a raw 400.
+const PASSWORD_PATTERN = /^(?=.*[0-9])(?=.*[a-z])(?=.*[A-Z])(?=.*[@#$%^&+=!]).*$/;
+
 export default function ProfileScreen() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
@@ -46,6 +51,11 @@ export default function ProfileScreen() {
 
   const [prefsSaved, setPrefsSaved] = useState(false);
   const [settingsView, setSettingsView] = useState<SettingsView>('closed');
+  const [oldPassword, setOldPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [changingPassword, setChangingPassword] = useState(false);
+  const [passwordChanged, setPasswordChanged] = useState(false);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
 
   const loadProfile = useCallback(async () => {
     const profileResponse = await API.getOwnProfile();
@@ -186,6 +196,39 @@ export default function ProfileScreen() {
     } catch (refreshError) {
       setError(refreshError instanceof Error ? refreshError.message : 'Could not refresh your profile.');
       setSettingsView('hub');
+    }
+  };
+
+  const handleChangePassword = async () => {
+    if (newPassword.length < 8 || newPassword.length > 100) {
+      setPasswordError('Password must be between 8 and 100 characters');
+      return;
+    }
+    if (!PASSWORD_PATTERN.test(newPassword)) {
+      setPasswordError('Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character');
+      return;
+    }
+
+    setChangingPassword(true);
+    setPasswordChanged(false);
+    setPasswordError(null);
+
+    try {
+      const response = await API.changePassword({ oldPassword, newPassword });
+      if (!response.ok) {
+        if (response.status === 401) {
+          throw new Error('Current password is incorrect.');
+        }
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Could not change password');
+      }
+      setOldPassword('');
+      setNewPassword('');
+      setPasswordChanged(true);
+    } catch (changeError) {
+      setPasswordError(changeError instanceof Error ? changeError.message : 'Could not change password');
+    } finally {
+      setChangingPassword(false);
     }
   };
 
@@ -439,6 +482,68 @@ export default function ProfileScreen() {
                     </TouchableOpacity>
                   </ModalSheetPanel>
 
+                  <ModalSheetPanel
+                    title="Change password"
+                    trailing={passwordChanged ? (
+                      <ThemedText type="small" themeColor="textSecondary">
+                        Updated
+                      </ThemedText>
+                    ) : undefined}
+                  >
+                    <View style={styles.fieldBlock}>
+                      <ThemedText type="smallBold">Current password</ThemedText>
+                      <TextInput
+                        value={oldPassword}
+                        onChangeText={(text) => {
+                          setOldPassword(text);
+                          setPasswordError(null);
+                        }}
+                        secureTextEntry
+                        autoCapitalize="none"
+                        placeholder="Current password"
+                        placeholderTextColor={theme.iconMuted}
+                        style={[styles.input, { borderColor: theme.tabActiveBorder, color: theme.text }]}
+                      />
+                    </View>
+
+                    <View style={styles.fieldBlock}>
+                      <ThemedText type="smallBold">New password</ThemedText>
+                      <TextInput
+                        value={newPassword}
+                        onChangeText={(text) => {
+                          setNewPassword(text);
+                          setPasswordError(null);
+                        }}
+                        secureTextEntry
+                        autoCapitalize="none"
+                        placeholder="New password"
+                        placeholderTextColor={theme.iconMuted}
+                        style={[styles.input, { borderColor: theme.tabActiveBorder, color: theme.text }]}
+                      />
+                    </View>
+
+                    {passwordError && (
+                      <ThemedText type="small" style={styles.errorText}>
+                        {passwordError}
+                      </ThemedText>
+                    )}
+
+                    <TouchableOpacity
+                      onPress={handleChangePassword}
+                      disabled={changingPassword}
+                      style={[styles.buttonStyle, { borderColor: '#6249cabe' }]}
+                    >
+                      <SymbolView
+                        name={{ ios: 'lock', android: 'lock', web: 'lock' } as any}
+                        tintColor='#8769ffbe'
+                        size={20}
+                      />
+                      <ThemedText type="smallBold">
+                        Save new password
+                      </ThemedText>
+                    </TouchableOpacity>
+                  </ModalSheetPanel>
+
                   <TouchableOpacity
                     onPress={onLogout}
                     style={[styles.buttonStyle, { borderColor: '#ef4444' }]}
@@ -534,6 +639,18 @@ const styles = StyleSheet.create({
   profileEditorBackButton: {
     marginHorizontal: Spacing.three,
     marginTop: Spacing.two,
+  },
+  fieldBlock: {
+    gap: Spacing.one,
+  },
+  input: {
+    minHeight: 44,
+    borderRadius: 8,
+    borderWidth: 1,
+    paddingHorizontal: Spacing.three,
+    fontSize: 16,
+    fontWeight: '600',
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
   },
   buttonStyle: {
     borderColor: '#6249cabe',

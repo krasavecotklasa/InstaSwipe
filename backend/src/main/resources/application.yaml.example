@@ -26,6 +26,19 @@ app:
     from-email: ${APP_EMAIL_FROM:noreply@instaswipe.app}
     from-name: ${APP_EMAIL_FROM_NAME:InstaSwipe}
     enabled: ${APP_EMAIL_ENABLED:true}
+  gifs:
+    rating: ${APP_GIFS_RATING:pg-13}
+    lang: ${APP_GIFS_LANG:en}
+    default-limit: ${APP_GIFS_DEFAULT_LIMIT:24}
+    max-limit: ${APP_GIFS_MAX_LIMIT:50}
+    giphy:
+      api-key: ${GIPHY_API_KEY:}
+      search-url: ${GIPHY_SEARCH_URL:https://api.giphy.com/v1/gifs/search}
+      enabled: ${GIPHY_ENABLED:true}
+    klipy:
+      api-key: ${KLIPY_API_KEY:}
+      search-url: ${KLIPY_SEARCH_URL:https://api.klipy.com/v2/search}
+      enabled: ${KLIPY_ENABLED:true}
 
 otp: 
   expiry-minutes: 10

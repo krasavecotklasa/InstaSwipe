@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { MediaStatus } from '@/components/post-card';
 
 interface UseMediaStatusPollingOptions {

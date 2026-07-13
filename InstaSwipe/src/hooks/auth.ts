@@ -350,6 +350,13 @@ class API {
       body: payload,
     });
   }
+
+  static async changePassword(payload: { oldPassword: string; newPassword: string }): Promise<Response> {
+    return this.request(`${PROFILE_BASE_PATH}/password`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
+  }
 }
 
 export { API, setTokens, clearTokens, getAccessToken, getRefreshToken, getCurrentUserId, logout };
