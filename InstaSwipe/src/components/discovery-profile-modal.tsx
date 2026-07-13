@@ -70,6 +70,11 @@ export default function DiscoveryProfileModal({
   }, []);
 
   const loadProfilePosts = useCallback(async (profileId: string, page: number) => {
+    await Promise.resolve();
+    if (activeProfileIdRef.current !== profileId) {
+      return;
+    }
+
     if (page === 0) {
       setLoadingPosts(true);
     } else {
@@ -125,32 +130,40 @@ export default function DiscoveryProfileModal({
   useEffect(() => {
     activeProfileIdRef.current = targetProfileId;
     if (targetProfileId) {
-      void loadProfilePosts(targetProfileId, 0);
+      void Promise.resolve().then(() => loadProfilePosts(targetProfileId, 0));
     }
   }, [targetProfileId, loadProfilePosts]);
 
   useEffect(() => {
     let active = true;
-    setDecision(initialDecision);
-    setDecisionError(null);
-
-    if (!targetProfileId || initialDecision) {
-      if (targetProfileId && initialDecision) {
-        void setProfileDecision(targetProfileId, initialDecision);
+    const loadDecision = async () => {
+      await Promise.resolve();
+      if (!active) {
+        return;
       }
-      setLoadingDecision(false);
-      return () => {
-        active = false;
-      };
-    }
 
-    setLoadingDecision(true);
-    void getProfileDecision(targetProfileId).then((storedDecision) => {
+      setDecision(initialDecision);
+      setDecisionError(null);
+
+      if (!targetProfileId || initialDecision) {
+        if (targetProfileId && initialDecision) {
+          await setProfileDecision(targetProfileId, initialDecision);
+        }
+        if (active) {
+          setLoadingDecision(false);
+        }
+        return;
+      }
+
+      setLoadingDecision(true);
+      const storedDecision = await getProfileDecision(targetProfileId);
       if (active) {
         setDecision(storedDecision);
         setLoadingDecision(false);
       }
-    });
+    };
+
+    void loadDecision();
 
     return () => {
       active = false;

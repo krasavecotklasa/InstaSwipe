@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
@@ -27,7 +27,7 @@ const PROFILE_OPEN_THRESHOLD = 90;
 export default function MatchScreen() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
-  const position = useRef(new Animated.ValueXY()).current;
+  const [position] = useState(() => new Animated.ValueXY());
   const {
     currentProfile,
     loading,
@@ -45,28 +45,28 @@ export default function MatchScreen() {
     position.setValue({ x: 0, y: 0 });
   }, [currentProfile?.id, position]);
 
-  const openProfileModal = () => {
+  const openProfileModal = useCallback(() => {
     if (!currentProfile) {
       return;
     }
 
     setProfileModalProfile(currentProfile);
-  };
+  }, [currentProfile]);
 
   const closeProfileModal = () => {
     setProfileModalProfile(null);
   };
 
-  const resetCardPosition = () => {
+  const resetCardPosition = useCallback(() => {
     Animated.spring(position, {
       toValue: { x: 0, y: 0 },
       useNativeDriver: true,
       friction: 6,
       tension: 60,
     }).start();
-  };
+  }, [position]);
 
-  const finishSwipe = (action: 'love' | 'pass') => {
+  const finishSwipe = useCallback((action: 'love' | 'pass') => {
     if (!beginDecision()) {
       resetCardPosition();
       return;
@@ -84,7 +84,7 @@ export default function MatchScreen() {
         resetCardPosition();
       }
     });
-  };
+  }, [beginDecision, finishDecision, position, resetCardPosition]);
 
   const panResponder = useMemo(
     () => PanResponder.create({
@@ -124,7 +124,7 @@ export default function MatchScreen() {
       },
       onPanResponderTerminate: resetCardPosition,
     }),
-    [acting, currentProfile, position],
+    [acting, currentProfile, finishSwipe, openProfileModal, position, resetCardPosition],
   );
 
   const cardAnimatedStyle = {
