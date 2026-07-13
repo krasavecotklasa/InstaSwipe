@@ -3,7 +3,7 @@ import { Client, type IMessage, type StompSubscription } from '@stomp/stompjs';
 import { Platform } from 'react-native';
 
 import { API_HOST, API_PORT, API_PREFIX } from '@/hooks/api';
-import { authorizedFetch, getAccessToken, getCurrentUserId } from '@/hooks/auth';
+import { authorizedFetch, ensureFreshAccessToken, getCurrentUserId, getJwtExpiryMs } from '@/hooks/auth';
 import { normalizeMediaUrl } from '@/hooks/media';
 
 const MATCHES_BASE_PATH = `${API_PREFIX}/matches`;
@@ -120,12 +120,16 @@ const getChatHistory = async (matchId: string): Promise<ChatMessage[]> => {
 
 const isNativePlatform = Platform.OS !== 'web';
 
-const createStompClient = (token: string): Client => {
+// The backend's WebSocketAuthInterceptor authenticates the STOMP CONNECT frame
+// once and stores the access token's expiry on the session; it never re-reads
+// headers afterwards. So the session must be torn down and reconnected (with a
+// fresh token) a bit before that stored expiry, or the next frame is rejected -
+// this buffer is how much lead time that reconnect gets.
+const TOKEN_REFRESH_LEAD_MS = 30_000;
+
+const createStompClient = (): Client => {
   const client = new Client({
     brokerURL: WS_URL,
-    // The backend authenticates the STOMP CONNECT frame (not the HTTP handshake)
-    // from this native header, and re-checks token expiry on every later frame.
-    connectHeaders: { Authorization: `Bearer ${token}` },
     connectionTimeout: 10000,
     reconnectDelay: 4000,
     heartbeatIncoming: 10000,
@@ -184,6 +188,14 @@ export function useChatRoom(matchId: string, otherUserId: string): UseChatRoom {
   useEffect(() => {
     let active = true;
     let subscription: StompSubscription | undefined;
+    let expiryTimer: ReturnType<typeof setTimeout> | undefined;
+
+    const clearExpiryTimer = () => {
+      if (expiryTimer !== undefined) {
+        clearTimeout(expiryTimer);
+        expiryTimer = undefined;
+      }
+    };
 
     (async () => {
       const uid = await getCurrentUserId();
@@ -208,15 +220,26 @@ export function useChatRoom(matchId: string, otherUserId: string): UseChatRoom {
         }
       }
 
-      const token = await getAccessToken();
-      if (!token || !active) {
-        if (active) {
-          setError('Could not connect to chat. Please sign in again.');
-        }
+      if (!active) {
         return;
       }
 
-      const client = createStompClient(token);
+      const client = createStompClient();
+      // Called before the initial connect and before every auto-reconnect, so a
+      // token that expired (or was refreshed) while the socket was open/down
+      // never gets silently reused - see TOKEN_REFRESH_LEAD_MS above.
+      client.beforeConnect = async () => {
+        const token = await ensureFreshAccessToken();
+        if (!token) {
+          if (active) {
+            setConnected(false);
+            setError('Your session expired. Please sign in again.');
+          }
+          void client.deactivate();
+          return;
+        }
+        client.connectHeaders = { Authorization: `Bearer ${token}` };
+      };
       client.onWebSocketError = (event) => {
         console.warn('[chat] WebSocket error:', event);
         if (active) {
@@ -232,6 +255,18 @@ export function useChatRoom(matchId: string, otherUserId: string): UseChatRoom {
         // A successful (re)connect clears any transient connection error left over
         // from a dropped socket, so the red banner doesn't linger after we recover.
         setError(null);
+
+        // Proactively reconnect a bit before this token expires, rather than
+        // waiting for the backend to reject a frame against a lapsed session.
+        clearExpiryTimer();
+        const authHeader = client.connectHeaders['Authorization'];
+        const currentToken = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : undefined;
+        const expiresAt = currentToken ? getJwtExpiryMs(currentToken) : null;
+        if (expiresAt !== null) {
+          const delay = Math.max(expiresAt - Date.now() - TOKEN_REFRESH_LEAD_MS, 0);
+          expiryTimer = setTimeout(() => client.forceDisconnect(), delay);
+        }
+
         // The backend delivers via convertAndSendToUser(userId, "/queue/{roomId}").
         // RabbitMQ's STOMP relay requires a single-segment /queue/ name (no extra "/"),
         // so the room id is used directly — a "/chat/" sub-path resolves to an invalid
@@ -256,6 +291,7 @@ export function useChatRoom(matchId: string, otherUserId: string): UseChatRoom {
         }
       };
       client.onWebSocketClose = (event) => {
+        clearExpiryTimer();
         if (active) {
           console.warn('[chat] WebSocket closed:', event.code, event.reason);
           setConnected(false);
@@ -268,6 +304,7 @@ export function useChatRoom(matchId: string, otherUserId: string): UseChatRoom {
 
     return () => {
       active = false;
+      clearExpiryTimer();
       subscription?.unsubscribe();
       void clientRef.current?.deactivate();
       clientRef.current = null;

@@ -3,6 +3,8 @@ import { SymbolView } from 'expo-symbols';
 import type { ComponentProps } from 'react';
 import { Pressable, StyleSheet, useColorScheme, View } from 'react-native';
 
+import { TabBarHeight } from '@/constants/theme';
+
 export default function AppTabs() {
   return (
     <Tabs>
@@ -83,7 +85,7 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 18,
     overflow: 'hidden',
     borderTopWidth: 0.25,
-    height: 110,
+    height: TabBarHeight,
     paddingTop: 10,
   },
   tabButton: {

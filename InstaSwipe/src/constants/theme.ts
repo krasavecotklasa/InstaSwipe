@@ -79,4 +79,10 @@ export const Spacing = {
 } as const;
 
 export const BottomTabInset = Platform.select({ ios: 50, android: 80 }) ?? 0;
+// Real rendered height of the bottom tab bar shown wherever useResponsiveLayout's
+// usesBottomTabs is true (native, and mobile web). Native (app-tabs.tsx) and web
+// (app-tabs.web.tsx) render this bar at different fixed heights, so screens whose
+// content can sit at the very bottom of the viewport (e.g. a chat input) must
+// reserve the one that matches the platform actually rendering it.
+export const TabBarHeight = Platform.select({ web: 64, default: 110 }) ?? 110;
 export const MaxContentWidth = 800;
