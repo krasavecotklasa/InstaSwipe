@@ -23,6 +23,7 @@ import { fetchFeed } from '@/hooks/posts';
 import { type DiscoveryProfile, getPublicProfile } from '@/hooks/matches';
 import DiscoveryProfileModal from '@/components/discovery-profile-modal';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useResponsiveLayout } from '@/hooks/use-responsive-layout';
 
 
 function ComposerEntry({ onPress }: { onPress: () => void }) {
@@ -58,6 +59,7 @@ export default function HomeScreen() {
   const [profileError, setProfileError] = useState<string | null>(null);
   const hasLoadedPosts = useRef(false);
   const insets = useSafeAreaInsets();
+  const { isMobileWeb, isDesktopWeb } = useResponsiveLayout();
 
 
   const loadPosts = useCallback(async () => {
@@ -105,7 +107,7 @@ export default function HomeScreen() {
       keyboardVerticalOffset={insets.top}
     >
       <ThemedView style={styles.container}>
-        <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+        <SafeAreaView style={[styles.safeArea, { marginLeft: isDesktopWeb ? 100 : 0 }]} edges={['top', 'left', 'right']}>
           <Header title='InstaSwipe'/>
 
           <FlatList
@@ -115,7 +117,7 @@ export default function HomeScreen() {
               <PostCard post={item} onAuthorPress={openAuthorProfile} />
             )}
             ListHeaderComponent={<ComposerEntry onPress={() => setComposerVisible(true)} />}
-            contentContainerStyle={styles.listContent}
+            contentContainerStyle={[styles.listContent, isMobileWeb && styles.mobileListContent]}
             showsVerticalScrollIndicator={true}
             scrollEnabled={true}
             nestedScrollEnabled={Platform.OS === 'web'}
@@ -169,12 +171,14 @@ const styles = StyleSheet.create({
     flex: 1,
     maxWidth: MaxContentWidth,
     width: '100%',
-    marginLeft: Platform.OS === 'web' ? 100 : 0,
   },
 
   listContent: {
     paddingTop: Spacing.three,
     paddingBottom: BottomTabInset + Spacing.four,
+  },
+  mobileListContent: {
+    paddingBottom: 80,
   },
   composer: {
     flexDirection: 'row',

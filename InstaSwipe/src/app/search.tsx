@@ -22,11 +22,13 @@ import { searchProfilesByName } from '@/hooks/search';
 import { useTheme } from '@/hooks/use-theme';
 import Header from '@/components/header';
 import DiscoveryProfileModal from '@/components/discovery-profile-modal';
+import { useResponsiveLayout } from '@/hooks/use-responsive-layout';
 
 const PAGE_SIZE = 100;
 
 export default function SearchScreen() {
   const theme = useTheme();
+  const { isMobileWeb, isDesktopWeb } = useResponsiveLayout();
   const [name, setName] = useState('');
   const [profiles, setProfiles] = useState<DiscoveryProfile[]>([]);
   const [loading, setLoading] = useState(false);
@@ -135,7 +137,7 @@ export default function SearchScreen() {
 
   return (
     <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+      <SafeAreaView style={[styles.safeArea, { marginLeft: isDesktopWeb ? 100 : 0 }]} edges={['top', 'left', 'right']}>
         <Header title='Search'/>
         <FlatList
           data={profiles}
@@ -145,7 +147,7 @@ export default function SearchScreen() {
           onEndReachedThreshold={0.5}
           ListHeaderComponent={
             <View style={styles.header}>
-              {Platform.OS === 'web' ? 
+              {isDesktopWeb ?
               <ThemedText type="subtitle" style={styles.title}>
                  Search
               </ThemedText> 
@@ -210,7 +212,7 @@ export default function SearchScreen() {
               <ActivityIndicator color={theme.text} style={styles.footerLoader} />
             ) : null
           }
-          contentContainerStyle={styles.listContent}
+          contentContainerStyle={[styles.listContent, isMobileWeb && styles.mobileListContent]}
           showsVerticalScrollIndicator
         />
         <DiscoveryProfileModal
@@ -233,12 +235,15 @@ const styles = StyleSheet.create({
     flex: 1,
     maxWidth: MaxContentWidth,
     width: '100%',
-    marginLeft: Platform.OS === 'web' ? 100 : 0,
   },
   listContent: {
     padding: Spacing.three,
     paddingBottom: BottomTabInset + Spacing.four,
     gap: Spacing.three,
+  },
+  mobileListContent: {
+    padding: Spacing.two,
+    paddingBottom: 80,
   },
   header: {
     gap: Spacing.three,

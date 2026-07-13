@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useFocusEffect } from 'expo-router';
 import {
   ActivityIndicator,
-  Platform,
   ScrollView,
   StyleSheet,
   TextInput,
@@ -35,6 +34,7 @@ import { normalizeMediaUrl } from '@/hooks/media';
 import { useTheme } from '@/hooks/use-theme';
 import Header from '@/components/header';
 import { fetchUserPosts } from '@/hooks/posts';
+import { useResponsiveLayout } from '@/hooks/use-responsive-layout';
 
 const DEFAULT_PREFS: DiscoveryPreferences = {
   minAge: '',
@@ -66,10 +66,11 @@ const toInputValue = (value: string | number | undefined) => {
 // so free text like "9 years old" can't reach the saved preferences.
 const sanitizeAge = (text: string) => text.replace(/[^0-9]/g, '').slice(0, 3);
 
-export default function ProfileScreen() {
+export function ProfileScreen() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
-  const { onEditProfile, onLogout } = useAuthContext();
+  const {isMobileWeb, isDesktopWeb} = useResponsiveLayout();
+  const {onEditProfile, onLogout} = useAuthContext();
   const [profile, setProfile] = useState<OwnProfileResponse | null>(null);
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -104,8 +105,11 @@ export default function ProfileScreen() {
         }
 
         if (!profileResponse.ok) {
-          const errorData = await profileResponse.json().catch(() => ({}));
-          throw new Error(errorData.message || 'Could not load your profile');
+          const errorData = await profileResponse.json().catch(() => ({})) as { message?: string };
+          if (isActive) {
+            setError(errorData.message || 'Could not load your profile');
+          }
+          return;
         }
 
         const profileData: OwnProfileResponse = await profileResponse.json();
@@ -173,9 +177,9 @@ export default function ProfileScreen() {
   }, [profile?.id]);
 
   useFocusEffect(
-    useCallback(() => {
-      void loadPosts();
-    }, [loadPosts]),
+      useCallback(() => {
+        void loadPosts();
+      }, [loadPosts]),
   );
 
   const savePreferences = async () => {
@@ -233,307 +237,316 @@ export default function ProfileScreen() {
   const profilePicture = profile?.profilePictureUrl;
 
   return (
-    <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-        <Header title='Profile'/>
-        <ScrollView
-          contentContainerStyle={[
-            styles.content,
-            { paddingBottom: BottomTabInset + insets.bottom + Spacing.five },
-          ]}
-          showsVerticalScrollIndicator
-        >
-          {error && (
-            <View style={[styles.notice, { borderColor: '#ef4444' }]}>
-              <ThemedText type="small" style={styles.errorText}>
-                {error}
-              </ThemedText>
-            </View>
-          )}
-
-          {loadingProfile ? (
-            <View style={[styles.panel, { borderColor: theme.tabActiveBorder }]}>
-              <View style={styles.loadingRow}>
-                <ActivityIndicator color={theme.text} />
-                <ThemedText type="small" themeColor="textSecondary">
-                  Loading profile...
-                </ThemedText>
-              </View>
-            </View>
-          ) : profile ? (
-            <>
-              <View style={[styles.panel, { borderColor: theme.tabActiveBorder }]}>
-                <View style={styles.panelHeader}>
-                  <ThemedText style={styles.panelHeaderText} type="smallBold">
-                    Your profile
+      <ThemedView style={styles.container}>
+        <SafeAreaView style={[styles.safeArea, {marginLeft: isDesktopWeb ? 100 : 0}]} edges={['top', 'left', 'right']}>
+          <Header title='Profile'/>
+          <ScrollView
+              contentContainerStyle={[
+                styles.content,
+                {paddingBottom: (isMobileWeb ? 64 : BottomTabInset) + insets.bottom + Spacing.five},
+              ]}
+              showsVerticalScrollIndicator
+          >
+            {error && (
+                <View style={[styles.notice, {borderColor: '#ef4444'}]}>
+                  <ThemedText type="small" style={styles.errorText}>
+                    {error}
                   </ThemedText>
-                  <TouchableOpacity
-                    onPress={() => setShowSettings(true)}
-                    style={[styles.iconButton, { borderColor: theme.tabActiveBorder }]}
-                    accessibilityRole="button"
-                    accessibilityLabel="Open settings"
-                  >
-                    <SymbolView
-                      name={{ ios: 'gearshape', android: 'settings', web: 'settings' } as any}
-                      tintColor='#8769ffbe'
-                      size={20}
-                    />
-                  </TouchableOpacity>
                 </View>
+            )}
 
-                <View style={styles.profileBlock}>
-                  <View style={styles.profileTopRow}>
-                    <Image
-                      source={profilePicture ? { uri: profilePicture } : undefined}
-                      style={styles.avatar}
-                      contentFit="cover"
-                    />
-
-                    <View style={styles.profileMeta}>
-                      <ThemedText type="smallBold" style={styles.profileName}>
-                        {profile.displayName} <ThemedText type="small" themeColor="textSecondary">
-                          ({profile.email})
-                        </ThemedText>
-                      </ThemedText>
-                      <ThemedText type="small" themeColor="textSecondary">
-                        Birthday: <ThemedText type="small" themeColor="textSecondary" style={styles.profileMetaDetail}>{profile.birthDate}</ThemedText>
-                      </ThemedText>
-                      <ThemedText type="small" themeColor="textSecondary">
-                        Country: <ThemedText type="small" themeColor="textSecondary" style={styles.profileMetaDetail}>{profile.country}</ThemedText>
-                      </ThemedText>
-                      <ThemedText type="small" themeColor="textSecondary">
-                        Gender: <ThemedText type="small" themeColor="textSecondary" style={styles.profileMetaDetail}>{profile.gender}</ThemedText>
-                      </ThemedText>
-                    </View>
+            {loadingProfile ? (
+                <View style={[styles.panel, {borderColor: theme.tabActiveBorder}]}>
+                  <View style={styles.loadingRow}>
+                    <ActivityIndicator color={theme.text}/>
+                    <ThemedText type="small" themeColor="textSecondary">
+                      Loading profile...
+                    </ThemedText>
                   </View>
-
-                  <View style={styles.bioInterestsRow}>
-                    <View style={[styles.bioColumn, { borderColor: theme.tabActiveBorder }]}>
-                      <ThemedText type="smallBold">Bio:</ThemedText>
-                      {!!profile.bio && (
-                        <ThemedText type="small" style={styles.bio}>
-                          {profile.bio}
-                        </ThemedText>
-                      )}
+                </View>
+            ) : profile ? (
+                <>
+                  <View style={[styles.panel, isMobileWeb && styles.mobilePanel, {borderColor: theme.tabActiveBorder}]}>
+                    <View style={styles.panelHeader}>
+                      <ThemedText style={styles.panelHeaderText} type="smallBold">
+                        Your profile
+                      </ThemedText>
+                      <TouchableOpacity
+                          onPress={() => setShowSettings(true)}
+                          style={[styles.iconButton, {borderColor: theme.tabActiveBorder}]}
+                          accessibilityRole="button"
+                          accessibilityLabel="Open settings"
+                      >
+                        <SymbolView
+                            name={{ios: 'gearshape', android: 'settings', web: 'settings'} as any}
+                            tintColor='#8769ffbe'
+                            size={20}
+                        />
+                      </TouchableOpacity>
                     </View>
 
-                    <View style={[styles.interestsColumn, { borderColor: theme.tabActiveBorder }]}>
-                      <ThemedText type="smallBold">My interests:</ThemedText>
-                      <View style={styles.chips}>
-                        {(profile.interests ?? []).map((interest) => (
-                          <View key={interest} style={[styles.chip, { backgroundColor: theme.backgroundSelected, borderColor: theme.tabActiveBorder }]}>
-                            <ThemedText type="small" style={styles.chipText}>
-                              {interest}
-                            </ThemedText>
+                    <View style={styles.profileBlock}>
+                      <View style={[styles.profileTopRow, isMobileWeb && styles.mobileProfileTopRow]}>
+                        <Image
+                            source={profilePicture ? {uri: profilePicture} : undefined}
+                            style={[styles.avatar, isMobileWeb && styles.mobileAvatar]}
+                            contentFit="cover"
+                        />
+
+                        <View style={styles.profileMeta}>
+                          <ThemedText type="smallBold" style={styles.profileName}>
+                            {profile.displayName}
+                          </ThemedText>
+                          <ThemedText type="small" themeColor="textSecondary" numberOfLines={2}>
+                            {profile.email}
+                          </ThemedText>
+                          <ThemedText type="small" themeColor="textSecondary">
+                            Birthday: <ThemedText type="small" themeColor="textSecondary"
+                                                  style={styles.profileMetaDetail}>{profile.birthDate}</ThemedText>
+                          </ThemedText>
+                          <ThemedText type="small" themeColor="textSecondary">
+                            Country: <ThemedText type="small" themeColor="textSecondary"
+                                                 style={styles.profileMetaDetail}>{profile.country}</ThemedText>
+                          </ThemedText>
+                          <ThemedText type="small" themeColor="textSecondary">
+                            Gender: <ThemedText type="small" themeColor="textSecondary"
+                                                style={styles.profileMetaDetail}>{profile.gender}</ThemedText>
+                          </ThemedText>
+                        </View>
+                      </View>
+
+                      <View style={[styles.bioInterestsRow, isMobileWeb && styles.mobileBioInterestsRow]}>
+                        <View
+                            style={[styles.bioColumn, isMobileWeb && styles.mobileProfileColumn, {borderColor: theme.tabActiveBorder}]}>
+                          <ThemedText type="smallBold">Bio:</ThemedText>
+                          {!!profile.bio && (
+                              <ThemedText type="small" style={styles.bio}>
+                                {profile.bio}
+                              </ThemedText>
+                          )}
+                        </View>
+
+                        <View
+                            style={[styles.interestsColumn, isMobileWeb && styles.mobileProfileColumn, {borderColor: theme.tabActiveBorder}]}>
+                          <ThemedText type="smallBold">My interests:</ThemedText>
+                          <View style={styles.chips}>
+                            {(profile.interests ?? []).map((interest) => (
+                                <View key={interest} style={[styles.chip, {
+                                  backgroundColor: theme.backgroundSelected,
+                                  borderColor: theme.tabActiveBorder
+                                }]}>
+                                  <ThemedText type="small" style={styles.chipText}>
+                                    {interest}
+                                  </ThemedText>
+                                </View>
+                            ))}
                           </View>
-                        ))}
+                        </View>
                       </View>
                     </View>
                   </View>
-                </View>
-              </View>
 
-              <View style={styles.postsSection}>
-                <View style={styles.postsHeader}>
-                  <ThemedText type="smallBold" style={styles.postsTitle}>
-                    Posts
-                  </ThemedText>
-                  <ThemedText type="small" themeColor="textSecondary">
-                    {posts.length} {posts.length === 1 ? 'post' : 'posts'}
-                  </ThemedText>
-                </View>
+                  <View style={styles.postsSection}>
+                    <View style={styles.postsHeader}>
+                      <ThemedText type="smallBold" style={styles.postsTitle}>
+                        Posts
+                      </ThemedText>
+                      <ThemedText type="small" themeColor="textSecondary">
+                        {posts.length} {posts.length === 1 ? 'post' : 'posts'}
+                      </ThemedText>
+                    </View>
 
-                {loadingPosts ? (
-                  <View style={styles.emptyState}>
-                    <ActivityIndicator size="large" color={theme.text} />
+                    {loadingPosts ? (
+                        <View style={styles.emptyState}>
+                          <ActivityIndicator size="large" color={theme.text}/>
+                        </View>
+                    ) : postsError ? (
+                        <View style={[styles.notice, {borderColor: '#ef4444'}]}>
+                          <ThemedText type="small" style={styles.errorText}>
+                            {postsError}
+                          </ThemedText>
+                        </View>
+                    ) : posts.length > 0 ? (
+                        <View style={styles.postsList}>
+                          {posts.map((post) => (
+                              <PostCard key={post.id} post={post}/>
+                          ))}
+                        </View>
+                    ) : (
+                        <View style={styles.emptyState}>
+                          <ThemedText type="small" themeColor="textSecondary">
+                            No posts yet.
+                          </ThemedText>
+                        </View>
+                    )}
                   </View>
-                ) : postsError ? (
-                  <View style={[styles.notice, { borderColor: '#ef4444' }]}>
-                    <ThemedText type="small" style={styles.errorText}>
-                      {postsError}
-                    </ThemedText>
-                  </View>
-                ) : posts.length > 0 ? (
-                  <View style={styles.postsList}>
-                    {posts.map((post) => (
-                      <PostCard key={post.id} post={post} />
-                    ))}
-                  </View>
-                ) : (
-                  <View style={styles.emptyState}>
-                    <ThemedText type="small" themeColor="textSecondary">
-                      No posts yet.
-                    </ThemedText>
-                  </View>
-                )}
-              </View>
-            </>
-          ) : null}
-        </ScrollView>
-
-        <ResponsiveModalSheet
-          visible={showSettings}
-          onClose={() => setShowSettings(false)}
-          title="Settings"
-          closeAccessibilityLabel="Close settings"
-        >
-          <ScrollView
-            style={styles.settingsScroll}
-            contentContainerStyle={styles.modalContent}
-            keyboardShouldPersistTaps="handled"
-            showsVerticalScrollIndicator
-          >
-            <ModalSheetPanel title="Profile settings">
-              <View style={styles.actionsRow}>
-                <TouchableOpacity
-                  onPress={openEditor}
-                  disabled={openingEditor}
-                  style={[styles.buttonStyle, { borderColor: '#6249cabe' }]}
-                >
-                  <SymbolView
-                    name={{ ios: 'square.and.pencil', android: 'edit', web: 'edit' } as any}
-                    tintColor='#8769ffbe'
-                    size={20}
-                  />
-                  <ThemedText type="smallBold">
-                    Update profile
-                  </ThemedText>
-                </TouchableOpacity>
-              </View>
-            </ModalSheetPanel>
-
-            <ModalSheetPanel
-              title="Discovery preferences"
-              trailing={prefsSaved ? (
-                <ThemedText type="small" themeColor="textSecondary">
-                  Saved
-                </ThemedText>
-              ) : undefined}
-            >
-              <View style={styles.row}>
-                <View style={styles.field}>
-                  <ThemedText type="smallBold">Minimum age</ThemedText>
-                  <TextInput
-                    value={minAge}
-                    onChangeText={(text) => {
-                      setMinAge(sanitizeAge(text));
-                      setPrefsError(null);
-                    }}
-                    keyboardType="number-pad"
-                    maxLength={3}
-                    placeholder={String(MIN_ALLOWED_AGE)}
-                    placeholderTextColor={theme.iconMuted}
-                    style={[styles.input, { borderColor: theme.tabActiveBorder, color: theme.text }]}
-                  />
-                </View>
-                <View style={styles.field}>
-                  <ThemedText type="smallBold">Maximum age</ThemedText>
-                  <TextInput
-                    value={maxAge}
-                    onChangeText={(text) => {
-                      setMaxAge(sanitizeAge(text));
-                      setPrefsError(null);
-                    }}
-                    keyboardType="number-pad"
-                    maxLength={3}
-                    placeholder={String(MAX_ALLOWED_AGE)}
-                    placeholderTextColor={theme.iconMuted}
-                    style={[styles.input, { borderColor: theme.tabActiveBorder, color: theme.text }]}
-                  />
-                </View>
-              </View>
-
-              <View style={styles.fieldBlock}>
-                <ThemedText type="smallBold">Gender</ThemedText>
-                <View style={styles.segmented}>
-                  {GENDER_OPTIONS.map((option) => {
-                    const selected = option === gender;
-
-                    return (
-                      <TouchableOpacity
-                        key={option || 'any'}
-                        onPress={() => setGender(option)}
-                        style={[
-                          styles.segment,
-                          {
-                            borderColor: theme.tabActiveBorder,
-                            backgroundColor: selected ? theme.backgroundElement : 'transparent',
-                          },
-                        ]}
-                      >
-                        <ThemedText
-                          type="smallBold"
-                          style={[styles.segmentText, selected && styles.segmentTextSelected]}
-                        >
-                          {genderOptionLabel(option)}
-                        </ThemedText>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              </View>
-
-              <View style={[styles.fieldBlock, styles.countryFieldBlock]}>
-                <ThemedText type="smallBold">Country</ThemedText>
-                <SelectField
-                  value={country || COUNTRY_ANY}
-                  options={COUNTRY_OPTIONS}
-                  onChange={(value) => setCountry(value === COUNTRY_ANY ? '' : value)}
-                  placeholder="Any country"
-                  title="Country"
-                  searchable
-                  inlineOnWeb
-                />
-              </View>
-
-              <View style={styles.fieldBlock}>
-                <ThemedText type="smallBold">Interests</ThemedText>
-                <InterestsSelect value={interests} onChange={setInterests} requireMin={false} />
-              </View>
-
-              {prefsError && (
-                <ThemedText type="small" style={styles.errorText}>
-                  {prefsError}
-                </ThemedText>
-              )}
-
-              <View style={styles.actionsRow}>
-                <TouchableOpacity
-                  onPress={savePreferences}
-                  disabled={savingPrefs}
-                  style={[styles.buttonStyle]}
-                >
-                  <SymbolView
-                    name={{ ios: 'save', android: 'save', web: 'save' } as any}
-                    tintColor='#8769ffbe'
-                    size={20}
-                  />
-                  <ThemedText type="smallBold">
-                    Save changes
-                  </ThemedText>
-                </TouchableOpacity>
-              </View>
-            </ModalSheetPanel>
-
-            <View style={styles.actionsRow}>
-              <TouchableOpacity
-                onPress={onLogout}
-                style={[styles.buttonStyle, { borderColor: '#ef4444' }]}
-              >
-                <SymbolView
-                  name={{ ios: 'rectangle.portrait.and.arrow.right', android: 'logout', web: 'logout' } as any}
-                  tintColor="#ef4444"
-                  size={20}
-                />
-                <ThemedText type="smallBold">
-                  Logout
-                </ThemedText>
-              </TouchableOpacity>
-            </View>
+                </>
+            ) : null}
           </ScrollView>
-        </ResponsiveModalSheet>
-      </SafeAreaView>
-    </ThemedView>
+
+          <ResponsiveModalSheet
+              visible={showSettings}
+              onClose={() => setShowSettings(false)}
+              title="Settings"
+              closeAccessibilityLabel="Close settings"
+          >
+            <ScrollView
+                style={styles.settingsScroll}
+                contentContainerStyle={styles.modalContent}
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator
+            >
+              <ModalSheetPanel title="Profile settings">
+                <View style={styles.actionsRow}>
+                  <TouchableOpacity
+                      onPress={openEditor}
+                      disabled={openingEditor}
+                      style={[styles.buttonStyle, {borderColor: '#6249cabe'}]}
+                  >
+                    <SymbolView
+                        name={{ios: 'square.and.pencil', android: 'edit', web: 'edit'} as any}
+                        tintColor='#8769ffbe'
+                        size={20}
+                    />
+                    <ThemedText type="smallBold">
+                      Update profile
+                    </ThemedText>
+                  </TouchableOpacity>
+                </View>
+              </ModalSheetPanel>
+
+              <ModalSheetPanel
+                  title="Discovery preferences"
+                  trailing={prefsSaved ? (
+                      <ThemedText type="small" themeColor="textSecondary">
+                        Saved
+                      </ThemedText>
+                  ) : undefined}
+              >
+                <View style={styles.row}>
+                  <View style={styles.field}>
+                    <ThemedText type="smallBold">Minimum age</ThemedText>
+                    <TextInput
+                        value={minAge}
+                        onChangeText={(text) => {
+                          setMinAge(sanitizeAge(text));
+                          setPrefsError(null);
+                        }}
+                        keyboardType="number-pad"
+                        maxLength={3}
+                        placeholder={String(MIN_ALLOWED_AGE)}
+                        placeholderTextColor={theme.iconMuted}
+                        style={[styles.input, {borderColor: theme.tabActiveBorder, color: theme.text}]}
+                    />
+                  </View>
+                  <View style={styles.field}>
+                    <ThemedText type="smallBold">Maximum age</ThemedText>
+                    <TextInput
+                        value={maxAge}
+                        onChangeText={(text) => {
+                          setMaxAge(sanitizeAge(text));
+                          setPrefsError(null);
+                        }}
+                        keyboardType="number-pad"
+                        maxLength={3}
+                        placeholder={String(MAX_ALLOWED_AGE)}
+                        placeholderTextColor={theme.iconMuted}
+                        style={[styles.input, {borderColor: theme.tabActiveBorder, color: theme.text}]}
+                    />
+                  </View>
+                </View>
+
+                <View style={styles.fieldBlock}>
+                  <ThemedText type="smallBold">Gender</ThemedText>
+                  <View style={styles.segmented}>
+                    {GENDER_OPTIONS.map((option) => {
+                      const selected = option === gender;
+
+                      return (
+                          <TouchableOpacity
+                              key={option || 'any'}
+                              onPress={() => setGender(option)}
+                              style={[
+                                styles.segment,
+                                {
+                                  borderColor: theme.tabActiveBorder,
+                                  backgroundColor: selected ? theme.backgroundElement : 'transparent',
+                                },
+                              ]}
+                          >
+                            <ThemedText
+                                type="smallBold"
+                                style={[styles.segmentText, selected && styles.segmentTextSelected]}
+                            >
+                              {genderOptionLabel(option)}
+                            </ThemedText>
+                          </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </View>
+
+                <View style={[styles.fieldBlock, styles.countryFieldBlock]}>
+                  <ThemedText type="smallBold">Country</ThemedText>
+                  <SelectField
+                      value={country || COUNTRY_ANY}
+                      options={COUNTRY_OPTIONS}
+                      onChange={(value) => setCountry(value === COUNTRY_ANY ? '' : value)}
+                      placeholder="Any country"
+                      title="Country"
+                      searchable
+                      inlineOnWeb
+                  />
+                </View>
+
+                <View style={styles.fieldBlock}>
+                  <ThemedText type="smallBold">Interests</ThemedText>
+                  <InterestsSelect value={interests} onChange={setInterests} requireMin={false}/>
+                </View>
+
+                {prefsError && (
+                    <ThemedText type="small" style={styles.errorText}>
+                      {prefsError}
+                    </ThemedText>
+                )}
+
+                <View style={styles.actionsRow}>
+                  <TouchableOpacity
+                      onPress={savePreferences}
+                      disabled={savingPrefs}
+                      style={[styles.buttonStyle]}
+                  >
+                    <SymbolView
+                        name={{ios: 'save', android: 'save', web: 'save'} as any}
+                        tintColor='#8769ffbe'
+                        size={20}
+                    />
+                    <ThemedText type="smallBold">
+                      Save changes
+                    </ThemedText>
+                  </TouchableOpacity>
+                </View>
+              </ModalSheetPanel>
+
+              <View style={styles.actionsRow}>
+                <TouchableOpacity
+                    onPress={onLogout}
+                    style={[styles.buttonStyle, {borderColor: '#ef4444'}]}
+                >
+                  <SymbolView
+                      name={{ios: 'rectangle.portrait.and.arrow.right', android: 'logout', web: 'logout'} as any}
+                      tintColor="#ef4444"
+                      size={20}
+                  />
+                  <ThemedText type="smallBold">
+                    Logout
+                  </ThemedText>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+          </ResponsiveModalSheet>
+        </SafeAreaView>
+      </ThemedView>
   );
 }
 
@@ -547,7 +560,6 @@ const styles = StyleSheet.create({
     flex: 1,
     maxWidth: MaxContentWidth,
     width: '100%',
-    marginLeft: Platform.OS === 'web' ? 100 : 0,
   },
   content: {
     padding: Spacing.three,
@@ -567,6 +579,9 @@ const styles = StyleSheet.create({
     padding: Spacing.three,
     gap: Spacing.three,
     backgroundColor: 'rgba(0, 0, 0, 0.08)',
+  },
+  mobilePanel: {
+    padding: Spacing.two,
   },
   panelHeader: {
     flexDirection: 'row',
@@ -664,6 +679,14 @@ const styles = StyleSheet.create({
     alignItems: 'stretch',
     flexWrap: 'wrap',
   },
+  mobileBioInterestsRow: {
+    flexDirection: 'column',
+  },
+  mobileProfileColumn: {
+    width: '100%',
+    minWidth: 0,
+    padding: Spacing.two,
+  },
   bioColumn: {
     flex: 1,
     minWidth: 220,
@@ -687,6 +710,9 @@ const styles = StyleSheet.create({
     gap: Spacing.three,
     alignItems: 'flex-start',
   },
+  mobileProfileTopRow: {
+    alignItems: 'center',
+  },
   avatar: {
     width: 120,
     height: 120,
@@ -694,6 +720,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#6249cabe',
     backgroundColor: Colors.dark.backgroundSelected,
+  },
+  mobileAvatar: {
+    width: 88,
+    height: 88,
   },
   profileMeta: {
     flex: 1,
@@ -729,9 +759,7 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   panelHeaderText: {
-    bottom: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
+    lineHeight: 22,
   },
   iconButton: {
     width: 44,

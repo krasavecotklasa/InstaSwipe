@@ -21,6 +21,7 @@ import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { createPost } from '@/hooks/posts';
 import { getImageValidationError } from '@/constants/media';
+import { useResponsiveLayout } from '@/hooks/use-responsive-layout';
 
 interface PostComposerProps {
   visible: boolean;
@@ -53,6 +54,7 @@ export default function PostComposer({ visible, onClose, onPosted }: PostCompose
   const scrollRef = useRef<ScrollView>(null);
   const captionFocusedRef = useRef(false);
   const theme = useTheme();
+  const { isDesktopWeb } = useResponsiveLayout();
 
   useEffect(() => {
     if (!visible || Platform.OS === 'web') {
@@ -154,9 +156,9 @@ export default function PostComposer({ visible, onClose, onPosted }: PostCompose
             </ThemedText>
           }
         >
-          <View style={styles.formGrid}>
+          <View style={[styles.formGrid, isDesktopWeb ? styles.desktopFormGrid : styles.mobileFormGrid]}>
             <TouchableOpacity
-              style={styles.imageTile}
+              style={[styles.imageTile, isDesktopWeb ? styles.desktopImageTile : styles.mobileImageTile]}
               onPress={handlePickImage}
               activeOpacity={0.8}
               disabled={loading}
@@ -184,7 +186,7 @@ export default function PostComposer({ visible, onClose, onPosted }: PostCompose
               )}
             </TouchableOpacity>
 
-            <View style={styles.captionColumn}>
+            <View style={[styles.captionColumn, isDesktopWeb && styles.desktopCaptionColumn]}>
               <TextInput
                 style={[styles.input, styles.textArea, { color: theme.text, borderColor: theme.tabActiveBorder }]}
                 placeholder="Write a caption..."
@@ -206,6 +208,7 @@ export default function PostComposer({ visible, onClose, onPosted }: PostCompose
               <Pressable
                 style={({ pressed }) => [
                   styles.submitButton,
+                  isDesktopWeb ? styles.desktopSubmitButton : styles.mobileSubmitButton,
                   { borderColor: '#6249cabe' },
                   (pressed || loading) && styles.submitButtonPressed,
                 ]}
@@ -244,14 +247,26 @@ const styles = StyleSheet.create({
     gap: Spacing.three,
   },
   formGrid: {
-    flexDirection: Platform.OS === 'web' ? 'row' : 'column',
     gap: Spacing.three,
-    alignItems: Platform.OS === 'web' ? 'flex-start' : 'stretch',
+  },
+  desktopFormGrid: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  mobileFormGrid: {
+    flexDirection: 'column',
+    alignItems: 'stretch',
   },
   imageTile: {
-    width: Platform.OS === 'web' ? 220 : '100%',
     maxWidth: 320,
-    alignSelf: Platform.OS === 'web' ? 'flex-start' : 'center',
+  },
+  desktopImageTile: {
+    width: 220,
+    alignSelf: 'flex-start',
+  },
+  mobileImageTile: {
+    width: '100%',
+    alignSelf: 'center',
   },
   imagePlaceholder: {
     width: '100%',
@@ -274,8 +289,10 @@ const styles = StyleSheet.create({
   },
   captionColumn: {
     flex: 1,
-    minWidth: Platform.OS === 'web' ? 260 : undefined,
     gap: Spacing.three,
+  },
+  desktopCaptionColumn: {
+    minWidth: 260,
   },
   input: {
     borderWidth: 1,
@@ -298,8 +315,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: Spacing.two,
     borderWidth: 1,
-    alignSelf: Platform.OS === 'web' ? 'flex-start' : 'stretch',
-    minWidth: Platform.OS === 'web' ? 180 : undefined,
+  },
+  desktopSubmitButton: {
+    alignSelf: 'flex-start',
+    minWidth: 180,
+  },
+  mobileSubmitButton: {
+    alignSelf: 'stretch',
   },
   submitButtonPressed: {
     opacity: 0.72,
