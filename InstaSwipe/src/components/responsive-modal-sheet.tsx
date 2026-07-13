@@ -15,6 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { useResponsiveLayout } from '@/hooks/use-responsive-layout';
 
 const SHEET_CLOSE_THRESHOLD = 80;
 
@@ -70,6 +71,8 @@ export default function ResponsiveModalSheet({
 }: ResponsiveModalSheetProps) {
   const theme = useTheme();
   const isWeb = Platform.OS === 'web';
+  const { isMobileWeb } = useResponsiveLayout();
+  const useMobileSheet = !isWeb || isMobileWeb;
   const sheetDragStartYRef = useRef<number | null>(null);
 
   const requestClose = () => {
@@ -107,14 +110,14 @@ export default function ResponsiveModalSheet({
       onRequestClose={requestClose}
     >
       <View
-        style={[styles.backdrop, isWeb ? styles.webBackdrop : styles.mobileBackdrop]}
+        style={[styles.backdrop, useMobileSheet ? styles.mobileBackdrop : styles.webBackdrop]}
         onStartShouldSetResponder={handleBackdropResponderStart}
         onResponderRelease={handleBackdropResponderRelease}
       >
         <View
           style={[
             styles.surface,
-            isWeb ? styles.webSurface : styles.mobileSurface,
+            useMobileSheet ? styles.mobileSurface : styles.webSurface,
             {
               backgroundColor: theme.background,
               borderColor: theme.tabActiveBorder,
@@ -123,7 +126,7 @@ export default function ResponsiveModalSheet({
           ]}
         >
           <SafeAreaView
-            edges={isWeb ? ['left', 'right'] : ['left', 'right', 'bottom']}
+            edges={useMobileSheet ? ['left', 'right', 'bottom'] : ['left', 'right']}
             style={[styles.surfaceContent, contentStyle]}
           >
             <View
@@ -193,7 +196,9 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   mobileSurface: {
-    height: '75%',
+    width: '100%',
+    height: '88%',
+    maxHeight: 760,
     borderTopLeftRadius: 18,
     borderTopRightRadius: 18,
   },

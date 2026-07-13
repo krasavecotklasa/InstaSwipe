@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import {
   ActivityIndicator,
-  Platform,
   Pressable,
   StyleSheet,
   View,
@@ -18,9 +17,11 @@ import { type DiscoveryProfile, useDiscoverySwipe } from '@/hooks/matches';
 import { MAX_VISIBLE_MATCH_INTERESTS } from '@/constants/interests';
 import { useTheme } from '@/hooks/use-theme';
 import Header from '@/components/header';
+import { useResponsiveLayout } from '@/hooks/use-responsive-layout';
 
 export default function MatchScreen() {
   const theme = useTheme();
+  const { isMobileWeb, isDesktopWeb } = useResponsiveLayout();
   const {
     currentProfile,
     loading,
@@ -45,9 +46,9 @@ export default function MatchScreen() {
 
   return (
     <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+      <SafeAreaView style={[styles.safeArea, { marginLeft: isDesktopWeb ? 100 : 0 }]} edges={['top', 'left', 'right']}>
         <Header />
-        <View style={styles.content}>
+        <View style={[styles.content, isMobileWeb && styles.mobileContent]}>
           <View style={styles.header} />
 
           {loading ? (
@@ -59,7 +60,7 @@ export default function MatchScreen() {
             </View>
           ) : currentProfile ? (
             <View style={styles.stage}>
-              <View style={[styles.card, { borderColor: theme.tabActiveBorder }]}>
+              <View style={[styles.card, isMobileWeb && styles.mobileCard, { borderColor: theme.tabActiveBorder }]}>
                 <Image
                   source={currentProfile.profilePictureUrl ? { uri: currentProfile.profilePictureUrl } : undefined}
                   style={styles.portrait}
@@ -93,11 +94,11 @@ export default function MatchScreen() {
               </View>
 
               {/* Pass button */}
-              <View style={styles.actions}>
+              <View style={[styles.actions, isMobileWeb && styles.mobileActions]}>
                 <Pressable
                   onPress={() => handleDecision('pass')}
                   disabled={acting}
-                  style={[styles.actionButton, styles.passButton, acting && styles.disabledButton]}
+                  style={[styles.actionButton, isMobileWeb && styles.mobileActionButton, styles.passButton, acting && styles.disabledButton]}
                 >
                   <SymbolView
                     name={{ ios: 'xmark', android: 'close', web: 'close' } as any}
@@ -111,7 +112,7 @@ export default function MatchScreen() {
                 <Pressable
                   onPress={openProfileModal}
                   disabled={acting}
-                  style={[styles.actionButton, styles.profileButton, acting && styles.disabledButton]}
+                  style={[styles.actionButton, isMobileWeb && styles.mobileActionButton, styles.profileButton, acting && styles.disabledButton]}
                 >
                   <SymbolView
                     name={{ ios: 'person.crop.circle', android: 'person', web: 'person' } as any}
@@ -124,7 +125,7 @@ export default function MatchScreen() {
                 <Pressable
                   onPress={() => handleDecision('love')}
                   disabled={acting}
-                  style={[styles.actionButton, styles.loveButton, acting && styles.disabledButton]}
+                  style={[styles.actionButton, isMobileWeb && styles.mobileActionButton, styles.loveButton, acting && styles.disabledButton]}
                 >
                   <SymbolView
                     name={{ ios: 'heart.fill', android: 'favorite', web: 'favorite' } as any}
@@ -161,6 +162,7 @@ export default function MatchScreen() {
         visible={Boolean(profileModalProfile)}
         profile={profileModalProfile}
         onClose={closeProfileModal}
+        onDecision={handleDecision}
       />
     </ThemedView>
   );
@@ -177,13 +179,16 @@ const styles = StyleSheet.create({
     flex: 1,
     maxWidth: MaxContentWidth,
     width: '100%',
-    marginLeft: Platform.OS === 'web' ? 100 : 0,
   },
   content: {
     flex: 1,
     padding: Spacing.three,
     paddingBottom: BottomTabInset + Spacing.four,
     gap: Spacing.three,
+  },
+  mobileContent: {
+    padding: Spacing.two,
+    paddingBottom: 76,
   },
   header: {
     flexDirection: 'row',
@@ -217,6 +222,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     overflow: 'hidden',
     backgroundColor: 'rgba(0, 0, 0, 0.3)',
+  },
+  mobileCard: {
+    maxWidth: 380,
   },
   portrait: {
     width: '100%',
@@ -259,12 +267,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Spacing.four,
   },
+  mobileActions: {
+    gap: Spacing.three,
+  },
   actionButton: {
     width: 72,
     height: 72,
     borderRadius: 36,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  mobileActionButton: {
+    width: 58,
+    height: 58,
+    borderRadius: 29,
   },
   passButton: {
     backgroundColor: '#ff3131',

@@ -1,14 +1,16 @@
 import { Platform, StyleSheet, View } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
+import { useResponsiveLayout } from '@/hooks/use-responsive-layout';
 
 interface HeaderProps {
     title?: string;
 }
 
 export default function Header({ title = 'InstaSwipe' }: HeaderProps) {
+    const { isMobileWeb } = useResponsiveLayout();
 
-    if (Platform.OS !== 'ios' && Platform.OS !== 'android') {
+    if (Platform.OS === 'web' && !isMobileWeb) {
         return null;
     }
 

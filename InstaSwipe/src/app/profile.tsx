@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useFocusEffect } from 'expo-router';
 import {
   ActivityIndicator,
-  Platform,
   ScrollView,
   StyleSheet,
   TextInput,
@@ -13,61 +12,24 @@ import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { SymbolView } from 'expo-symbols';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { PostCard, type Post } from '@/components/post-card';
 import ResponsiveModalSheet, { ModalSheetPanel } from '@/components/responsive-modal-sheet';
-import { SelectField } from '@/components/form/select-field';
-import { InterestsSelect } from '@/components/form/interests-select';
+import { DiscoveryPreferencesForm } from '@/components/discovery-preferences-form';
+import OnboardingGate from '@/components/onboarding-gate';
 import { BottomTabInset, Colors, MaxContentWidth, Spacing } from '@/constants/theme';
-import { COUNTRIES } from '@/constants/countries';
 import { getImageValidationError } from '@/constants/media';
-import { useAuthContext } from '@/hooks/auth-context';
+import { useAuthContext } from '@/context/auth-context';
 import { API, type OwnProfileResponse, uploadProfilePicture } from '@/hooks/auth';
 import { useMediaStatusPolling } from '@/hooks/use-media-status-polling';
-import {
-  DISCOVERY_GENDER_LABELS,
-  DISCOVERY_GENDERS,
-  type DiscoveryPreferences,
-  type Gender,
-  getDiscoveryPreferences,
-  setDiscoveryPreferences,
-} from '@/hooks/matches';
 import { normalizeMediaUrl } from '@/hooks/media';
 import { useTheme } from '@/hooks/use-theme';
 import Header from '@/components/header';
 import { fetchUserPosts } from '@/hooks/posts';
+import { useResponsiveLayout } from '@/hooks/use-responsive-layout';
 
-const DEFAULT_PREFS: DiscoveryPreferences = {
-  minAge: '',
-  maxAge: '',
-  gender: '',
-  country: '',
-  interests: [],
-};
-
-// Includes an "Any" option ('') so a user can search all genders; '' means no
-// gender filter, which is what the backend expects when the param is omitted.
-const GENDER_OPTIONS: (Gender | '')[] = ['', ...DISCOVERY_GENDERS];
-const genderOptionLabel = (option: Gender | '') => (option === '' ? 'Any' : DISCOVERY_GENDER_LABELS[option]);
-
-// Country filter is optional: the "Any country" sentinel clears the filter ('').
-const COUNTRY_ANY = 'Any country';
-const COUNTRY_OPTIONS = [COUNTRY_ANY, ...COUNTRIES];
-
-// Discovery age filter bounds. The app's minimum age is 18, so a filter below
-// that can never match anyone; cap the top end at a sane upper bound.
-const MIN_ALLOWED_AGE = 18;
-const MAX_ALLOWED_AGE = 100;
-
-const toInputValue = (value: string | number | undefined) => {
-  return value == null ? '' : String(value);
-};
-
-// Keep age inputs numeric: strip anything that isn't a digit and cap the length
-// so free text like "9 years old" can't reach the saved preferences.
-const sanitizeAge = (text: string) => text.replace(/[^0-9]/g, '').slice(0, 3);
+type SettingsView = 'closed' | 'hub' | 'profile' | 'discovery';
 
 // Mirrors PasswordChangeRequest's @Pattern rule on the backend so a bad password
 // is caught before the round-trip instead of surfacing a raw 400.
@@ -76,7 +38,8 @@ const PASSWORD_PATTERN = /^(?=.*[0-9])(?=.*[a-z])(?=.*[A-Z])(?=.*[@#$%^&+=!]).*$
 export default function ProfileScreen() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
-  const { onEditProfile, onLogout } = useAuthContext();
+  const { isMobileWeb, isDesktopWeb } = useResponsiveLayout();
+  const { onLogout } = useAuthContext();
   const [profile, setProfile] = useState<OwnProfileResponse | null>(null);
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -86,16 +49,8 @@ export default function ProfileScreen() {
   const [postsError, setPostsError] = useState<string | null>(null);
   const hasLoadedPosts = useRef(false);
 
-  const [minAge, setMinAge] = useState('');
-  const [maxAge, setMaxAge] = useState('');
-  const [gender, setGender] = useState<Gender | ''>('');
-  const [country, setCountry] = useState('');
-  const [interests, setInterests] = useState<string[]>([]);
-  const [savingPrefs, setSavingPrefs] = useState(false);
   const [prefsSaved, setPrefsSaved] = useState(false);
-  const [prefsError, setPrefsError] = useState<string | null>(null);
-  const [openingEditor, setOpeningEditor] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
+  const [settingsView, setSettingsView] = useState<SettingsView>('closed');
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [changingPassword, setChangingPassword] = useState(false);
@@ -122,29 +77,13 @@ export default function ProfileScreen() {
 
     (async () => {
       try {
-        const [, savedPreferences] = await Promise.all([
-          loadProfile(),
-          getDiscoveryPreferences(),
-        ]);
+        await loadProfile();
 
         if (!isActive) {
           return;
         }
 
-        const mergedPreferences = {
-          ...DEFAULT_PREFS,
-          gender: savedPreferences.gender,
-          country: savedPreferences.country || '',
-          interests: savedPreferences.interests || [],
-          minAge: savedPreferences.minAge || '',
-          maxAge: savedPreferences.maxAge || '',
-        } satisfies DiscoveryPreferences;
 
-        setMinAge(toInputValue(mergedPreferences.minAge));
-        setMaxAge(toInputValue(mergedPreferences.maxAge));
-        setGender(mergedPreferences.gender);
-        setCountry(mergedPreferences.country);
-        setInterests(mergedPreferences.interests);
       } catch (loadError) {
         if (isActive) {
           setError(loadError instanceof Error ? loadError.message : 'Could not load profile');
@@ -163,7 +102,7 @@ export default function ProfileScreen() {
 
   const { timedOut: avatarTimedOut } = useMediaStatusPolling(
     profile?.profilePictureStatus,
-    () => { loadProfile().catch(() => {}); },
+    () => { loadProfile().catch(() => { }); },
   );
 
   const handlePickAvatar = async () => {
@@ -233,41 +172,30 @@ export default function ProfileScreen() {
     }, [loadPosts]),
   );
 
-  const savePreferences = async () => {
-    const parsedMin = minAge.trim() ? Number(minAge) : null;
-    const parsedMax = maxAge.trim() ? Number(maxAge) : null;
-
-    if (parsedMin !== null && (parsedMin < MIN_ALLOWED_AGE || parsedMin > MAX_ALLOWED_AGE)) {
-      setPrefsError(`Minimum age must be between ${MIN_ALLOWED_AGE} and ${MAX_ALLOWED_AGE}.`);
+  const handleProfileUpdated = async () => {
+    if (!profile) {
       return;
     }
-    if (parsedMax !== null && (parsedMax < MIN_ALLOWED_AGE || parsedMax > MAX_ALLOWED_AGE)) {
-      setPrefsError(`Maximum age must be between ${MIN_ALLOWED_AGE} and ${MAX_ALLOWED_AGE}.`);
-      return;
-    }
-    if (parsedMin !== null && parsedMax !== null && parsedMin > parsedMax) {
-      setPrefsError('Minimum age cannot be greater than maximum age.');
-      return;
-    }
-
-    setSavingPrefs(true);
-    setPrefsSaved(false);
-    setPrefsError(null);
-    setError(null);
 
     try {
-      await setDiscoveryPreferences({
-        minAge: parsedMin ?? '',
-        maxAge: parsedMax ?? '',
-        gender,
-        country,
-        interests,
+      const response = await API.getOwnProfile();
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({})) as { message?: string };
+        setError(errorData.message || 'Profile updated, but it could not be refreshed.');
+        setSettingsView('hub');
+        return;
+      }
+
+      const profileData: OwnProfileResponse = await response.json();
+      setProfile({
+        ...profileData,
+        id: profileData.id ?? profileData.userId,
+        profilePictureUrl: normalizeMediaUrl(profileData.profilePictureUrl),
       });
-      setPrefsSaved(true);
-    } catch (saveError) {
-      setPrefsError(saveError instanceof Error ? saveError.message : 'Could not save preferences');
-    } finally {
-      setSavingPrefs(false);
+      setSettingsView('hub');
+    } catch (refreshError) {
+      setError(refreshError instanceof Error ? refreshError.message : 'Could not refresh your profile.');
+      setSettingsView('hub');
     }
   };
 
@@ -304,30 +232,16 @@ export default function ProfileScreen() {
     }
   };
 
-  const openEditor = async () => {
-    if (!profile) {
-      return;
-    }
-
-    setOpeningEditor(true);
-    try {
-      setShowSettings(false);
-      onEditProfile(profile);
-    } finally {
-      setOpeningEditor(false);
-    }
-  };
-
   const profilePicture = profile?.profilePictureUrl;
 
   return (
     <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-        <Header title='Profile'/>
+      <SafeAreaView style={[styles.safeArea, { marginLeft: isDesktopWeb ? 100 : 0 }]} edges={['top', 'left', 'right']}>
+        <Header title='Profile' />
         <ScrollView
           contentContainerStyle={[
             styles.content,
-            { paddingBottom: BottomTabInset + insets.bottom + Spacing.five },
+            { paddingBottom: (isMobileWeb ? 64 : BottomTabInset) + insets.bottom + Spacing.five },
           ]}
           showsVerticalScrollIndicator
         >
@@ -350,13 +264,13 @@ export default function ProfileScreen() {
             </View>
           ) : profile ? (
             <>
-              <View style={[styles.panel, { borderColor: theme.tabActiveBorder }]}>
+              <View style={[styles.panel, isMobileWeb && styles.mobilePanel, { borderColor: theme.tabActiveBorder }]}>
                 <View style={styles.panelHeader}>
                   <ThemedText style={styles.panelHeaderText} type="smallBold">
                     Your profile
                   </ThemedText>
                   <TouchableOpacity
-                    onPress={() => setShowSettings(true)}
+                    onPress={() => setSettingsView('hub')}
                     style={[styles.iconButton, { borderColor: theme.tabActiveBorder }]}
                     accessibilityRole="button"
                     accessibilityLabel="Open settings"
@@ -370,7 +284,7 @@ export default function ProfileScreen() {
                 </View>
 
                 <View style={styles.profileBlock}>
-                  <View style={styles.profileTopRow}>
+                  <View style={[styles.profileTopRow, isMobileWeb && styles.mobileProfileTopRow]}>
                     <TouchableOpacity
                       onPress={handlePickAvatar}
                       disabled={avatarUploading}
@@ -379,7 +293,7 @@ export default function ProfileScreen() {
                     >
                       <Image
                         source={profilePicture ? { uri: profilePicture } : undefined}
-                        style={styles.avatar}
+                        style={[styles.avatar, isMobileWeb && styles.mobileAvatar]}
                         contentFit="cover"
                       />
                       {(avatarUploading || profile.profilePictureStatus === 'PROCESSING') && (
@@ -401,24 +315,28 @@ export default function ProfileScreen() {
 
                     <View style={styles.profileMeta}>
                       <ThemedText type="smallBold" style={styles.profileName}>
-                        {profile.displayName} <ThemedText type="small" themeColor="textSecondary">
-                          ({profile.email})
-                        </ThemedText>
+                        {profile.displayName}
+                      </ThemedText>
+                      <ThemedText type="small" themeColor="textSecondary" numberOfLines={2}>
+                        {profile.email}
                       </ThemedText>
                       <ThemedText type="small" themeColor="textSecondary">
-                        Birthday: <ThemedText type="small" themeColor="textSecondary" style={styles.profileMetaDetail}>{profile.birthDate}</ThemedText>
+                        Birthday: <ThemedText type="small" themeColor="textSecondary"
+                          style={styles.profileMetaDetail}>{profile.birthDate}</ThemedText>
                       </ThemedText>
                       <ThemedText type="small" themeColor="textSecondary">
-                        Country: <ThemedText type="small" themeColor="textSecondary" style={styles.profileMetaDetail}>{profile.country}</ThemedText>
+                        Country: <ThemedText type="small" themeColor="textSecondary"
+                          style={styles.profileMetaDetail}>{profile.country}</ThemedText>
                       </ThemedText>
                       <ThemedText type="small" themeColor="textSecondary">
-                        Gender: <ThemedText type="small" themeColor="textSecondary" style={styles.profileMetaDetail}>{profile.gender}</ThemedText>
+                        Gender: <ThemedText type="small" themeColor="textSecondary"
+                          style={styles.profileMetaDetail}>{profile.gender}</ThemedText>
                       </ThemedText>
                     </View>
                   </View>
 
-                  <View style={styles.bioInterestsRow}>
-                    <View style={[styles.bioColumn, { borderColor: theme.tabActiveBorder }]}>
+                  <View style={[styles.bioInterestsRow, isMobileWeb && styles.mobileBioInterestsRow]}>
+                    <View style={[styles.bioColumn, isMobileWeb && styles.mobileProfileColumn, { borderColor: theme.tabActiveBorder }]}>
                       <ThemedText type="smallBold">Bio:</ThemedText>
                       {!!profile.bio && (
                         <ThemedText type="small" style={styles.bio}>
@@ -427,11 +345,14 @@ export default function ProfileScreen() {
                       )}
                     </View>
 
-                    <View style={[styles.interestsColumn, { borderColor: theme.tabActiveBorder }]}>
+                    <View style={[styles.interestsColumn, isMobileWeb && styles.mobileProfileColumn, { borderColor: theme.tabActiveBorder }]}>
                       <ThemedText type="smallBold">My interests:</ThemedText>
                       <View style={styles.chips}>
                         {(profile.interests ?? []).map((interest) => (
-                          <View key={interest} style={[styles.chip, { backgroundColor: theme.backgroundSelected, borderColor: theme.tabActiveBorder }]}>
+                          <View key={interest} style={[styles.chip, {
+                            backgroundColor: theme.backgroundSelected,
+                            borderColor: theme.tabActiveBorder
+                          }]}>
                             <ThemedText type="small" style={styles.chipText}>
                               {interest}
                             </ThemedText>
@@ -482,229 +403,184 @@ export default function ProfileScreen() {
         </ScrollView>
 
         <ResponsiveModalSheet
-          visible={showSettings}
-          onClose={() => setShowSettings(false)}
-          title="Settings"
+          visible={settingsView !== 'closed'}
+          onClose={() => setSettingsView('closed')}
+          title={settingsView === 'profile'
+            ? 'Profile settings'
+            : settingsView === 'discovery'
+              ? 'Discovery preferences'
+              : 'Settings'}
           closeAccessibilityLabel="Close settings"
         >
-          <ScrollView
-            style={styles.settingsScroll}
-            contentContainerStyle={styles.modalContent}
-            keyboardShouldPersistTaps="handled"
-            showsVerticalScrollIndicator
-          >
-            <ModalSheetPanel title="Profile settings">
-              <View style={styles.actionsRow}>
-                <TouchableOpacity
-                  onPress={openEditor}
-                  disabled={openingEditor}
-                  style={[styles.buttonStyle, { borderColor: '#6249cabe' }]}
-                >
-                  <SymbolView
-                    name={{ ios: 'square.and.pencil', android: 'edit', web: 'edit' } as any}
-                    tintColor='#8769ffbe'
-                    size={20}
-                  />
-                  <ThemedText type="smallBold">
-                    Update profile
-                  </ThemedText>
-                </TouchableOpacity>
-              </View>
-            </ModalSheetPanel>
-
-            <ModalSheetPanel
-              title="Discovery preferences"
-              trailing={prefsSaved ? (
-                <ThemedText type="small" themeColor="textSecondary">
-                  Saved
-                </ThemedText>
-              ) : undefined}
-            >
-              <View style={styles.row}>
-                <View style={styles.field}>
-                  <ThemedText type="smallBold">Minimum age</ThemedText>
-                  <TextInput
-                    value={minAge}
-                    onChangeText={(text) => {
-                      setMinAge(sanitizeAge(text));
-                      setPrefsError(null);
-                    }}
-                    keyboardType="number-pad"
-                    maxLength={3}
-                    placeholder={String(MIN_ALLOWED_AGE)}
-                    placeholderTextColor={theme.iconMuted}
-                    style={[styles.input, { borderColor: theme.tabActiveBorder, color: theme.text }]}
-                  />
-                </View>
-                <View style={styles.field}>
-                  <ThemedText type="smallBold">Maximum age</ThemedText>
-                  <TextInput
-                    value={maxAge}
-                    onChangeText={(text) => {
-                      setMaxAge(sanitizeAge(text));
-                      setPrefsError(null);
-                    }}
-                    keyboardType="number-pad"
-                    maxLength={3}
-                    placeholder={String(MAX_ALLOWED_AGE)}
-                    placeholderTextColor={theme.iconMuted}
-                    style={[styles.input, { borderColor: theme.tabActiveBorder, color: theme.text }]}
-                  />
-                </View>
-              </View>
-
-              <View style={styles.fieldBlock}>
-                <ThemedText type="smallBold">Gender</ThemedText>
-                <View style={styles.segmented}>
-                  {GENDER_OPTIONS.map((option) => {
-                    const selected = option === gender;
-
-                    return (
-                      <TouchableOpacity
-                        key={option || 'any'}
-                        onPress={() => setGender(option)}
-                        style={[
-                          styles.segment,
-                          {
-                            borderColor: theme.tabActiveBorder,
-                            backgroundColor: selected ? theme.backgroundElement : 'transparent',
-                          },
-                        ]}
-                      >
-                        <ThemedText
-                          type="smallBold"
-                          style={[styles.segmentText, selected && styles.segmentTextSelected]}
-                        >
-                          {genderOptionLabel(option)}
-                        </ThemedText>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              </View>
-
-              <View style={[styles.fieldBlock, styles.countryFieldBlock]}>
-                <ThemedText type="smallBold">Country</ThemedText>
-                <SelectField
-                  value={country || COUNTRY_ANY}
-                  options={COUNTRY_OPTIONS}
-                  onChange={(value) => setCountry(value === COUNTRY_ANY ? '' : value)}
-                  placeholder="Any country"
-                  title="Country"
-                  searchable
-                  inlineOnWeb
-                />
-              </View>
-
-              <View style={styles.fieldBlock}>
-                <ThemedText type="smallBold">Interests</ThemedText>
-                <InterestsSelect value={interests} onChange={setInterests} requireMin={false} />
-              </View>
-
-              {prefsError && (
-                <ThemedText type="small" style={styles.errorText}>
-                  {prefsError}
-                </ThemedText>
-              )}
-
-              <View style={styles.actionsRow}>
-                <TouchableOpacity
-                  onPress={savePreferences}
-                  disabled={savingPrefs}
-                  style={[styles.buttonStyle]}
-                >
-                  <SymbolView
-                    name={{ ios: 'save', android: 'save', web: 'save' } as any}
-                    tintColor='#8769ffbe'
-                    size={20}
-                  />
-                  <ThemedText type="smallBold">
-                    Save changes
-                  </ThemedText>
-                </TouchableOpacity>
-              </View>
-            </ModalSheetPanel>
-
-            <ModalSheetPanel
-              title="Change password"
-              trailing={passwordChanged ? (
-                <ThemedText type="small" themeColor="textSecondary">
-                  Updated
-                </ThemedText>
-              ) : undefined}
-            >
-              <View style={styles.fieldBlock}>
-                <ThemedText type="smallBold">Current password</ThemedText>
-                <TextInput
-                  value={oldPassword}
-                  onChangeText={(text) => {
-                    setOldPassword(text);
-                    setPasswordError(null);
-                  }}
-                  secureTextEntry
-                  autoCapitalize="none"
-                  placeholder="Current password"
-                  placeholderTextColor={theme.iconMuted}
-                  style={[styles.input, { borderColor: theme.tabActiveBorder, color: theme.text }]}
-                />
-              </View>
-
-              <View style={styles.fieldBlock}>
-                <ThemedText type="smallBold">New password</ThemedText>
-                <TextInput
-                  value={newPassword}
-                  onChangeText={(text) => {
-                    setNewPassword(text);
-                    setPasswordError(null);
-                  }}
-                  secureTextEntry
-                  autoCapitalize="none"
-                  placeholder="New password"
-                  placeholderTextColor={theme.iconMuted}
-                  style={[styles.input, { borderColor: theme.tabActiveBorder, color: theme.text }]}
-                />
-              </View>
-
-              {passwordError && (
-                <ThemedText type="small" style={styles.errorText}>
-                  {passwordError}
-                </ThemedText>
-              )}
-
-              <View style={styles.actionsRow}>
-                <TouchableOpacity
-                  onPress={handleChangePassword}
-                  disabled={changingPassword}
-                  style={[styles.buttonStyle]}
-                >
-                  <SymbolView
-                    name={{ ios: 'lock', android: 'lock', web: 'lock' } as any}
-                    tintColor='#8769ffbe'
-                    size={20}
-                  />
-                  <ThemedText type="smallBold">
-                    Save new password
-                  </ThemedText>
-                </TouchableOpacity>
-              </View>
-            </ModalSheetPanel>
-
-            <View style={styles.actionsRow}>
+          {settingsView === 'profile' && profile ? (
+            <View style={styles.profileEditor}>
               <TouchableOpacity
-                onPress={onLogout}
-                style={[styles.buttonStyle, { borderColor: '#ef4444' }]}
+                onPress={() => setSettingsView('hub')}
+                style={[styles.backButton, styles.profileEditorBackButton]}
               >
                 <SymbolView
-                  name={{ ios: 'rectangle.portrait.and.arrow.right', android: 'logout', web: 'logout' } as any}
-                  tintColor="#ef4444"
-                  size={20}
+                  name={{ ios: 'chevron.left', android: 'arrow_back', web: 'arrow_back' } as any}
+                  tintColor='#8769ffbe'
+                  size={18}
                 />
-                <ThemedText type="smallBold">
-                  Logout
-                </ThemedText>
+                <ThemedText type="smallBold">Back to settings</ThemedText>
               </TouchableOpacity>
+              <OnboardingGate
+                embedded
+                initialProfile={profile}
+                onOnboardSuccess={() => void handleProfileUpdated()}
+              />
             </View>
-          </ScrollView>
+          ) : (
+            <ScrollView
+              style={styles.settingsScroll}
+              contentContainerStyle={styles.modalContent}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator
+            >
+              {settingsView === 'hub' ? (
+                <>
+                  <ModalSheetPanel title="Profile settings">
+                    <ThemedText type="small" themeColor="textSecondary">
+                      Update your public profile, photo, bio, and personal details.
+                    </ThemedText>
+                    <TouchableOpacity
+                      onPress={() => setSettingsView('profile')}
+                      style={[styles.buttonStyle, { borderColor: '#6249cabe' }]}
+                    >
+                      <SymbolView
+                        name={{ ios: 'square.and.pencil', android: 'edit', web: 'edit' } as any}
+                        tintColor='#8769ffbe'
+                        size={20}
+                      />
+                      <ThemedText type="smallBold">Edit profile</ThemedText>
+                    </TouchableOpacity>
+                  </ModalSheetPanel>
+
+                  <ModalSheetPanel
+                    title="Discovery preferences"
+                    trailing={prefsSaved ? (
+                      <ThemedText type="small" themeColor="textSecondary">Saved</ThemedText>
+                    ) : undefined}
+                  >
+                    <ThemedText type="small" themeColor="textSecondary">
+                      Control the age range, genders, countries, and interests you discover.
+                    </ThemedText>
+                    <TouchableOpacity
+                      onPress={() => {
+                        setPrefsSaved(false);
+                        setSettingsView('discovery');
+                      }}
+                      style={[styles.buttonStyle, { borderColor: '#6249cabe' }]}
+                    >
+                      <SymbolView
+                        name={{ ios: 'slider.horizontal.3', android: 'tune', web: 'tune' } as any}
+                        tintColor='#8769ffbe'
+                        size={20}
+                      />
+                      <ThemedText type="smallBold">Edit discovery preferences</ThemedText>
+                    </TouchableOpacity>
+                  </ModalSheetPanel>
+
+                  <ModalSheetPanel
+                    title="Change password"
+                    trailing={passwordChanged ? (
+                      <ThemedText type="small" themeColor="textSecondary">
+                        Updated
+                      </ThemedText>
+                    ) : undefined}
+                  >
+                    <View style={styles.fieldBlock}>
+                      <ThemedText type="smallBold">Current password</ThemedText>
+                      <TextInput
+                        value={oldPassword}
+                        onChangeText={(text) => {
+                          setOldPassword(text);
+                          setPasswordError(null);
+                        }}
+                        secureTextEntry
+                        autoCapitalize="none"
+                        placeholder="Current password"
+                        placeholderTextColor={theme.iconMuted}
+                        style={[styles.input, { borderColor: theme.tabActiveBorder, color: theme.text }]}
+                      />
+                    </View>
+
+                    <View style={styles.fieldBlock}>
+                      <ThemedText type="smallBold">New password</ThemedText>
+                      <TextInput
+                        value={newPassword}
+                        onChangeText={(text) => {
+                          setNewPassword(text);
+                          setPasswordError(null);
+                        }}
+                        secureTextEntry
+                        autoCapitalize="none"
+                        placeholder="New password"
+                        placeholderTextColor={theme.iconMuted}
+                        style={[styles.input, { borderColor: theme.tabActiveBorder, color: theme.text }]}
+                      />
+                    </View>
+
+                    {passwordError && (
+                      <ThemedText type="small" style={styles.errorText}>
+                        {passwordError}
+                      </ThemedText>
+                    )}
+
+                    <TouchableOpacity
+                      onPress={handleChangePassword}
+                      disabled={changingPassword}
+                      style={[styles.buttonStyle, { borderColor: '#6249cabe' }]}
+                    >
+                      <SymbolView
+                        name={{ ios: 'lock', android: 'lock', web: 'lock' } as any}
+                        tintColor='#8769ffbe'
+                        size={20}
+                      />
+                      <ThemedText type="smallBold">
+                        Save new password
+                      </ThemedText>
+                    </TouchableOpacity>
+                  </ModalSheetPanel>
+
+                  <TouchableOpacity
+                    onPress={onLogout}
+                    style={[styles.buttonStyle, { borderColor: '#ef4444' }]}
+                  >
+                    <SymbolView
+                      name={{ ios: 'rectangle.portrait.and.arrow.right', android: 'logout', web: 'logout' } as any}
+                      tintColor="#ef4444"
+                      size={20}
+                    />
+                    <ThemedText type="smallBold">Logout</ThemedText>
+                  </TouchableOpacity>
+                </>
+              ) : settingsView === 'discovery' ? (
+                <>
+                  <TouchableOpacity
+                    onPress={() => setSettingsView('hub')}
+                    style={styles.backButton}
+                  >
+                    <SymbolView
+                      name={{ ios: 'chevron.left', android: 'arrow_back', web: 'arrow_back' } as any}
+                      tintColor='#8769ffbe'
+                      size={18}
+                    />
+                    <ThemedText type="smallBold">Back to settings</ThemedText>
+                  </TouchableOpacity>
+                  <ModalSheetPanel>
+                    <DiscoveryPreferencesForm
+                      onSaved={() => {
+                        setPrefsSaved(true);
+                        setSettingsView('hub');
+                      }}
+                    />
+                  </ModalSheetPanel>
+                </>
+              ) : null}
+            </ScrollView>
+          )}
         </ResponsiveModalSheet>
       </SafeAreaView>
     </ThemedView>
@@ -721,7 +597,6 @@ const styles = StyleSheet.create({
     flex: 1,
     maxWidth: MaxContentWidth,
     width: '100%',
-    marginLeft: Platform.OS === 'web' ? 100 : 0,
   },
   content: {
     padding: Spacing.three,
@@ -742,29 +617,31 @@ const styles = StyleSheet.create({
     gap: Spacing.three,
     backgroundColor: 'rgba(0, 0, 0, 0.08)',
   },
+  mobilePanel: {
+    padding: Spacing.two,
+  },
   panelHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: Spacing.two,
   },
-  row: {
+  backButton: {
+    minHeight: 40,
+    alignSelf: 'flex-start',
     flexDirection: 'row',
-    gap: Spacing.three,
-  },
-  field: {
-    flex: 1,
+    alignItems: 'center',
     gap: Spacing.one,
   },
-  // Full-width stacked fields (gender, country, interests). Unlike `field`, these
-  // must NOT flex: inside the modal's scroll column a flex-basis:0 item collapses
-  // and lets the following buttons overlap the tall interest chip grid.
+  profileEditor: {
+    flex: 1,
+  },
+  profileEditorBackButton: {
+    marginHorizontal: Spacing.three,
+    marginTop: Spacing.two,
+  },
   fieldBlock: {
     gap: Spacing.one,
-  },
-  countryFieldBlock: {
-    position: 'relative',
-    zIndex: 10,
   },
   input: {
     minHeight: 44,
@@ -774,34 +651,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     backgroundColor: 'rgba(255, 255, 255, 0.06)',
-  },
-  segmented: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Spacing.two,
-  },
-  segment: {
-    flexGrow: 1,
-    minWidth: '22%',
-    minHeight: 40,
-    borderWidth: 1,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: Spacing.two,
-  },
-  segmentText: {
-    fontSize: 13,
-    lineHeight: 18,
-    textAlign: 'center',
-  },
-  segmentTextSelected: {
-    color: '#ffffff',
-  },
-  actionsRow: {
-    flexDirection: 'row',
-    gap: Spacing.two,
-    flexWrap: 'wrap',
   },
   buttonStyle: {
     borderColor: '#6249cabe',
@@ -838,6 +687,14 @@ const styles = StyleSheet.create({
     alignItems: 'stretch',
     flexWrap: 'wrap',
   },
+  mobileBioInterestsRow: {
+    flexDirection: 'column',
+  },
+  mobileProfileColumn: {
+    width: '100%',
+    minWidth: 0,
+    padding: Spacing.two,
+  },
   bioColumn: {
     flex: 1,
     minWidth: 220,
@@ -861,6 +718,9 @@ const styles = StyleSheet.create({
     gap: Spacing.three,
     alignItems: 'flex-start',
   },
+  mobileProfileTopRow: {
+    alignItems: 'center',
+  },
   avatar: {
     width: 120,
     height: 120,
@@ -868,6 +728,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#6249cabe',
     backgroundColor: Colors.dark.backgroundSelected,
+  },
+  mobileAvatar: {
+    width: 88,
+    height: 88,
   },
   avatarOverlay: {
     position: 'absolute',
@@ -920,9 +784,8 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   panelHeaderText: {
-    bottom: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
+    bottom: 10,
+    lineHeight: 22,
   },
   iconButton: {
     width: 44,

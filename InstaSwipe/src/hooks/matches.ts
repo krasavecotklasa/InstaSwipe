@@ -4,7 +4,7 @@ import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 
 import { API_PREFIX } from '@/hooks/api';
-import { authorizedFetch } from '@/hooks/auth';
+import { authorizedFetch, getCurrentUserId } from '@/hooks/auth';
 import { normalizeMediaUrl } from '@/hooks/media';
 
 const DISCOVERY_BASE_PATH = `${API_PREFIX}/discovery`;
@@ -66,6 +66,7 @@ export interface DiscoveryPreferences {
 }
 
 export type SwipeStatus = 'PASSED' | 'LIKED' | 'MATCHED';
+export type ProfileDecision = 'liked' | 'passed';
 
 export interface SwipeResult {
   status: SwipeStatus;
@@ -73,8 +74,14 @@ export interface SwipeResult {
 }
 
 const DISCOVERY_PREFERENCES_KEY = 'discovery_preferences';
+const PROFILE_DECISIONS_KEY = 'profile_decisions';
 
 const isWebPlatform = () => Platform.OS === 'web';
+
+const getProfileDecisionsStorageKey = async () => {
+  const currentUserId = await getCurrentUserId();
+  return `${PROFILE_DECISIONS_KEY}_${currentUserId ?? 'anonymous'}`;
+};
 
 const appendNumberParam = (params: URLSearchParams, key: string, value?: number) => {
   if (typeof value === 'number' && Number.isFinite(value)) {
@@ -150,6 +157,18 @@ export const getDiscoveryPreferences = async (): Promise<DiscoveryPreferences> =
   }
 };
 
+export const hasDiscoveryPreferences = async (): Promise<boolean> => {
+  try {
+    const rawValue = isWebPlatform()
+      ? window.localStorage.getItem(DISCOVERY_PREFERENCES_KEY)
+      : await SecureStore.getItemAsync(DISCOVERY_PREFERENCES_KEY);
+
+    return rawValue !== null;
+  } catch {
+    return false;
+  }
+};
+
 const normalizeDiscoveryProfile = (profile: DiscoveryProfile): DiscoveryProfile => ({
   ...profile,
   profilePictureUrl: normalizeMediaUrl(profile.profilePictureUrl),
@@ -214,6 +233,52 @@ export class MatchAPI {
 export const getDiscovery = MatchAPI.getDiscovery;
 export const lovePerson = MatchAPI.lovePerson;
 export const passPerson = MatchAPI.passPerson;
+
+const getStoredProfileDecisions = async (): Promise<Record<string, ProfileDecision>> => {
+  try {
+    const storageKey = await getProfileDecisionsStorageKey();
+    const rawValue = isWebPlatform()
+      ? window.localStorage.getItem(storageKey)
+      : await SecureStore.getItemAsync(storageKey);
+    if (!rawValue) {
+      return {};
+    }
+
+    const parsed = JSON.parse(rawValue) as Record<string, unknown>;
+    return Object.fromEntries(
+      Object.entries(parsed).filter((entry): entry is [string, ProfileDecision] => (
+        entry[1] === 'liked' || entry[1] === 'passed'
+      )),
+    );
+  } catch {
+    return {};
+  }
+};
+
+export const getProfileDecision = async (userId: string): Promise<ProfileDecision | null> => {
+  const decisions = await getStoredProfileDecisions();
+  return decisions[userId] ?? null;
+};
+
+export const setProfileDecision = async (userId: string, decision: ProfileDecision) => {
+  const decisions = await getStoredProfileDecisions();
+  const serialized = JSON.stringify({ ...decisions, [userId]: decision });
+  const storageKey = await getProfileDecisionsStorageKey();
+
+  if (isWebPlatform()) {
+    window.localStorage.setItem(storageKey, serialized);
+  } else {
+    await SecureStore.setItemAsync(storageKey, serialized);
+  }
+};
+
+export const decideOnProfile = async (userId: string, action: 'love' | 'pass') => {
+  const result = action === 'love'
+    ? await lovePerson(userId)
+    : await passPerson(userId);
+  await setProfileDecision(userId, action === 'love' ? 'liked' : 'passed');
+  return result;
+};
 
 export const getPublicProfile = async (userId: string): Promise<DiscoveryProfile> => {
   const response = await authorizedFetch(`${PROFILE_BASE_PATH}/${userId}`, {
@@ -342,9 +407,7 @@ export function useDiscoverySwipe() {
     setResultMessage(null);
 
     try {
-      const result = action === 'love'
-        ? await lovePerson(currentProfile.id)
-        : await passPerson(currentProfile.id);
+      const result = await decideOnProfile(currentProfile.id, action);
 
       setResultMessage(formatResultMessage(result));
       setProfiles((current) => current.slice(1));

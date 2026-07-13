@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
@@ -24,20 +24,10 @@ const SWIPE_THRESHOLD = 120;
 const SWIPE_OUT_DISTANCE = 700;
 const PROFILE_OPEN_THRESHOLD = 90;
 
-/* eslint-disable react-hooks/refs -- This screen uses React Native's legacy Animated API
- * (Animated.ValueXY via useRef), the standard native-driven pattern for gesture-based
- * animation in React Native: the ref's identity is stable across renders, and its value is
- * mutated imperatively outside React's render cycle via the native driver, bypassing normal
- * re-renders for performance. That predates and is unrelated to the mutable-ref-as-state
- * pattern this rule targets. The modern Compiler-friendly replacement is
- * react-native-reanimated's useSharedValue (already a dependency), but migrating this
- * screen's gesture+animation logic to it is a larger rewrite warranting its own dedicated
- * pass and testing on this core swipe screen, not a lint-sweep side effect. */
-
 export default function MatchScreen() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
-  const position = useRef(new Animated.ValueXY()).current;
+  const [position] = useState(() => new Animated.ValueXY());
   const {
     currentProfile,
     loading,
@@ -55,31 +45,28 @@ export default function MatchScreen() {
     position.setValue({ x: 0, y: 0 });
   }, [currentProfile?.id, position]);
 
-  const openProfileModal = () => {
+  const openProfileModal = useCallback(() => {
     if (!currentProfile) {
       return;
     }
 
     setProfileModalProfile(currentProfile);
-  };
+  }, [currentProfile]);
 
   const closeProfileModal = () => {
     setProfileModalProfile(null);
   };
 
-  const resetCardPosition = () => {
+  const resetCardPosition = useCallback(() => {
     Animated.spring(position, {
       toValue: { x: 0, y: 0 },
       useNativeDriver: true,
       friction: 6,
       tension: 60,
     }).start();
-  };
+  }, [position]);
 
-  // Take the single-decision lock at gesture release (before the animation), so a
-  // second swipe or a button tap during the 180ms animation can't queue a second
-  // decision. The lock is released inside finishDecision once the swipe resolves.
-  const finishSwipe = (action: 'love' | 'pass') => {
+  const finishSwipe = useCallback((action: 'love' | 'pass') => {
     if (!beginDecision()) {
       resetCardPosition();
       return;
@@ -97,7 +84,7 @@ export default function MatchScreen() {
         resetCardPosition();
       }
     });
-  };
+  }, [beginDecision, finishDecision, position, resetCardPosition]);
 
   const panResponder = useMemo(
     () => PanResponder.create({
@@ -137,8 +124,7 @@ export default function MatchScreen() {
       },
       onPanResponderTerminate: resetCardPosition,
     }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [acting, currentProfile, position],
+    [acting, currentProfile, finishSwipe, openProfileModal, position, resetCardPosition],
   );
 
   const cardAnimatedStyle = {
@@ -174,7 +160,7 @@ export default function MatchScreen() {
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-        <Header title='Match'/>
+        <Header title='Match' />
         <View style={[styles.content, { paddingBottom: bottomClearance }]}>
           <View style={styles.header} />
 
@@ -292,6 +278,7 @@ export default function MatchScreen() {
         visible={Boolean(profileModalProfile)}
         profile={profileModalProfile}
         onClose={closeProfileModal}
+        onDecision={handleDecision}
       />
     </ThemedView>
   );

@@ -50,7 +50,12 @@ export function useMediaStatusPolling(
       onPollRef.current();
     }, intervalMs);
 
-    return () => clearInterval(interval);
+    // When status leaves 'PROCESSING' the effect re-runs and this cleanup
+    // fires, resetting timedOut without a synchronous setState in the body.
+    return () => {
+      clearInterval(interval);
+      setTimedOut(false);
+    };
   }, [status, intervalMs, maxAttempts]);
 
   return { timedOut };

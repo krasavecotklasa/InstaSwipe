@@ -4,17 +4,25 @@ import {
   NativeScrollEvent,
   NativeSyntheticEvent,
   Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   View,
 } from 'react-native';
 import { Image } from 'expo-image';
+import { SymbolView } from 'expo-symbols';
 
 import { PostCard, type Post } from '@/components/post-card';
 import ResponsiveModalSheet, { ModalSheetPanel } from '@/components/responsive-modal-sheet';
 import { ThemedText } from '@/components/themed-text';
 import { Colors, Spacing } from '@/constants/theme';
-import { type DiscoveryProfile } from '@/hooks/matches';
+import {
+  decideOnProfile,
+  type DiscoveryProfile,
+  getProfileDecision,
+  type ProfileDecision,
+  setProfileDecision,
+} from '@/hooks/matches';
 import { fetchUserPostsPage } from '@/hooks/posts';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -26,12 +34,16 @@ interface DiscoveryProfileModalProps {
   visible: boolean;
   profile: DiscoveryProfile | null;
   onClose: () => void;
+  initialDecision?: ProfileDecision | null;
+  onDecision?: (action: 'love' | 'pass') => Promise<boolean>;
 }
 
 export default function DiscoveryProfileModal({
   visible,
   profile,
   onClose,
+  initialDecision = null,
+  onDecision,
 }: DiscoveryProfileModalProps) {
   const theme = useTheme();
   const isWeb = Platform.OS === 'web';
@@ -43,6 +55,10 @@ export default function DiscoveryProfileModal({
   const [loadingMorePosts, setLoadingMorePosts] = useState(false);
   const [postsError, setPostsError] = useState<string | null>(null);
   const [loadedProfileId, setLoadedProfileId] = useState<string | null>(null);
+  const [decision, setDecision] = useState<ProfileDecision | null>(initialDecision);
+  const [loadingDecision, setLoadingDecision] = useState(false);
+  const [savingDecision, setSavingDecision] = useState(false);
+  const [decisionError, setDecisionError] = useState<string | null>(null);
 
   const resetPosts = useCallback(() => {
     setPosts([]);
@@ -54,6 +70,11 @@ export default function DiscoveryProfileModal({
   }, []);
 
   const loadProfilePosts = useCallback(async (profileId: string, page: number) => {
+    await Promise.resolve();
+    if (activeProfileIdRef.current !== profileId) {
+      return;
+    }
+
     if (page === 0) {
       setLoadingPosts(true);
     } else {
@@ -100,9 +121,6 @@ export default function DiscoveryProfileModal({
     }
   }, []);
 
-  // Reset synchronously during render when the target profile changes (React's documented
-  // alternative to an Effect for this: https://react.dev/learn/you-might-not-need-an-effect).
-  // The ref write and the actual fetch are real side effects and stay in the Effect below.
   const targetProfileId = visible && profile ? profile.id : null;
   if (targetProfileId !== loadedProfileId) {
     setLoadedProfileId(targetProfileId);
@@ -112,13 +130,71 @@ export default function DiscoveryProfileModal({
   useEffect(() => {
     activeProfileIdRef.current = targetProfileId;
     if (targetProfileId) {
-      // loadProfilePosts sets its loading state synchronously before its first await (so the
-      // spinner shows immediately) - standard fetch-on-mount UX, not the derived-state pattern
-      // this rule targets.
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      void loadProfilePosts(targetProfileId, 0);
+      void Promise.resolve().then(() => loadProfilePosts(targetProfileId, 0));
     }
   }, [targetProfileId, loadProfilePosts]);
+
+  useEffect(() => {
+    let active = true;
+    const loadDecision = async () => {
+      await Promise.resolve();
+      if (!active) {
+        return;
+      }
+
+      setDecision(initialDecision);
+      setDecisionError(null);
+
+      if (!targetProfileId || initialDecision) {
+        if (targetProfileId && initialDecision) {
+          await setProfileDecision(targetProfileId, initialDecision);
+        }
+        if (active) {
+          setLoadingDecision(false);
+        }
+        return;
+      }
+
+      setLoadingDecision(true);
+      const storedDecision = await getProfileDecision(targetProfileId);
+      if (active) {
+        setDecision(storedDecision);
+        setLoadingDecision(false);
+      }
+    };
+
+    void loadDecision();
+
+    return () => {
+      active = false;
+    };
+  }, [targetProfileId, initialDecision]);
+
+  const handleDecision = async (action: 'love' | 'pass') => {
+    if (!profile || savingDecision || decision) {
+      return;
+    }
+
+    setSavingDecision(true);
+    setDecisionError(null);
+    try {
+      const applied = onDecision
+        ? await onDecision(action)
+        : Boolean(await decideOnProfile(profile.id, action));
+      if (!applied) {
+        setDecisionError('Could not save your choice. Please try again.');
+        return;
+      }
+
+      const nextDecision = action === 'love' ? 'liked' : 'passed';
+      await setProfileDecision(profile.id, nextDecision);
+      setDecision(nextDecision);
+    } catch (error) {
+      setDecisionError(error instanceof Error ? error.message : 'Could not save your choice.');
+    } finally {
+      setSavingDecision(false);
+    }
+  };
 
   const loadMorePosts = () => {
     if (!profile || loadingPosts || loadingMorePosts || postsLast) {
@@ -180,7 +256,52 @@ export default function DiscoveryProfileModal({
                     Gender: <ThemedText type="small" themeColor="textSecondary" style={styles.profileMetaDetail}>{profile.gender}</ThemedText>
                   </ThemedText>
                 </View>
+
+                <View style={styles.decisionActions}>
+                  {loadingDecision ? (
+                    <ActivityIndicator color={theme.text} />
+                  ) : decision ? (
+                    <ThemedText
+                      type="smallBold"
+                      style={decision === 'liked' ? {color: '#17de60'} : {color: '#ef4444'}}
+                    >
+                      {decision === 'liked' ? 'Liked' : 'Passed'}
+                    </ThemedText>
+                  ) : (
+                    <>
+                      <Pressable
+                        onPress={() => void handleDecision('pass')}
+                        disabled={savingDecision}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Pass on ${profile.displayName}`}
+                        style={[styles.decisionButton, styles.passButton, savingDecision && styles.disabledButton]}
+                      >
+                        <SymbolView
+                          name={{ ios: 'xmark', android: 'close', web: 'close' } as any}
+                          tintColor="#ffffff"
+                          size={24}
+                        />
+                      </Pressable>
+                      <Pressable
+                        onPress={() => void handleDecision('love')}
+                        disabled={savingDecision}
+                        accessibilityRole="button"
+                        style={[styles.decisionButton, styles.likeButton, savingDecision && styles.disabledButton]}
+                      >
+                        <SymbolView
+                          name={{ ios: 'heart.fill', android: 'favorite', web: 'favorite' } as any}
+                          tintColor="#ffffff"
+                          size={24}
+                        />
+                      </Pressable>
+                    </>
+                  )}
+                </View>
               </View>
+
+              {decisionError ? (
+                <ThemedText type="small" style={styles.errorText}>{decisionError}</ThemedText>
+              ) : null}
 
               <View style={styles.bioInterestsRow}>
                 <View style={[styles.bioColumn, { borderColor: theme.tabActiveBorder }]}>
@@ -285,6 +406,43 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 180,
     gap: Spacing.one,
+  },
+  decisionActions: {
+    marginLeft: 'auto',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: Spacing.two,
+    minHeight: 40,
+  },
+  decisionButton: {
+    width: 50,
+    height: 50,
+    borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.28,
+    shadowRadius: 12,
+  },
+  passButton: {
+    backgroundColor: '#ff3131',
+  },
+  likeButton: {
+    backgroundColor: '#17de60',
+  },
+  disabledButton: {
+    opacity: 0.6,
+  },
+  decisionButtonText: {
+    color: '#ffffff',
+  },
+  likedText: {
+    color: '#17de60',
+  },
+  passedText: {
+    color: '#ef4444',
   },
   profileName: {
     fontSize: 18,
