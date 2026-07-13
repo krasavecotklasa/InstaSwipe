@@ -6,17 +6,19 @@ import { useColorScheme } from 'react-native';
 import AppTabs from '@/components/app-tabs';
 import AuthGate from '@/components/auth-gate';
 import OnboardingGate from '@/components/onboarding-gate';
-import { getAccessToken, logout, API, OwnProfileResponse } from '@/hooks/auth';
+import { getAccessToken, logout, API } from '@/hooks/auth';
 import { AuthContext } from '@/context/auth-context';
 import { registerForPushNotificationsAsync, registerNotificationTokenAsync } from '@/hooks/notifications';
+import { hasDiscoveryPreferences } from '@/hooks/matches';
+
+type OnboardingStep = 'profile' | 'discovery';
 
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
-  const [needsOnboarding, setNeedsOnboarding] = useState<boolean | null>(null);
-  const [profileEditorProfile, setProfileEditorProfile] = useState<OwnProfileResponse | null>(null);
+  const [onboardingStep, setOnboardingStep] = useState<OnboardingStep | null | undefined>(undefined);
 
   useEffect(() => {
     async function checkAuth() {
@@ -27,7 +29,7 @@ export default function RootLayout() {
   }, []);
 
   // Once authenticated, check whether onboarding is required. Transitions back to
-  // unauthenticated reset needsOnboarding at their source (onLogout, the 401 handler
+  // unauthenticated reset onboardingStep at their source (onLogout, the 401 handler
   // below) rather than reactively here, so this effect only needs to act when signed in.
   useEffect(() => {
     if (!isAuthenticated) {
@@ -38,16 +40,20 @@ export default function RootLayout() {
         const response = await API.getProfileStatus();
         if (response.ok) {
           const data = await response.json();
-          setNeedsOnboarding(!!data.needsOnboarding);
+          if (data.needsOnboarding) {
+            setOnboardingStep('profile');
+          } else {
+            setOnboardingStep(await hasDiscoveryPreferences() ? null : 'discovery');
+          }
         } else if (response.status === 401) {
           setIsAuthenticated(false);
-          setNeedsOnboarding(null);
+          setOnboardingStep(undefined);
         } else {
           // If the status check fails, skip onboarding to avoid blocking the user
-          setNeedsOnboarding(false);
+          setOnboardingStep(null);
         }
       } catch {
-        setNeedsOnboarding(false);
+        setOnboardingStep(null);
       }
     }
     checkOnboarding();
@@ -56,7 +62,7 @@ export default function RootLayout() {
   // Register for push notifications once the user reaches the main app (fully
   // authenticated and onboarded). This is what triggers the OS permission prompt.
   useEffect(() => {
-    if (!isAuthenticated || needsOnboarding !== false) {
+    if (!isAuthenticated || onboardingStep !== null) {
       return;
     }
     async function registerPush() {
@@ -66,7 +72,7 @@ export default function RootLayout() {
       }
     }
     registerPush();
-  }, [isAuthenticated, needsOnboarding]);
+  }, [isAuthenticated, onboardingStep]);
 
   const authContextValue = useMemo(
     () => ({
@@ -74,10 +80,8 @@ export default function RootLayout() {
       onLogout: async () => {
         await logout();
         setIsAuthenticated(false);
-        setNeedsOnboarding(null);
-        setProfileEditorProfile(null);
+        setOnboardingStep(undefined);
       },
-      onEditProfile: (profile: OwnProfileResponse) => setProfileEditorProfile(profile),
     }),
     [],
   );
@@ -88,7 +92,7 @@ export default function RootLayout() {
   }
 
   // Still loading onboarding status
-  if (isAuthenticated && needsOnboarding === null) {
+  if (isAuthenticated && onboardingStep === undefined) {
     return null;
   }
 
@@ -98,15 +102,12 @@ export default function RootLayout() {
         {!isAuthenticated ? (
           // Not authenticated: show login / register
           <AuthGate onAuthSuccess={() => setIsAuthenticated(true)} />
-        ) : profileEditorProfile ? (
+        ) : onboardingStep ? (
+          // Authenticated but setup incomplete: finish profile and discovery onboarding.
           <OnboardingGate
-            mode="update"
-            initialProfile={profileEditorProfile}
-            onOnboardSuccess={() => setProfileEditorProfile(null)}
+            initialStep={onboardingStep}
+            onOnboardSuccess={() => setOnboardingStep(null)}
           />
-        ) : needsOnboarding ? (
-          // Authenticated but profile incomplete: show onboarding
-          <OnboardingGate onOnboardSuccess={() => setNeedsOnboarding(false)} />
         ) : (
           // Fully set up: render the main tab navigator
           <AppTabs />

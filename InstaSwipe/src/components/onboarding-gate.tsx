@@ -26,10 +26,15 @@ import { getImageValidationError } from '@/constants/media';
 import { normalizeMediaUrl } from '@/hooks/media';
 import { useTheme } from '@/hooks/use-theme';
 import { SymbolView } from 'expo-symbols';
+import { DiscoveryPreferencesForm } from '@/components/discovery-preferences-form';
+
+type OnboardingStep = 'profile' | 'discovery';
 
 interface OnboardingGateProps {
   onOnboardSuccess: () => void;
   mode?: 'create' | 'update';
+  initialStep?: OnboardingStep;
+  embedded?: boolean;
   initialProfile?: Pick<OwnProfileResponse, 'displayName' | 'bio' | 'birthDate' | 'country' | 'gender' | 'interests' | 'profilePictureUrl'>;
 }
 
@@ -63,7 +68,14 @@ const getAge = (isoDate: string) => {
   return age;
 };
 
-export default function OnboardingGate({ onOnboardSuccess, mode = 'create', initialProfile }: OnboardingGateProps) {
+export default function OnboardingGate({
+  onOnboardSuccess,
+  mode = 'create',
+  initialStep = 'profile',
+  embedded = false,
+  initialProfile,
+}: OnboardingGateProps) {
+  const [step, setStep] = useState<OnboardingStep>(mode === 'update' ? 'profile' : initialStep);
   const [displayName, setDisplayName] = useState(initialProfile?.displayName ?? '');
   const [bio, setBio] = useState(initialProfile?.bio ?? '');
   const [birthDate, setBirthDate] = useState(initialProfile?.birthDate ?? '');
@@ -79,9 +91,17 @@ export default function OnboardingGate({ onOnboardSuccess, mode = 'create', init
   const insets = useSafeAreaInsets();
   const currentProfilePictureUrl = normalizeMediaUrl(initialProfile?.profilePictureUrl);
 
-  // Re-sync the form when the parent hands us a different profile to edit (identity is
-  // stable across re-renders - it only changes via the parent's onEditProfile setter - so
-  // reference equality is safe here). Done during render rather than in an Effect, since
+  const handleProfileSaved = () => {
+    if (mode === 'create') {
+      setStep('discovery');
+    } else {
+      onOnboardSuccess();
+    }
+  };
+
+  // Re-sync the form when the parent hands us a refreshed profile to edit (identity is
+  // stable until the parent replaces the profile after a successful save, so reference
+  // equality is safe here). Done during render rather than in an Effect, since
   // there's no external system involved, just local state (React's documented pattern:
   // https://react.dev/learn/you-might-not-need-an-effect).
   if (initialProfile !== syncedProfile) {
@@ -169,7 +189,7 @@ export default function OnboardingGate({ onOnboardSuccess, mode = 'create', init
         });
 
         if (uploadResult.status >= 200 && uploadResult.status < 300) {
-          onOnboardSuccess();
+          handleProfileSaved();
         } else {
           let errorMsg = 'Could not update profile';
           try {
@@ -210,7 +230,7 @@ export default function OnboardingGate({ onOnboardSuccess, mode = 'create', init
 
         const response = await API.updateProfile(formData);
         if (response.ok) {
-          onOnboardSuccess();
+          handleProfileSaved();
         } else {
           const errorData = await response.json().catch(() => ({}));
           errorHandle(errorData.message || 'Could not update profile');
@@ -224,6 +244,37 @@ export default function OnboardingGate({ onOnboardSuccess, mode = 'create', init
     }
   };
 
+  if (mode === 'create' && step === 'discovery') {
+    return (
+      <ThemedView style={styles.container}>
+        <KeyboardAvoidingView
+          style={styles.keyboardAvoidingView}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={insets.top}
+        >
+          <SafeAreaView style={styles.safeArea}>
+            <ScrollView
+              contentContainerStyle={[styles.scrollContent, embedded && styles.embeddedScrollContent]}
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="on-drag"
+            >
+              <View style={styles.discoveryContent}>
+                <ThemedText type="title" style={styles.title}>Set your discovery preferences</ThemedText>
+                <ThemedText style={styles.discoverySubtitle}>
+                  One last step. Tell us which profiles you would like to discover.
+                </ThemedText>
+                <DiscoveryPreferencesForm
+                  onSaved={onOnboardSuccess}
+                  submitLabel="Finish setup"
+                />
+              </View>
+            </ScrollView>
+          </SafeAreaView>
+        </KeyboardAvoidingView>
+      </ThemedView>
+    );
+  }
+
   return (
     <ThemedView style={styles.container}>
       <KeyboardAvoidingView
@@ -233,13 +284,15 @@ export default function OnboardingGate({ onOnboardSuccess, mode = 'create', init
       >
         <SafeAreaView style={styles.safeArea}>
           <ScrollView
-            contentContainerStyle={styles.scrollContent}
+            contentContainerStyle={[styles.scrollContent, embedded && styles.embeddedScrollContent]}
             keyboardShouldPersistTaps="handled"
             keyboardDismissMode="on-drag"
           >
-            <ThemedText type="title" style={styles.title}>
-              {mode === 'update' ? 'Update your profile' : "Let's finish setting up your profile"}
-            </ThemedText>
+            {!embedded ? (
+              <ThemedText type="title" style={styles.title}>
+                {mode === 'update' ? 'Update your profile' : "Let's finish setting up your profile"}
+              </ThemedText>
+            ) : null}
 
             <View style={styles.form}>
               <TouchableOpacity style={styles.avatarContainer} onPress={handlePickImage}>
@@ -358,6 +411,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingBottom: Spacing.six,
   },
+  embeddedScrollContent: {
+    justifyContent: 'flex-start',
+    paddingVertical: Spacing.four,
+  },
   title: {
     textAlign: 'center',
     marginBottom: Spacing.six,
@@ -367,6 +424,18 @@ const styles = StyleSheet.create({
     maxWidth: 400,
     width: '100%',
     alignSelf: 'center',
+  },
+  discoveryContent: {
+    gap: Spacing.three,
+    maxWidth: 520,
+    width: '100%',
+    alignSelf: 'center',
+  },
+  discoverySubtitle: {
+    textAlign: 'center',
+    marginTop: -Spacing.four,
+    marginBottom: Spacing.two,
+    opacity: 0.75,
   },
   avatarContainer: {
     alignSelf: 'center',

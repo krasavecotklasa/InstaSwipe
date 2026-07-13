@@ -4,7 +4,6 @@ import {
   ActivityIndicator,
   ScrollView,
   StyleSheet,
-  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -16,61 +15,24 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { PostCard, type Post } from '@/components/post-card';
 import ResponsiveModalSheet, { ModalSheetPanel } from '@/components/responsive-modal-sheet';
-import { SelectField } from '@/components/form/select-field';
-import { InterestsSelect } from '@/components/form/interests-select';
+import { DiscoveryPreferencesForm } from '@/components/discovery-preferences-form';
+import OnboardingGate from '@/components/onboarding-gate';
 import { BottomTabInset, Colors, MaxContentWidth, Spacing } from '@/constants/theme';
-import { COUNTRIES } from '@/constants/countries';
 import { useAuthContext } from '@/context/auth-context';
 import { API, type OwnProfileResponse } from '@/hooks/auth';
-import {
-  DISCOVERY_GENDER_LABELS,
-  DISCOVERY_GENDERS,
-  type DiscoveryPreferences,
-  type Gender,
-  getDiscoveryPreferences,
-  setDiscoveryPreferences,
-} from '@/hooks/matches';
 import { normalizeMediaUrl } from '@/hooks/media';
 import { useTheme } from '@/hooks/use-theme';
 import Header from '@/components/header';
 import { fetchUserPosts } from '@/hooks/posts';
 import { useResponsiveLayout } from '@/hooks/use-responsive-layout';
 
-const DEFAULT_PREFS: DiscoveryPreferences = {
-  minAge: '',
-  maxAge: '',
-  gender: '',
-  country: '',
-  interests: [],
-};
-
-// Includes an "Any" option ('') so a user can search all genders; '' means no
-// gender filter, which is what the backend expects when the param is omitted.
-const GENDER_OPTIONS: (Gender | '')[] = ['', ...DISCOVERY_GENDERS];
-const genderOptionLabel = (option: Gender | '') => (option === '' ? 'Any' : DISCOVERY_GENDER_LABELS[option]);
-
-// Country filter is optional: the "Any country" sentinel clears the filter ('').
-const COUNTRY_ANY = 'Any country';
-const COUNTRY_OPTIONS = [COUNTRY_ANY, ...COUNTRIES];
-
-// Discovery age filter bounds. The app's minimum age is 18, so a filter below
-// that can never match anyone; cap the top end at a sane upper bound.
-const MIN_ALLOWED_AGE = 18;
-const MAX_ALLOWED_AGE = 100;
-
-const toInputValue = (value: string | number | undefined) => {
-  return value == null ? '' : String(value);
-};
-
-// Keep age inputs numeric: strip anything that isn't a digit and cap the length
-// so free text like "9 years old" can't reach the saved preferences.
-const sanitizeAge = (text: string) => text.replace(/[^0-9]/g, '').slice(0, 3);
+type SettingsView = 'closed' | 'hub' | 'profile' | 'discovery';
 
 export default function ProfileScreen() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const {isMobileWeb, isDesktopWeb} = useResponsiveLayout();
-  const {onEditProfile, onLogout} = useAuthContext();
+  const {onLogout} = useAuthContext();
   const [profile, setProfile] = useState<OwnProfileResponse | null>(null);
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -79,26 +41,15 @@ export default function ProfileScreen() {
   const [postsError, setPostsError] = useState<string | null>(null);
   const hasLoadedPosts = useRef(false);
 
-  const [minAge, setMinAge] = useState('');
-  const [maxAge, setMaxAge] = useState('');
-  const [gender, setGender] = useState<Gender | ''>('');
-  const [country, setCountry] = useState('');
-  const [interests, setInterests] = useState<string[]>([]);
-  const [savingPrefs, setSavingPrefs] = useState(false);
   const [prefsSaved, setPrefsSaved] = useState(false);
-  const [prefsError, setPrefsError] = useState<string | null>(null);
-  const [openingEditor, setOpeningEditor] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
+  const [settingsView, setSettingsView] = useState<SettingsView>('closed');
 
   useEffect(() => {
     let isActive = true;
 
     (async () => {
       try {
-        const [profileResponse, savedPreferences] = await Promise.all([
-          API.getOwnProfile(),
-          getDiscoveryPreferences(),
-        ]);
+        const profileResponse = await API.getOwnProfile();
 
         if (!isActive) {
           return;
@@ -120,20 +71,6 @@ export default function ProfileScreen() {
           profilePictureUrl: normalizeMediaUrl(profileData.profilePictureUrl),
         });
 
-        const mergedPreferences = {
-          ...DEFAULT_PREFS,
-          gender: savedPreferences.gender,
-          country: savedPreferences.country || '',
-          interests: savedPreferences.interests || [],
-          minAge: savedPreferences.minAge || '',
-          maxAge: savedPreferences.maxAge || '',
-        } satisfies DiscoveryPreferences;
-
-        setMinAge(toInputValue(mergedPreferences.minAge));
-        setMaxAge(toInputValue(mergedPreferences.maxAge));
-        setGender(mergedPreferences.gender);
-        setCountry(mergedPreferences.country);
-        setInterests(mergedPreferences.interests);
       } catch (loadError) {
         if (isActive) {
           setError(loadError instanceof Error ? loadError.message : 'Could not load profile');
@@ -182,55 +119,30 @@ export default function ProfileScreen() {
       }, [loadPosts]),
   );
 
-  const savePreferences = async () => {
-    const parsedMin = minAge.trim() ? Number(minAge) : null;
-    const parsedMax = maxAge.trim() ? Number(maxAge) : null;
-
-    if (parsedMin !== null && (parsedMin < MIN_ALLOWED_AGE || parsedMin > MAX_ALLOWED_AGE)) {
-      setPrefsError(`Minimum age must be between ${MIN_ALLOWED_AGE} and ${MAX_ALLOWED_AGE}.`);
-      return;
-    }
-    if (parsedMax !== null && (parsedMax < MIN_ALLOWED_AGE || parsedMax > MAX_ALLOWED_AGE)) {
-      setPrefsError(`Maximum age must be between ${MIN_ALLOWED_AGE} and ${MAX_ALLOWED_AGE}.`);
-      return;
-    }
-    if (parsedMin !== null && parsedMax !== null && parsedMin > parsedMax) {
-      setPrefsError('Minimum age cannot be greater than maximum age.');
-      return;
-    }
-
-    setSavingPrefs(true);
-    setPrefsSaved(false);
-    setPrefsError(null);
-    setError(null);
-
-    try {
-      await setDiscoveryPreferences({
-        minAge: parsedMin ?? '',
-        maxAge: parsedMax ?? '',
-        gender,
-        country,
-        interests,
-      });
-      setPrefsSaved(true);
-    } catch (saveError) {
-      setPrefsError(saveError instanceof Error ? saveError.message : 'Could not save preferences');
-    } finally {
-      setSavingPrefs(false);
-    }
-  };
-
-  const openEditor = async () => {
+  const handleProfileUpdated = async () => {
     if (!profile) {
       return;
     }
 
-    setOpeningEditor(true);
     try {
-      setShowSettings(false);
-      onEditProfile(profile);
-    } finally {
-      setOpeningEditor(false);
+      const response = await API.getOwnProfile();
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({})) as { message?: string };
+        setError(errorData.message || 'Profile updated, but it could not be refreshed.');
+        setSettingsView('hub');
+        return;
+      }
+
+      const profileData: OwnProfileResponse = await response.json();
+      setProfile({
+        ...profileData,
+        id: profileData.id ?? profileData.userId,
+        profilePictureUrl: normalizeMediaUrl(profileData.profilePictureUrl),
+      });
+      setSettingsView('hub');
+    } catch (refreshError) {
+      setError(refreshError instanceof Error ? refreshError.message : 'Could not refresh your profile.');
+      setSettingsView('hub');
     }
   };
 
@@ -272,7 +184,7 @@ export default function ProfileScreen() {
                         Your profile
                       </ThemedText>
                       <TouchableOpacity
-                          onPress={() => setShowSettings(true)}
+                          onPress={() => setSettingsView('hub')}
                           style={[styles.iconButton, {borderColor: theme.tabActiveBorder}]}
                           accessibilityRole="button"
                           accessibilityLabel="Open settings"
@@ -385,165 +297,123 @@ export default function ProfileScreen() {
           </ScrollView>
 
           <ResponsiveModalSheet
-              visible={showSettings}
-              onClose={() => setShowSettings(false)}
-              title="Settings"
+              visible={settingsView !== 'closed'}
+              onClose={() => setSettingsView('closed')}
+              title={settingsView === 'profile'
+                ? 'Profile settings'
+                : settingsView === 'discovery'
+                  ? 'Discovery preferences'
+                  : 'Settings'}
               closeAccessibilityLabel="Close settings"
           >
-            <ScrollView
+            {settingsView === 'profile' && profile ? (
+              <View style={styles.profileEditor}>
+                <TouchableOpacity
+                    onPress={() => setSettingsView('hub')}
+                    style={[styles.backButton, styles.profileEditorBackButton]}
+                >
+                  <SymbolView
+                      name={{ios: 'chevron.left', android: 'arrow_back', web: 'arrow_back'} as any}
+                      tintColor='#8769ffbe'
+                      size={18}
+                  />
+                  <ThemedText type="smallBold">Back to settings</ThemedText>
+                </TouchableOpacity>
+                <OnboardingGate
+                    mode="update"
+                    embedded
+                    initialProfile={profile}
+                    onOnboardSuccess={() => void handleProfileUpdated()}
+                />
+              </View>
+            ) : (
+              <ScrollView
                 style={styles.settingsScroll}
                 contentContainerStyle={styles.modalContent}
                 keyboardShouldPersistTaps="handled"
                 showsVerticalScrollIndicator
-            >
-              <ModalSheetPanel title="Profile settings">
-                <View style={styles.actionsRow}>
-                  <TouchableOpacity
-                      onPress={openEditor}
-                      disabled={openingEditor}
-                      style={[styles.buttonStyle, {borderColor: '#6249cabe'}]}
-                  >
-                    <SymbolView
-                        name={{ios: 'square.and.pencil', android: 'edit', web: 'edit'} as any}
-                        tintColor='#8769ffbe'
-                        size={20}
-                    />
-                    <ThemedText type="smallBold">
-                      Update profile
-                    </ThemedText>
-                  </TouchableOpacity>
-                </View>
-              </ModalSheetPanel>
-
-              <ModalSheetPanel
-                  title="Discovery preferences"
-                  trailing={prefsSaved ? (
-                      <ThemedText type="small" themeColor="textSecondary">
-                        Saved
-                      </ThemedText>
-                  ) : undefined}
               >
-                <View style={styles.row}>
-                  <View style={styles.field}>
-                    <ThemedText type="smallBold">Minimum age</ThemedText>
-                    <TextInput
-                        value={minAge}
-                        onChangeText={(text) => {
-                          setMinAge(sanitizeAge(text));
-                          setPrefsError(null);
-                        }}
-                        keyboardType="number-pad"
-                        maxLength={3}
-                        placeholder={String(MIN_ALLOWED_AGE)}
-                        placeholderTextColor={theme.iconMuted}
-                        style={[styles.input, {borderColor: theme.tabActiveBorder, color: theme.text}]}
-                    />
-                  </View>
-                  <View style={styles.field}>
-                    <ThemedText type="smallBold">Maximum age</ThemedText>
-                    <TextInput
-                        value={maxAge}
-                        onChangeText={(text) => {
-                          setMaxAge(sanitizeAge(text));
-                          setPrefsError(null);
-                        }}
-                        keyboardType="number-pad"
-                        maxLength={3}
-                        placeholder={String(MAX_ALLOWED_AGE)}
-                        placeholderTextColor={theme.iconMuted}
-                        style={[styles.input, {borderColor: theme.tabActiveBorder, color: theme.text}]}
-                    />
-                  </View>
-                </View>
-
-                <View style={styles.fieldBlock}>
-                  <ThemedText type="smallBold">Gender</ThemedText>
-                  <View style={styles.segmented}>
-                    {GENDER_OPTIONS.map((option) => {
-                      const selected = option === gender;
-
-                      return (
-                          <TouchableOpacity
-                              key={option || 'any'}
-                              onPress={() => setGender(option)}
-                              style={[
-                                styles.segment,
-                                {
-                                  borderColor: theme.tabActiveBorder,
-                                  backgroundColor: selected ? theme.backgroundElement : 'transparent',
-                                },
-                              ]}
-                          >
-                            <ThemedText
-                                type="smallBold"
-                                style={[styles.segmentText, selected && styles.segmentTextSelected]}
-                            >
-                              {genderOptionLabel(option)}
-                            </ThemedText>
-                          </TouchableOpacity>
-                      );
-                    })}
-                  </View>
-                </View>
-
-                <View style={[styles.fieldBlock, styles.countryFieldBlock]}>
-                  <ThemedText type="smallBold">Country</ThemedText>
-                  <SelectField
-                      value={country || COUNTRY_ANY}
-                      options={COUNTRY_OPTIONS}
-                      onChange={(value) => setCountry(value === COUNTRY_ANY ? '' : value)}
-                      placeholder="Any country"
-                      title="Country"
-                      searchable
-                      inlineOnWeb
-                  />
-                </View>
-
-                <View style={styles.fieldBlock}>
-                  <ThemedText type="smallBold">Interests</ThemedText>
-                  <InterestsSelect value={interests} onChange={setInterests} requireMin={false}/>
-                </View>
-
-                {prefsError && (
-                    <ThemedText type="small" style={styles.errorText}>
-                      {prefsError}
+              {settingsView === 'hub' ? (
+                <>
+                  <ModalSheetPanel title="Profile settings">
+                    <ThemedText type="small" themeColor="textSecondary">
+                      Update your public profile, photo, bio, and personal details.
                     </ThemedText>
-                )}
+                    <TouchableOpacity
+                        onPress={() => setSettingsView('profile')}
+                        style={[styles.buttonStyle, {borderColor: '#6249cabe'}]}
+                    >
+                      <SymbolView
+                          name={{ios: 'square.and.pencil', android: 'edit', web: 'edit'} as any}
+                          tintColor='#8769ffbe'
+                          size={20}
+                      />
+                      <ThemedText type="smallBold">Edit profile</ThemedText>
+                    </TouchableOpacity>
+                  </ModalSheetPanel>
 
-                <View style={styles.actionsRow}>
+                  <ModalSheetPanel
+                      title="Discovery preferences"
+                      trailing={prefsSaved ? (
+                        <ThemedText type="small" themeColor="textSecondary">Saved</ThemedText>
+                      ) : undefined}
+                  >
+                    <ThemedText type="small" themeColor="textSecondary">
+                      Control the age range, genders, countries, and interests you discover.
+                    </ThemedText>
+                    <TouchableOpacity
+                        onPress={() => {
+                          setPrefsSaved(false);
+                          setSettingsView('discovery');
+                        }}
+                        style={[styles.buttonStyle, {borderColor: '#6249cabe'}]}
+                    >
+                      <SymbolView
+                          name={{ios: 'slider.horizontal.3', android: 'tune', web: 'tune'} as any}
+                          tintColor='#8769ffbe'
+                          size={20}
+                      />
+                      <ThemedText type="smallBold">Edit discovery preferences</ThemedText>
+                    </TouchableOpacity>
+                  </ModalSheetPanel>
+
                   <TouchableOpacity
-                      onPress={savePreferences}
-                      disabled={savingPrefs}
-                      style={[styles.buttonStyle]}
+                      onPress={onLogout}
+                      style={[styles.buttonStyle, {borderColor: '#ef4444'}]}
                   >
                     <SymbolView
-                        name={{ios: 'save', android: 'save', web: 'save'} as any}
-                        tintColor='#8769ffbe'
+                        name={{ios: 'rectangle.portrait.and.arrow.right', android: 'logout', web: 'logout'} as any}
+                        tintColor="#ef4444"
                         size={20}
                     />
-                    <ThemedText type="smallBold">
-                      Save changes
-                    </ThemedText>
+                    <ThemedText type="smallBold">Logout</ThemedText>
                   </TouchableOpacity>
-                </View>
-              </ModalSheetPanel>
-
-              <View style={styles.actionsRow}>
-                <TouchableOpacity
-                    onPress={onLogout}
-                    style={[styles.buttonStyle, {borderColor: '#ef4444'}]}
-                >
-                  <SymbolView
-                      name={{ios: 'rectangle.portrait.and.arrow.right', android: 'logout', web: 'logout'} as any}
-                      tintColor="#ef4444"
-                      size={20}
-                  />
-                  <ThemedText type="smallBold">
-                    Logout
-                  </ThemedText>
-                </TouchableOpacity>
-              </View>
-            </ScrollView>
+                </>
+              ) : settingsView === 'discovery' ? (
+                <>
+                  <TouchableOpacity
+                      onPress={() => setSettingsView('hub')}
+                      style={styles.backButton}
+                  >
+                    <SymbolView
+                        name={{ios: 'chevron.left', android: 'arrow_back', web: 'arrow_back'} as any}
+                        tintColor='#8769ffbe'
+                        size={18}
+                    />
+                    <ThemedText type="smallBold">Back to settings</ThemedText>
+                  </TouchableOpacity>
+                  <ModalSheetPanel>
+                    <DiscoveryPreferencesForm
+                      onSaved={() => {
+                        setPrefsSaved(true);
+                        setSettingsView('hub');
+                      }}
+                    />
+                  </ModalSheetPanel>
+                </>
+              ) : null}
+              </ScrollView>
+            )}
           </ResponsiveModalSheet>
         </SafeAreaView>
       </ThemedView>
@@ -589,60 +459,19 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: Spacing.two,
   },
-  row: {
-    flexDirection: 'row',
-    gap: Spacing.three,
-  },
-  field: {
-    flex: 1,
-    gap: Spacing.one,
-  },
-  // Full-width stacked fields (gender, country, interests). Unlike `field`, these
-  // must NOT flex: inside the modal's scroll column a flex-basis:0 item collapses
-  // and lets the following buttons overlap the tall interest chip grid.
-  fieldBlock: {
-    gap: Spacing.one,
-  },
-  countryFieldBlock: {
-    position: 'relative',
-    zIndex: 10,
-  },
-  input: {
-    minHeight: 44,
-    borderRadius: 8,
-    borderWidth: 1,
-    paddingHorizontal: Spacing.three,
-    fontSize: 16,
-    fontWeight: '600',
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
-  },
-  segmented: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Spacing.two,
-  },
-  segment: {
-    flexGrow: 1,
-    minWidth: '22%',
+  backButton: {
     minHeight: 40,
-    borderWidth: 1,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: Spacing.two,
-  },
-  segmentText: {
-    fontSize: 13,
-    lineHeight: 18,
-    textAlign: 'center',
-  },
-  segmentTextSelected: {
-    color: '#ffffff',
-  },
-  actionsRow: {
+    alignSelf: 'flex-start',
     flexDirection: 'row',
-    gap: Spacing.two,
-    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: Spacing.one,
+  },
+  profileEditor: {
+    flex: 1,
+  },
+  profileEditorBackButton: {
+    marginHorizontal: Spacing.three,
+    marginTop: Spacing.two,
   },
   buttonStyle: {
     borderColor: '#6249cabe',

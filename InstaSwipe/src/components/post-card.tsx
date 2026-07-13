@@ -155,15 +155,6 @@ export function PostCard({ post, onAuthorPress }: PostCardProps) {
             {likeCount}
           </Text>
         </Pressable>
-
-
-        <Pressable style={[styles.interactionButton, styles.shareIconRight]}>
-          <SymbolView
-            name={{ ios: 'paperplane', android: 'share', web: 'share' } as any}
-            tintColor={theme.iconMuted}
-            size={20}
-          />
-        </Pressable>
       </View>
     </View>
   );

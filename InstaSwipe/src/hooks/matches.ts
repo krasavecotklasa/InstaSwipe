@@ -150,6 +150,18 @@ export const getDiscoveryPreferences = async (): Promise<DiscoveryPreferences> =
   }
 };
 
+export const hasDiscoveryPreferences = async (): Promise<boolean> => {
+  try {
+    const rawValue = isWebPlatform()
+      ? window.localStorage.getItem(DISCOVERY_PREFERENCES_KEY)
+      : await SecureStore.getItemAsync(DISCOVERY_PREFERENCES_KEY);
+
+    return rawValue !== null;
+  } catch {
+    return false;
+  }
+};
+
 const normalizeDiscoveryProfile = (profile: DiscoveryProfile): DiscoveryProfile => ({
   ...profile,
   profilePictureUrl: normalizeMediaUrl(profile.profilePictureUrl),
