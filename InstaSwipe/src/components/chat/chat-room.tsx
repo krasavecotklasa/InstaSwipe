@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -18,6 +18,7 @@ import { ThemedText } from '@/components/themed-text';
 import { BottomTabInset, Spacing } from '@/constants/theme';
 import { type ChatMessage, type Conversation, useChatRoom } from '@/hooks/chat';
 import { useTheme } from '@/hooks/use-theme';
+import { type GifProvider, type GifSearchItem, useGifSearch, useMessageGif } from '@/hooks/gifs';
 
 interface ChatRoomProps {
   conversation: Conversation;
@@ -32,6 +33,46 @@ const formatTime = (timestamp: string) => {
   return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 };
 
+function ChatMessageBubble({ item, mine }: { item: ChatMessage; mine: boolean }) {
+  const theme = useTheme();
+  const gif = useMessageGif(item.content);
+
+  return (
+    <View style={[styles.bubbleRow, mine ? styles.bubbleRowMine : styles.bubbleRowTheirs]}>
+      <View
+        style={[
+          styles.bubble,
+          mine
+            ? { backgroundColor: '#6249ca' }
+            : { borderColor: theme.tabActiveBorder, borderWidth: 1 },
+          !mine && styles.bubbleTheirs,
+          gif && styles.gifBubble,
+        ]}
+      >
+        {gif ? (
+          <Image
+            source={{ uri: gif.url }}
+            style={styles.messageGif}
+            contentFit="cover"
+            accessibilityLabel={`${gif.provider} GIF`}
+          />
+        ) : (
+          <ThemedText type="small" style={mine ? styles.bubbleTextMine : { color: theme.textSecondary }}>
+            {item.content}
+          </ThemedText>
+        )}
+        <ThemedText
+          type="small"
+          themeColor="textSecondary"
+          style={[styles.timeText, mine && styles.timeTextMine]}
+        >
+          {formatTime(item.timestamp)}
+        </ThemedText>
+      </View>
+    </View>
+  );
+}
+
 export function ChatRoom({ conversation, onBack }: ChatRoomProps) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
@@ -40,6 +81,17 @@ export function ChatRoom({ conversation, onBack }: ChatRoomProps) {
     conversation.otherUserId,
   );
   const [draft, setDraft] = useState('');
+  const [gifPickerOpen, setGifPickerOpen] = useState(false);
+  const [gifQuery, setGifQuery] = useState('hello');
+  const [gifProvider, setGifProvider] = useState<GifProvider>('all');
+  const {
+    results: gifResults,
+    loading: gifsLoading,
+    loadingMore: gifsLoadingMore,
+    error: gifsError,
+    loadMore: loadMoreGifs,
+    hasMore: hasMoreGifs,
+  } = useGifSearch(gifQuery, gifProvider, gifPickerOpen);
   const bottomClearance = BottomTabInset + insets.bottom;
   const hasDraft = draft.trim().length > 0;
 
@@ -60,32 +112,17 @@ export function ChatRoom({ conversation, onBack }: ChatRoomProps) {
     }
   };
 
+  const onSelectGif = (gif: GifSearchItem) => {
+    if (send(gif.gifUrl)) {
+      setGifPickerOpen(false);
+      setDraft('');
+    }
+  };
+
   const renderMessage = ({ item }: { item: ChatMessage }) => {
     const mine = item.senderId === currentUserId;
-    return (
-      <View style={[styles.bubbleRow, mine ? styles.bubbleRowMine : styles.bubbleRowTheirs]}>
-        <View
-          style={[
-            styles.bubble,
-            mine
-              ? { backgroundColor: '#6249ca' }
-              : { borderColor: theme.tabActiveBorder, borderWidth: 1 },
-            !mine && styles.bubbleTheirs,
-          ]}
-        >
-          <ThemedText type="small" style={mine ? styles.bubbleTextMine : { color: theme.textSecondary }}>
-            {item.content}
-          </ThemedText>
-          <ThemedText
-            type="small"
-            themeColor="textSecondary"
-            style={[styles.timeText, mine && styles.timeTextMine]}
-          >
-            {formatTime(item.timestamp)}
-          </ThemedText>
-        </View>
-      </View>
-    );
+
+    return <ChatMessageBubble item={item} mine={mine} />;
   };
 
   return (
@@ -144,6 +181,98 @@ export function ChatRoom({ conversation, onBack }: ChatRoomProps) {
         </ThemedText>
       )}
 
+      {gifPickerOpen && (
+        <View style={[styles.gifPicker, { borderTopColor: theme.tabActiveBorder, backgroundColor: theme.background }]}>
+          <View style={styles.gifToolbar}>
+            {(['all', 'giphy', 'klipy'] as GifProvider[]).map((provider) => (
+              <Pressable
+                key={provider}
+                onPress={() => setGifProvider(provider)}
+                accessibilityRole="button"
+                accessibilityState={{ selected: gifProvider === provider }}
+                style={[
+                  styles.providerButton,
+                  {
+                    borderColor: theme.tabActiveBorder,
+                    backgroundColor: gifProvider === provider ? '#6249ca' : 'transparent',
+                  },
+                ]}
+              >
+                <ThemedText
+                  type="smallBold"
+                  style={gifProvider === provider ? styles.providerButtonActiveText : { color: theme.textSecondary }}
+                >
+                  {provider === 'all' ? 'All' : provider === 'giphy' ? 'GIPHY' : 'Klipy'}
+                </ThemedText>
+              </Pressable>
+            ))}
+          </View>
+          <TextInput
+            value={gifQuery}
+            onChangeText={setGifQuery}
+            placeholder="Search GIFs"
+            placeholderTextColor={theme.iconMuted}
+            style={[styles.gifSearchInput, { color: theme.text, borderColor: theme.tabActiveBorder }]}
+            returnKeyType="search"
+          />
+          {gifsLoading ? (
+            <View style={styles.gifStatus}>
+              <ActivityIndicator color={theme.text} />
+            </View>
+          ) : gifsError ? (
+            <ThemedText type="small" style={styles.errorText}>
+              {gifsError}
+            </ThemedText>
+          ) : (
+            <FlatList
+              data={gifResults}
+              keyExtractor={(item) => `${item.provider}-${item.id}-${item.gifUrl}`}
+              numColumns={3}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={styles.gifResults}
+              columnWrapperStyle={styles.gifResultsRow}
+              onEndReached={() => {
+                if (!gifsLoading && !gifsLoadingMore && hasMoreGifs) {
+                  void loadMoreGifs();
+                }
+              }}
+              onEndReachedThreshold={0.35}
+              ListFooterComponent={
+                gifsLoadingMore ? (
+                  <View style={styles.gifStatus}>
+                    <ActivityIndicator color={theme.text} />
+                  </View>
+                ) : null
+              }
+              ListEmptyComponent={
+                <ThemedText type="small" themeColor="textSecondary" style={styles.gifEmpty}>
+                  No GIFs found
+                </ThemedText>
+              }
+              renderItem={({ item }) => (
+                <Pressable
+                  onPress={() => onSelectGif(item)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Send ${item.provider} GIF`}
+                  style={({ pressed }) => [styles.gifResultButton, { opacity: pressed ? 0.75 : 1 }]}
+                >
+                  <Image
+                    source={{ uri: item.previewUrl || item.gifUrl }}
+                    style={styles.gifResultImage}
+                    contentFit="cover"
+                    accessibilityLabel={item.title || `${item.provider} GIF`}
+                  />
+                  <ThemedText type="small" style={styles.gifProviderLabel}>
+                    {item.provider}
+                  </ThemedText>
+                </Pressable>
+              )}
+            />
+          )}
+        </View>
+      )}
+
       <View
         style={[
           styles.inputRow,
@@ -154,6 +283,25 @@ export function ChatRoom({ conversation, onBack }: ChatRoomProps) {
           },
         ]}
       >
+        <Pressable
+          onPress={() => setGifPickerOpen((open) => !open)}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel={gifPickerOpen ? 'Close GIF picker' : 'Open GIF picker'}
+          accessibilityState={{ expanded: gifPickerOpen }}
+          style={({ pressed }) => [
+            styles.gifButton,
+            {
+              borderColor: theme.tabActiveBorder,
+              backgroundColor: gifPickerOpen ? '#6249ca' : 'transparent',
+              opacity: pressed ? 0.75 : 1,
+            },
+          ]}
+        >
+          <ThemedText type="smallBold" style={gifPickerOpen ? styles.providerButtonActiveText : { color: theme.textSecondary }}>
+            GIF
+          </ThemedText>
+        </Pressable>
         <TextInput
           value={draft}
           onChangeText={(text) => setDraft(text)}
@@ -259,6 +407,17 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     backgroundColor: 'transparent',
   },
+  gifBubble: {
+    paddingHorizontal: Spacing.half,
+    paddingTop: Spacing.half,
+  },
+  messageGif: {
+    width: 220,
+    height: 220,
+    maxWidth: '100%',
+    borderRadius: 10,
+    backgroundColor: '#24172c',
+  },
   bubbleTextMine: {
     color: '#ffffff',
   },
@@ -278,6 +437,81 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.three,
     paddingBottom: Spacing.two,
   },
+  gifPicker: {
+    borderTopWidth: 1,
+    paddingHorizontal: Spacing.two,
+    paddingTop: Spacing.two,
+    paddingBottom: Spacing.two,
+    gap: Spacing.two,
+    maxHeight: 320,
+  },
+  gifToolbar: {
+    flexDirection: 'row',
+    gap: Spacing.one,
+  },
+  providerButton: {
+    height: 32,
+    minWidth: 64,
+    paddingHorizontal: Spacing.two,
+    borderWidth: 1,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  providerButtonActiveText: {
+    color: '#ffffff',
+  },
+  gifSearchInput: {
+    height: 40,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: Spacing.three,
+    fontSize: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+  },
+  gifStatus: {
+    height: 112,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  gifResults: {
+    gap: Spacing.two,
+    paddingBottom: Spacing.two,
+    minHeight: 112,
+  },
+  gifResultsRow: {
+    justifyContent: 'space-between',
+    gap: Spacing.two,
+  },
+  gifResultButton: {
+    width: '31%',
+    aspectRatio: 1,
+    borderRadius: 8,
+    overflow: 'hidden',
+    backgroundColor: '#24172c',
+  },
+  gifResultImage: {
+    width: '100%',
+    height: '100%',
+  },
+  gifProviderLabel: {
+    position: 'absolute',
+    right: 4,
+    bottom: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    overflow: 'hidden',
+    color: '#ffffff',
+    backgroundColor: 'rgba(0, 0, 0, 0.55)',
+    fontSize: 10,
+    lineHeight: 12,
+  },
+  gifEmpty: {
+    width: '100%',
+    textAlign: 'center',
+    alignSelf: 'center',
+  },
   inputRow: {
     flexDirection: 'row',
     alignItems: 'flex-end',
@@ -285,6 +519,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.two,
     paddingTop: Spacing.two,
     borderTopWidth: 1,
+  },
+  gifButton: {
+    width: 48,
+    height: 40,
+    borderWidth: 1,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   input: {
     flex: 1,
