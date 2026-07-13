@@ -21,7 +21,7 @@ import { type ChatMessage, type Conversation, useChatRoom } from '@/hooks/chat';
 import { type DiscoveryProfile, getPublicProfile } from '@/hooks/matches';
 import { useResponsiveLayout } from '@/hooks/use-responsive-layout';
 import { useTheme } from '@/hooks/use-theme';
-import { type GifProvider, type GifSearchItem, useGifSearch, useMessageGif } from '@/hooks/gifs';
+import { type GifSearchItem, useGifSearch, useMessageGif } from '@/hooks/gifs';
 
 interface ChatRoomProps {
   conversation: Conversation;
@@ -90,7 +90,6 @@ export function ChatRoom({ conversation, onBack }: ChatRoomProps) {
   const [profileError, setProfileError] = useState<string | null>(null);
   const [gifPickerOpen, setGifPickerOpen] = useState(false);
   const [gifQuery, setGifQuery] = useState('hello');
-  const [gifProvider, setGifProvider] = useState<GifProvider>('all');
   const {
     results: gifResults,
     loading: gifsLoading,
@@ -98,7 +97,7 @@ export function ChatRoom({ conversation, onBack }: ChatRoomProps) {
     error: gifsError,
     loadMore: loadMoreGifs,
     hasMore: hasMoreGifs,
-  } = useGifSearch(gifQuery, gifProvider, gifPickerOpen);
+  } = useGifSearch(gifQuery, 'giphy', gifPickerOpen);
   // The bottom tab bar is an absolutely-positioned overlay (app-tabs.tsx) shown
   // on native AND mobile web (usesBottomTabs), so the input needs real clearance
   // for it there too - not just the native-only guess BottomTabInset provided.
@@ -234,30 +233,6 @@ export function ChatRoom({ conversation, onBack }: ChatRoomProps) {
 
       {gifPickerOpen && (
         <View style={[styles.gifPicker, { borderTopColor: theme.tabActiveBorder, backgroundColor: theme.background }]}>
-          <View style={styles.gifToolbar}>
-            {(['all', 'giphy', 'klipy'] as GifProvider[]).map((provider) => (
-              <Pressable
-                key={provider}
-                onPress={() => setGifProvider(provider)}
-                accessibilityRole="button"
-                accessibilityState={{ selected: gifProvider === provider }}
-                style={[
-                  styles.providerButton,
-                  {
-                    borderColor: theme.tabActiveBorder,
-                    backgroundColor: gifProvider === provider ? '#6249ca' : 'transparent',
-                  },
-                ]}
-              >
-                <ThemedText
-                  type="smallBold"
-                  style={gifProvider === provider ? styles.providerButtonActiveText : { color: theme.textSecondary }}
-                >
-                  {provider === 'all' ? 'All' : provider === 'giphy' ? 'GIPHY' : 'Klipy'}
-                </ThemedText>
-              </Pressable>
-            ))}
-          </View>
           <TextInput
             value={gifQuery}
             onChangeText={setGifQuery}
@@ -515,19 +490,6 @@ const styles = StyleSheet.create({
     paddingBottom: Spacing.two,
     gap: Spacing.two,
     maxHeight: 320,
-  },
-  gifToolbar: {
-    flexDirection: 'row',
-    gap: Spacing.one,
-  },
-  providerButton: {
-    height: 32,
-    minWidth: 64,
-    paddingHorizontal: Spacing.two,
-    borderWidth: 1,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   providerButtonActiveText: {
     color: '#ffffff',

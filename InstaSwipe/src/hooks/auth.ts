@@ -196,7 +196,7 @@ const isFormDataBody = (body: unknown): body is FormData => {
 // Exchanges the stored refresh token for a new access token, persisting both.
 // Returns null (and clears the session) if there is no refresh token or the
 // backend rejects it, matching the failure handling authorizedFetch already did.
-const refreshAccessToken = async (): Promise<string | null> => {
+const refreshAccessTokenRequest = async (): Promise<string | null> => {
   const refreshToken = await getRefreshToken();
   if (!refreshToken) {
     return null;
@@ -223,6 +223,23 @@ const refreshAccessToken = async (): Promise<string | null> => {
     await clearTokens();
     return null;
   }
+};
+
+// The backend issues single-use, rotating refresh tokens - each /auth/refresh
+// call invalidates the refresh token it was given. authorizedFetch's reactive
+// (401-triggered) refresh and the STOMP client's proactive (pre-expiry) refresh
+// can otherwise fire at nearly the same moment; without sharing one in-flight
+// request, the second call would present an already-rotated-away refresh token,
+// fail, and clearTokens() the whole session out from under the first caller.
+let inFlightRefresh: Promise<string | null> | null = null;
+
+const refreshAccessToken = (): Promise<string | null> => {
+  if (!inFlightRefresh) {
+    inFlightRefresh = refreshAccessTokenRequest().finally(() => {
+      inFlightRefresh = null;
+    });
+  }
+  return inFlightRefresh;
 };
 
 // The access token's lifetime is short (15 minutes by default); a caller that's

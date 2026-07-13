@@ -86,13 +86,19 @@ export default function RootLayout() {
     [],
   );
 
-  // Show nothing while checking auth or onboarding status to avoid flickering
-  if (isAuthenticated === null) {
-    return null;
-  }
+  const isLoading = isAuthenticated === null || (isAuthenticated && onboardingStep === undefined);
 
-  // Still loading onboarding status
-  if (isAuthenticated && onboardingStep === undefined) {
+  // Once we're past the auth/onboarding checks and about to render real UI, release
+  // the native splash screen held by preventAutoHideAsync() above - otherwise it
+  // stays on screen forever, since nothing else in the app ever calls hideAsync().
+  useEffect(() => {
+    if (!isLoading) {
+      SplashScreen.hideAsync();
+    }
+  }, [isLoading]);
+
+  // Show nothing while checking auth or onboarding status to avoid flickering
+  if (isLoading) {
     return null;
   }
 

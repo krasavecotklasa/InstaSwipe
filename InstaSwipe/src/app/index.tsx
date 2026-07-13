@@ -152,6 +152,7 @@ export default function HomeScreen() {
           <DiscoveryProfileModal
             visible={Boolean(selectedProfile)}
             profile={selectedProfile}
+            initialDecision="liked"
             onClose={() => setSelectedProfile(null)}
           />
         </SafeAreaView>
