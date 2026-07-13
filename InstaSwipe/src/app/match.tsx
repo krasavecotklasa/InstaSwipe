@@ -14,9 +14,10 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import DiscoveryProfileModal from '@/components/discovery-profile-modal';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { BottomTabInset, Spacing } from '@/constants/theme';
+import { Spacing, TabBarHeight } from '@/constants/theme';
 import { type DiscoveryProfile, useDiscoverySwipe } from '@/hooks/matches';
 import { MAX_VISIBLE_MATCH_INTERESTS } from '@/constants/interests';
+import { useResponsiveLayout } from '@/hooks/use-responsive-layout';
 import { useTheme } from '@/hooks/use-theme';
 import Header from '@/components/header';
 
@@ -27,6 +28,7 @@ const PROFILE_OPEN_THRESHOLD = 90;
 export default function MatchScreen() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
+  const { usesBottomTabs } = useResponsiveLayout();
   const [position] = useState(() => new Animated.ValueXY());
   const {
     currentProfile,
@@ -38,7 +40,10 @@ export default function MatchScreen() {
     finishDecision,
     handleDecision,
   } = useDiscoverySwipe();
-  const bottomClearance = BottomTabInset + insets.bottom - Spacing.three;
+  // Same overlay-clearance fix as chat-room.tsx: reserve the bottom tab bar's
+  // real height (not the old too-small BottomTabInset guess) wherever it's
+  // shown, so the pass/profile/like row doesn't render under/behind it.
+  const bottomClearance = (usesBottomTabs ? TabBarHeight : 0) + (Platform.OS === 'web' ? 0 : insets.bottom);
   const [profileModalProfile, setProfileModalProfile] = useState<DiscoveryProfile | null>(null);
 
   useEffect(() => {
