@@ -30,7 +30,7 @@ import { useResponsiveLayout } from '@/hooks/use-responsive-layout';
 
 type SettingsView = 'closed' | 'hub' | 'profile' | 'discovery';
 
-export function ProfileScreen() {
+export default function ProfileScreen() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const { isMobileWeb, isDesktopWeb } = useResponsiveLayout();
@@ -72,6 +72,8 @@ export function ProfileScreen() {
         if (!isActive) {
           return;
         }
+
+
       } catch (loadError) {
         if (isActive) {
           setError(loadError instanceof Error ? loadError.message : 'Could not load profile');
@@ -381,7 +383,6 @@ export function ProfileScreen() {
                 <ThemedText type="smallBold">Back to settings</ThemedText>
               </TouchableOpacity>
               <OnboardingGate
-                mode="update"
                 embedded
                 initialProfile={profile}
                 onOnboardSuccess={() => void handleProfileUpdated()}
