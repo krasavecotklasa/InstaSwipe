@@ -47,7 +47,7 @@ export default function MatchScreen() {
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={[styles.safeArea, { marginLeft: isDesktopWeb ? 100 : 0 }]} edges={['top', 'left', 'right']}>
-        <Header title='Match'/>
+        <Header />
         <View style={[styles.content, isMobileWeb && styles.mobileContent]}>
           <View style={styles.header} />
 

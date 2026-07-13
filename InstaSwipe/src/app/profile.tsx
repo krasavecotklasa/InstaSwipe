@@ -11,7 +11,6 @@ import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { SymbolView } from 'expo-symbols';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { PostCard, type Post } from '@/components/post-card';
@@ -31,7 +30,7 @@ import { useResponsiveLayout } from '@/hooks/use-responsive-layout';
 
 type SettingsView = 'closed' | 'hub' | 'profile' | 'discovery';
 
-export default function ProfileScreen() {
+export function ProfileScreen() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const { isMobileWeb, isDesktopWeb } = useResponsiveLayout();
@@ -91,7 +90,7 @@ export default function ProfileScreen() {
 
   const { timedOut: avatarTimedOut } = useMediaStatusPolling(
     profile?.profilePictureStatus,
-    () => { loadProfile().catch(() => {}); },
+    () => { loadProfile().catch(() => { }); },
   );
 
   const handlePickAvatar = async () => {
@@ -292,8 +291,7 @@ export default function ProfileScreen() {
                   </View>
 
                   <View style={[styles.bioInterestsRow, isMobileWeb && styles.mobileBioInterestsRow]}>
-                    <View
-                      style={[styles.bioColumn, isMobileWeb && styles.mobileProfileColumn, { borderColor: theme.tabActiveBorder }]}>
+                    <View style={[styles.bioColumn, isMobileWeb && styles.mobileProfileColumn, { borderColor: theme.tabActiveBorder }]}>
                       <ThemedText type="smallBold">Bio:</ThemedText>
                       {!!profile.bio && (
                         <ThemedText type="small" style={styles.bio}>
@@ -302,8 +300,7 @@ export default function ProfileScreen() {
                       )}
                     </View>
 
-                    <View
-                      style={[styles.interestsColumn, isMobileWeb && styles.mobileProfileColumn, { borderColor: theme.tabActiveBorder }]}>
+                    <View style={[styles.interestsColumn, isMobileWeb && styles.mobileProfileColumn, { borderColor: theme.tabActiveBorder }]}>
                       <ThemedText type="smallBold">My interests:</ThemedText>
                       <View style={styles.chips}>
                         {(profile.interests ?? []).map((interest) => (
