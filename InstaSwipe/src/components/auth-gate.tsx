@@ -127,7 +127,7 @@ function LoginView({ onAuthSuccess, onGoToRegister, onGoToForgotPassword, onNeed
         const errorData = await response.json().catch(() => ({}));
         errorHandle(errorData.message || 'Invalid credentials');
       }
-    } catch (error) {
+    } catch {
       errorHandle('An unexpected error occurred. Please try again.');
     } finally {
       setLoading(false);
@@ -237,7 +237,7 @@ function ForgotPasswordView({ onBackToLogin }: ForgotPasswordViewProps) {
         const errorData = await response.json().catch(() => ({}));
         errorHandle(errorData.message || 'Could not send a reset code');
       }
-    } catch (error) {
+    } catch {
       errorHandle('An unexpected error occurred. Please try again.');
     } finally {
       setLoading(false);
@@ -260,7 +260,7 @@ function ForgotPasswordView({ onBackToLogin }: ForgotPasswordViewProps) {
         const errorData = await response.json().catch(() => ({}));
         errorHandle(errorData.message || 'The reset code is invalid or has expired');
       }
-    } catch (error) {
+    } catch {
       errorHandle('An unexpected error occurred. Please try again.');
     } finally {
       setLoading(false);
@@ -301,7 +301,7 @@ function ForgotPasswordView({ onBackToLogin }: ForgotPasswordViewProps) {
         const errorData = await response.json().catch(() => ({}));
         errorHandle(errorData.message || 'Could not reset password');
       }
-    } catch (error) {
+    } catch {
       errorHandle('An unexpected error occurred. Please try again.');
     } finally {
       setLoading(false);
@@ -477,7 +477,7 @@ function VerifyEmailView({ email, password, onAuthSuccess, onBackToLogin }: Veri
       } else {
         Alert.alert('Success', 'Email verified. Please sign in.', [{ text: 'OK', onPress: goToLogin }]);
       }
-    } catch (error) {
+    } catch {
       errorHandle('An unexpected error occurred. Please try again.');
     } finally {
       setLoading(false);
@@ -494,7 +494,7 @@ function VerifyEmailView({ email, password, onAuthSuccess, onBackToLogin }: Veri
         const errorData = await response.json().catch(() => ({}));
         errorHandle(errorData.message || 'Could not resend the code');
       }
-    } catch (error) {
+    } catch {
       errorHandle('An unexpected error occurred. Please try again.');
     } finally {
       setLoading(false);

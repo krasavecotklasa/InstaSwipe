@@ -175,7 +175,7 @@ export default function OnboardingGate({ onOnboardSuccess, mode = 'create', init
           try {
             const data = JSON.parse(uploadResult.body);
             errorMsg = data.message || errorMsg;
-          } catch (e) { }
+          } catch { }
           errorHandle(errorMsg);
         }
       } else {
