@@ -40,6 +40,7 @@ public class SecurityConfig {
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/auth/**").permitAll()
+                        .requestMatchers("/api/status").permitAll()
                         .requestMatchers("/ws/**").permitAll()
                         .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
@@ -74,7 +75,17 @@ public class SecurityConfig {
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setAllowCredentials(true);
 
+        // /api/status is public, read-only, and carries no cookies/credentials - it's meant to be
+        // polled from anywhere (a kiosk page opened via file://, a random device on a TV, etc.),
+        // so it gets its own permissive rule instead of being limited to the app's known origins.
+        CorsConfiguration statusConfiguration = new CorsConfiguration();
+        statusConfiguration.setAllowedOriginPatterns(List.of("*"));
+        statusConfiguration.setAllowedMethods(List.of("GET", "OPTIONS"));
+        statusConfiguration.setAllowedHeaders(List.of("*"));
+        statusConfiguration.setAllowCredentials(false);
+
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/api/status", statusConfiguration);
         source.registerCorsConfiguration("/**", configuration);
         return source;
     }
