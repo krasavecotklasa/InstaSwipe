@@ -162,6 +162,7 @@ export default function MatchScreen() {
         visible={Boolean(profileModalProfile)}
         profile={profileModalProfile}
         onClose={closeProfileModal}
+        onDecision={handleDecision}
       />
     </ThemedView>
   );

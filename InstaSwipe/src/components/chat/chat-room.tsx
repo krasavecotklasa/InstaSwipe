@@ -15,8 +15,10 @@ import { SymbolView } from 'expo-symbols';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
+import DiscoveryProfileModal from '@/components/discovery-profile-modal';
 import { BottomTabInset, Spacing } from '@/constants/theme';
 import { type ChatMessage, type Conversation, useChatRoom } from '@/hooks/chat';
+import { type DiscoveryProfile, getPublicProfile } from '@/hooks/matches';
 import { useTheme } from '@/hooks/use-theme';
 
 interface ChatRoomProps {
@@ -40,6 +42,9 @@ export function ChatRoom({ conversation, onBack }: ChatRoomProps) {
     conversation.otherUserId,
   );
   const [draft, setDraft] = useState('');
+  const [selectedProfile, setSelectedProfile] = useState<DiscoveryProfile | null>(null);
+  const [loadingProfile, setLoadingProfile] = useState(false);
+  const [profileError, setProfileError] = useState<string | null>(null);
   const bottomClearance = BottomTabInset + insets.bottom;
   const hasDraft = draft.trim().length > 0;
 
@@ -57,6 +62,22 @@ export function ChatRoom({ conversation, onBack }: ChatRoomProps) {
     if (Platform.OS === 'web' && event.nativeEvent.key === 'Enter' && !event.nativeEvent.shiftKey) {
       event.preventDefault?.();
       onSend();
+    }
+  };
+
+  const openProfile = async () => {
+    if (loadingProfile) {
+      return;
+    }
+
+    setLoadingProfile(true);
+    setProfileError(null);
+    try {
+      setSelectedProfile(await getPublicProfile(conversation.otherUserId));
+    } catch (loadError) {
+      setProfileError(loadError instanceof Error ? loadError.message : 'Could not load this profile.');
+    } finally {
+      setLoadingProfile(false);
     }
   };
 
@@ -95,14 +116,30 @@ export function ChatRoom({ conversation, onBack }: ChatRoomProps) {
       keyboardVerticalOffset={insets.top}
     >
       <View style={[styles.header, { borderBottomColor: theme.tabActiveBorder }]}>
-        <Image
-          source={conversation.otherUserPicture ? { uri: conversation.otherUserPicture } : undefined}
-          style={styles.headerAvatar}
-          contentFit="cover"
-        />
-        <ThemedText type="smallBold" numberOfLines={1} style={styles.headerTitle}>
-          {conversation.otherUserName}
-        </ThemedText>
+        <Pressable
+          onPress={() => void openProfile()}
+          disabled={loadingProfile}
+          style={styles.headerAvatarButton}
+          accessibilityRole="button"
+          accessibilityLabel={`Open ${conversation.otherUserName}'s profile`}
+        >
+          <Image
+            source={conversation.otherUserPicture ? { uri: conversation.otherUserPicture } : undefined}
+            style={styles.headerAvatar}
+            contentFit="cover"
+          />
+        </Pressable>
+        <Pressable
+          onPress={() => void openProfile()}
+          disabled={loadingProfile}
+          accessibilityRole="button"
+          accessibilityLabel={`Open ${conversation.otherUserName}'s profile`}
+          style={styles.headerNameButton}
+        >
+          <ThemedText type="smallBold" numberOfLines={1} style={styles.headerTitle}>
+            {conversation.otherUserName}
+          </ThemedText>
+        </Pressable>
         <TouchableOpacity
           onPress={onBack}
           style={[styles.headerCloseButton, { borderColor: theme.tabActiveBorder }]}
@@ -116,6 +153,10 @@ export function ChatRoom({ conversation, onBack }: ChatRoomProps) {
           />
         </TouchableOpacity>
       </View>
+
+      {profileError ? (
+        <ThemedText type="small" style={styles.profileErrorText}>{profileError}</ThemedText>
+      ) : null}
 
       {loading ? (
         <View style={styles.centered}>
@@ -188,6 +229,13 @@ export function ChatRoom({ conversation, onBack }: ChatRoomProps) {
           />
         </Pressable>
       </View>
+
+      <DiscoveryProfileModal
+        visible={Boolean(selectedProfile)}
+        profile={selectedProfile}
+        initialDecision="liked"
+        onClose={() => setSelectedProfile(null)}
+      />
     </KeyboardAvoidingView>
   );
 }
@@ -220,16 +268,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  headerAvatar: {
+  headerAvatarButton: {
     position: 'absolute',
     left: Spacing.three,
     width: 40,
     height: 40,
     borderRadius: 20,
+    overflow: 'hidden',
+  },
+  headerAvatar: {
+    width: '100%',
+    height: '100%',
     backgroundColor: '#24172c',
   },
-  headerTitle: {
+  headerNameButton: {
     maxWidth: '70%',
+  },
+  headerTitle: {
     textAlign: 'center',
     fontSize: 16,
     lineHeight: 22,
@@ -277,6 +332,12 @@ const styles = StyleSheet.create({
     color: '#ef4444',
     paddingHorizontal: Spacing.three,
     paddingBottom: Spacing.two,
+  },
+  profileErrorText: {
+    color: '#ef4444',
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.one,
+    textAlign: 'center',
   },
   inputRow: {
     flexDirection: 'row',
