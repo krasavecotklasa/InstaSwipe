@@ -151,23 +151,18 @@ export const useGifSearch = (query: string, provider: GifProvider, enabled: bool
   useEffect(() => {
     const text = query.trim();
     if (!enabled || !text) {
-      setResults([]);
-      setLoading(false);
-      setLoadingMore(false);
-      setError(null);
-      setNextOffset(null);
-      setHasMore(false);
       return;
     }
 
     const requestId = ++requestIdRef.current;
-    setLoading(true);
-    setLoadingMore(false);
-    setError(null);
-    setNextOffset(null);
-    setHasMore(false);
 
     const timer = setTimeout(() => {
+      setLoading(true);
+      setLoadingMore(false);
+      setError(null);
+      setNextOffset(null);
+      setHasMore(false);
+      
       searchGifs(text, provider, 24, '0')
         .then(({ items, nextOffset: next }) => {
           if (requestId !== requestIdRef.current) {

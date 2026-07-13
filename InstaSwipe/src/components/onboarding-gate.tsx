@@ -195,7 +195,7 @@ export default function OnboardingGate({
           try {
             const data = JSON.parse(uploadResult.body);
             errorMsg = data.message || errorMsg;
-          } catch (e) { }
+          } catch { }
           errorHandle(errorMsg);
         }
       } else {

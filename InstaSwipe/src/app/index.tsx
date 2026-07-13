@@ -10,7 +10,7 @@ import {
   View,
   KeyboardAvoidingView
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SymbolView } from 'expo-symbols';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -22,7 +22,6 @@ import Header from '@/components/header';
 import { fetchFeed } from '@/hooks/posts';
 import { type DiscoveryProfile, getPublicProfile } from '@/hooks/matches';
 import DiscoveryProfileModal from '@/components/discovery-profile-modal';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useResponsiveLayout } from '@/hooks/use-responsive-layout';
 
 
@@ -108,7 +107,7 @@ export default function HomeScreen() {
     >
       <ThemedView style={styles.container}>
         <SafeAreaView style={[styles.safeArea, { marginLeft: isDesktopWeb ? 100 : 0 }]} edges={['top', 'left', 'right']}>
-          <Header title='InstaSwipe'/>
+          <Header title='InstaSwipe' />
 
           <FlatList
             data={posts}
