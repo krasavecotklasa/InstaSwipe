@@ -66,7 +66,7 @@ const toInputValue = (value: string | number | undefined) => {
 // so free text like "9 years old" can't reach the saved preferences.
 const sanitizeAge = (text: string) => text.replace(/[^0-9]/g, '').slice(0, 3);
 
-export function ProfileScreen() {
+export default function ProfileScreen() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const {isMobileWeb, isDesktopWeb} = useResponsiveLayout();
@@ -759,6 +759,7 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   panelHeaderText: {
+    bottom: 10,
     lineHeight: 22,
   },
   iconButton: {

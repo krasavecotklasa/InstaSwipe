@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
-  Platform,
   ActivityIndicator,
   FlatList,
   StyleSheet,
@@ -8,11 +7,11 @@ import {
   View
 } from 'react-native';
 import { Image } from 'expo-image';
-
 import { ThemedText } from '@/components/themed-text';
 import { BottomTabInset, Spacing } from '@/constants/theme';
 import { type Conversation, getConversations } from '@/hooks/chat';
 import { useTheme } from '@/hooks/use-theme';
+import { useResponsiveLayout } from "@/hooks/use-responsive-layout";
 
 interface ConversationListProps {
   onOpen: (conversation: Conversation) => void;
@@ -20,6 +19,7 @@ interface ConversationListProps {
 
 export function ConversationList({ onOpen }: ConversationListProps) {
   const theme = useTheme();
+  const { isDesktopWeb } = useResponsiveLayout();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -90,7 +90,7 @@ export function ConversationList({ onOpen }: ConversationListProps) {
       contentContainerStyle={styles.listContent}
       ListHeaderComponent={
         <>
-        {Platform.OS === 'web' ? 
+        {isDesktopWeb ?
         <ThemedText type="subtitle" style={styles.title}>
           Your chats
         </ThemedText>
