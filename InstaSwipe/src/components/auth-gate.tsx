@@ -83,8 +83,6 @@ export default function AuthGate({ onAuthSuccess }: AuthGateProps) {
   );
 }
 
-// ─── Login ────────────────────────────────────────────────────────────────────
-
 interface LoginViewProps {
   onAuthSuccess: () => void;
   onGoToRegister: () => void;
@@ -200,8 +198,6 @@ function LoginView({ onAuthSuccess, onGoToRegister, onGoToForgotPassword, onNeed
     </ThemedView>
   );
 }
-
-// ─── Forgot password ────────────────────────────────────────────────────────
 
 interface ForgotPasswordViewProps {
   onBackToLogin: () => void;
@@ -423,8 +419,6 @@ function ForgotPasswordView({ onBackToLogin }: ForgotPasswordViewProps) {
   );
 }
 
-// ─── Verify email ───────────────────────────────────────────────────────────
-
 interface VerifyEmailViewProps {
   email: string;
   password: string;
@@ -557,8 +551,6 @@ function VerifyEmailView({ email, password, onAuthSuccess, onBackToLogin }: Veri
   );
 }
 
-// ─── Register ─────────────────────────────────────────────────────────────────
-
 interface RegisterViewProps {
   onAuthSuccess: () => void;
   onGoToLogin: () => void;
@@ -573,6 +565,15 @@ function RegisterView({ onAuthSuccess, onGoToLogin, onNeedsVerification }: Regis
   const [loading, setLoading] = useState(false);
   const theme = useTheme();
   const insets = useSafeAreaInsets();
+  const passwordRequirements = [
+    { label: 'Between 8 and 100 characters', met: password.length >= 8 && password.length <= 100 },
+    { label: 'An uppercase letter', met: /[A-Z]/.test(password) },
+    { label: 'A lowercase letter', met: /[a-z]/.test(password) },
+    { label: 'A number', met: /\d/.test(password) },
+    { label: 'A special character', met: /[^A-Za-z0-9]/.test(password) },
+  ];
+  const isPasswordValid = passwordRequirements.every((requirement) => requirement.met);
+  const doPasswordsMatch = password.length > 0 && confirmPassword.length > 0 && password === confirmPassword;
 
   const handleRegister = async () => {
     if (!email || !password || !confirmPassword) {
@@ -582,6 +583,11 @@ function RegisterView({ onAuthSuccess, onGoToLogin, onNeedsVerification }: Regis
 
     if (!isAgeConfirmed) {
       errorHandle('You must be at least 18 years old to register.');
+      return;
+    }
+
+    if (!isPasswordValid) {
+      errorHandle('Please make sure your password meets all of the requirements.');
       return;
     }
 
@@ -652,6 +658,19 @@ function RegisterView({ onAuthSuccess, onGoToLogin, onNeedsVerification }: Regis
                   onChangeText={setPassword}
                   secureTextEntry
                 />
+                <View style={styles.passwordRequirements} accessibilityLiveRegion="polite">
+                  {passwordRequirements.map((requirement) => (
+                    <ThemedText
+                      key={requirement.label}
+                      style={[
+                        { fontSize: 13 },
+                        requirement.met ? { color: '#16a34a' } : { opacity: 0.65 },
+                      ]}
+                    >
+                      {requirement.met ? '\u2713' : '\u2022'} {requirement.label}
+                    </ThemedText>
+                  ))}
+                </View>
                 <TextInput
                   style={[styles.input, { color: theme.text, borderColor: theme.tabActiveBorder }]}
                   placeholder="Confirm Password"
@@ -660,6 +679,17 @@ function RegisterView({ onAuthSuccess, onGoToLogin, onNeedsVerification }: Regis
                   onChangeText={setConfirmPassword}
                   secureTextEntry
                 />
+                {confirmPassword.length > 0 ? (
+                  <ThemedText
+                    style={[
+                      styles.passwordMatchText,
+                      doPasswordsMatch ? {color: '#16a34a'} : { color: '#dc2626' },
+                    ]}
+                    accessibilityLiveRegion="polite"
+                  >
+                    {doPasswordsMatch ? '\u2713 Passwords match' : 'Passwords do not match'}
+                  </ThemedText>
+                ) : null}
 
                 <View style={styles.ageRow}>
                   <Switch
@@ -701,8 +731,6 @@ function RegisterView({ onAuthSuccess, onGoToLogin, onNeedsVerification }: Regis
     </ThemedView>
   );
 }
-
-// ─── Shared styles ────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
   container: {
@@ -772,6 +800,17 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.two,
     opacity: 0.8,
     textAlign: 'center',
+  },
+  passwordRequirements: {
+    gap: Spacing.one,
+  },
+  passwordRequirementsTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  passwordMatchText: {
+    fontSize: 13,
+    marginTop: -Spacing.two,
   },
   ageRow: {
     flexDirection: 'row',
