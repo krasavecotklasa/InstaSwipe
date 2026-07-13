@@ -10,7 +10,6 @@ import com.instaswipe.dto.UserResponse;
 import com.instaswipe.dto.VerifyOtpTokenRequest;
 import com.instaswipe.ratelimit.KeyStrategy;
 import com.instaswipe.ratelimit.RateLimited;
-import com.instaswipe.ratelimit.RateLimits;
 import com.instaswipe.service.AuthService;
 import com.instaswipe.service.AuthSession;
 import com.instaswipe.service.EmailVerificationService;
