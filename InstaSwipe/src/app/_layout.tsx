@@ -6,7 +6,7 @@ import { useColorScheme } from 'react-native';
 import AppTabs from '@/components/app-tabs';
 import AuthGate from '@/components/auth-gate';
 import OnboardingGate from '@/components/onboarding-gate';
-import { getAccessToken, logout, API } from '@/hooks/auth';
+import { getAccessToken, logout, API, OwnProfileResponse } from '@/hooks/auth';
 import { AuthContext } from '@/context/auth-context';
 import { registerForPushNotificationsAsync, registerNotificationTokenAsync } from '@/hooks/notifications';
 import { hasDiscoveryPreferences } from '@/hooks/matches';
