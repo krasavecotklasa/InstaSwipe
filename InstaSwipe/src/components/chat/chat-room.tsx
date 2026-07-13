@@ -16,9 +16,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import DiscoveryProfileModal from '@/components/discovery-profile-modal';
-import { BottomTabInset, Spacing } from '@/constants/theme';
+import { Spacing, TabBarHeight } from '@/constants/theme';
 import { type ChatMessage, type Conversation, useChatRoom } from '@/hooks/chat';
 import { type DiscoveryProfile, getPublicProfile } from '@/hooks/matches';
+import { useResponsiveLayout } from '@/hooks/use-responsive-layout';
 import { useTheme } from '@/hooks/use-theme';
 import { type GifProvider, type GifSearchItem, useGifSearch, useMessageGif } from '@/hooks/gifs';
 
@@ -78,6 +79,7 @@ function ChatMessageBubble({ item, mine }: { item: ChatMessage; mine: boolean })
 export function ChatRoom({ conversation, onBack }: ChatRoomProps) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
+  const { usesBottomTabs } = useResponsiveLayout();
   const { messages, currentUserId, loading, error, send } = useChatRoom(
     conversation.matchId,
     conversation.otherUserId,
@@ -97,7 +99,15 @@ export function ChatRoom({ conversation, onBack }: ChatRoomProps) {
     loadMore: loadMoreGifs,
     hasMore: hasMoreGifs,
   } = useGifSearch(gifQuery, gifProvider, gifPickerOpen);
-  const bottomClearance = BottomTabInset + insets.bottom;
+  // The bottom tab bar is an absolutely-positioned overlay (app-tabs.tsx) shown
+  // on native AND mobile web (usesBottomTabs), so the input needs real clearance
+  // for it there too - not just the native-only guess BottomTabInset provided.
+  // insets.bottom is only added on native: there, the tab bar floats above a
+  // separate system home-indicator strip. On web the tab bar's bottom:0 already
+  // sits flush with the page's real bottom edge, so adding insets.bottom there
+  // (non-zero under Chrome's device-emulation safe-area simulation) double-counts
+  // and leaves a gap below the input.
+  const bottomClearance = (usesBottomTabs ? TabBarHeight : 0) + (Platform.OS === 'web' ? 0 : insets.bottom);
   const hasDraft = draft.trim().length > 0;
 
   const onSend = () => {

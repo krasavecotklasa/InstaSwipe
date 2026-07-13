@@ -9,7 +9,7 @@ import {
 import { SymbolView } from 'expo-symbols';
 import { Pressable, useColorScheme, View, StyleSheet } from 'react-native';
 import { ThemedText } from './themed-text';
-import { Colors, MaxContentWidth, Spacing } from '@/constants/theme';
+import { Colors, MaxContentWidth, Spacing, TabBarHeight } from '@/constants/theme';
 import { useResponsiveLayout } from '@/hooks/use-responsive-layout';
 
 type TabButtonProps = TabTriggerSlotProps & {
@@ -121,7 +121,7 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     width: '100%',
-    height: 64,
+    height: TabBarHeight,
     padding: 0,
     borderRightWidth: 0,
     borderTopWidth: 0.5,
