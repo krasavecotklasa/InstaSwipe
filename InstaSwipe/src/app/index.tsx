@@ -112,7 +112,7 @@ export default function HomeScreen() {
             data={posts}
             keyExtractor={(item) => item.id}
             renderItem={({ item }) => (
-              <PostCard post={item} onAuthorPress={openAuthorProfile} />
+              <PostCard post={item} onAuthorPress={openAuthorProfile} onMediaProcessing={loadPosts} />
             )}
             ListHeaderComponent={<ComposerEntry onPress={() => setComposerVisible(true)} />}
             contentContainerStyle={styles.listContent}

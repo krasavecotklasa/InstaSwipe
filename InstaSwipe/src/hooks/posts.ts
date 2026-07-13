@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Platform } from 'react-native';
-import type { Post } from '@/components/post-card';
+import type { Post, MediaStatus } from '@/components/post-card';
 import { authorizedFetch, getAccessToken } from '@/hooks/auth';
 import { API_BASE_URL, API_PREFIX, POSTS_BASE_PATH } from '@/hooks/api';
 
@@ -27,6 +27,7 @@ interface BackendPostPayload {
     url?: string;
     filename?: string;
     size?: number;
+    status?: MediaStatus;
   };
   displayName: string;
   profilePictureUrl?: string;
@@ -63,6 +64,7 @@ export const formatPost = (rawPost: BackendPostPayload | Post): Post => {
       url: backendPost.media?.url ?? '',
       filename: backendPost.media?.filename ?? 'post-media',
       size: backendPost.media?.size ?? 0,
+      status: backendPost.media?.status,
     },
     likedByMe: backendPost.likedByMe,
     createdAt: new Date(backendPost.createdAt).toLocaleDateString("bg-BG", {

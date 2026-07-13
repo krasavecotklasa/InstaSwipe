@@ -148,6 +148,8 @@ public class ProfileService {
             throw new IllegalArgumentException("Profile has not been set up yet.");
         }
 
+        Media picture = profile.getProfilePicture();
+
         return new OwnProfileResponse(
                 user.getId(),
                 user.getEmail(),
@@ -157,7 +159,8 @@ public class ProfileService {
                 profile.getCountry(),
                 profile.getGender(),
                 profile.getInterests(),
-                pictureUrl(profile)
+                pictureUrl(profile),
+                picture == null ? null : picture.getStatus()
         );
     }
 
