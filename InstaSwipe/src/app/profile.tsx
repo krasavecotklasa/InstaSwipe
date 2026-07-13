@@ -20,7 +20,7 @@ import { SelectField } from '@/components/form/select-field';
 import { InterestsSelect } from '@/components/form/interests-select';
 import { BottomTabInset, Colors, MaxContentWidth, Spacing } from '@/constants/theme';
 import { COUNTRIES } from '@/constants/countries';
-import { useAuthContext } from '@/hooks/auth-context';
+import { useAuthContext } from '@/context/auth-context';
 import { API, type OwnProfileResponse } from '@/hooks/auth';
 import {
   DISCOVERY_GENDER_LABELS,
