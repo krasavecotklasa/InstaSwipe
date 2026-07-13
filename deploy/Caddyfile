@@ -7,5 +7,11 @@ media.instaswipe.app {
 }
 
 instaswipe.app {
-	reverse_proxy 127.0.0.1:8082
+	handle /instaswipe.apk {
+		root * /opt/instaswipe/downloads
+		file_server
+	}
+	handle {
+		reverse_proxy 127.0.0.1:8082
+	}
 }

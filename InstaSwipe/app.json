@@ -2,6 +2,7 @@
   "expo": {
     "name": "InstaSwipe",
     "slug": "InstaSwipe",
+    "owner": "masurkadim",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -41,6 +42,12 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "d905c258-ae88-4901-9ad9-61893c0d1a6d"
+      }
     }
   }
 }
